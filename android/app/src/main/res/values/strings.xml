@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">柳职教务</string>
+    <string name="title_activity_main">柳职教务</string>
+    <string name="package_name">com.lzpu.jwxt</string>
+    <string name="custom_url_scheme">com.lzpu.jwxt</string>
+</resources>

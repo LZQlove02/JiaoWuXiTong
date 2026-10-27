@@ -1,0 +1,59 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { Capacitor } from '@capacitor/core'
+import { StatusBar, Style } from '@capacitor/status-bar'
+
+const STORAGE_KEY = 'lzpu.theme'
+
+export const useUiStore = defineStore('ui', () => {
+  const theme = ref('system')
+
+  function resolveTheme(value) {
+    if (value === 'light' || value === 'dark') return value
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light'
+  }
+
+  async function syncStatusBar(resolved) {
+    if (!Capacitor.isNativePlatform()) return
+    try {
+      await StatusBar.setOverlaysWebView({ overlay: false })
+      await StatusBar.setBackgroundColor({
+        color: resolved === 'dark' ? '#0f1216' : '#f5f6f8'
+      })
+      await StatusBar.setStyle({
+        style: resolved === 'dark' ? Style.Dark : Style.Light
+      })
+    } catch (error) {
+      // 状态栏在部分设备上不可控，忽略即可
+    }
+  }
+
+  function applyTheme() {
+    const resolved = resolveTheme(theme.value)
+    document.documentElement.dataset.theme = resolved
+    syncStatusBar(resolved)
+  }
+
+  function initTheme() {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved === 'light' || saved === 'dark' || saved === 'system') {
+      theme.value = saved
+    }
+    applyTheme()
+    window
+      .matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', () => {
+        if (theme.value === 'system') applyTheme()
+      })
+  }
+
+  function setTheme(value) {
+    theme.value = value
+    localStorage.setItem(STORAGE_KEY, value)
+    applyTheme()
+  }
+
+  return { theme, initTheme, setTheme }
+})
