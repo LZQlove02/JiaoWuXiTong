@@ -1,6 +1,6 @@
 export const mockUser = {
-  id: '20250010001',
-  name: '张同学',
+  id: '20256030154',
+  name: '丽泽桥',
   className: '2025 级软件技术 1 班',
   major: '软件技术',
   college: '电子信息工程学院',
