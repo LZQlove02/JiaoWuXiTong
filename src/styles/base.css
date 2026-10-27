@@ -82,3 +82,23 @@ a {
   align-items: center;
   justify-content: space-between;
 }
+
+/* 平板与横屏：内容居中限宽，避免元素被拉得过宽 */
+@media (min-width: 768px) {
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .login-page {
+    max-width: 520px;
+    margin: 0 auto;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .page {
+    padding-top: calc(env(safe-area-inset-top) + 8px);
+  }
+}
+

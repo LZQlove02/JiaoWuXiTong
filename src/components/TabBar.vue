@@ -70,4 +70,15 @@ const items = [
 .tab-icon {
   display: flex;
 }
+
+@media (min-width: 768px) {
+  .tab-bar {
+    left: 50%;
+    right: auto;
+    width: 100%;
+    max-width: 760px;
+    transform: translateX(-50%);
+    border-radius: 16px 16px 0 0;
+  }
+}
 </style>
