@@ -34,7 +34,7 @@
       </button>
       <button class="setting-row" @click="showAbout">
         <span class="setting-left"><AppIcon name="info" />关于</span>
-        <span class="tiny">v0.1.0 · M1</span>
+        <span class="tiny">v1.0.3</span>
       </button>
     </section>
 
@@ -43,7 +43,7 @@
       退出登录
     </button>
 
-    <p class="tiny footer">数据来源：柳州职业技术大学教务系统（M1 为模拟数据）</p>
+    <p class="tiny footer">数据来源：柳州职业技术大学教务系统（个人数据为模拟）</p>
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
@@ -86,7 +86,7 @@ function clearCache() {
 }
 
 function showAbout() {
-  showToast('柳职教务 v0.1.0 · M1 演示版')
+  showToast('柳职教务 v1.0.3 演示版')
 }
 
 async function logout() {

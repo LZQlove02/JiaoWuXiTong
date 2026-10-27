@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 与前端背景色保持一致，避免横屏避开挖孔时露出异色边条 -->
+    <color name="appBackground">#F5F6F8</color>
+</resources>

@@ -39,7 +39,7 @@
       <EmptyState v-if="!gradeList.length" title="暂无成绩" description="该学期还没有成绩记录。" />
     </section>
 
-    <p class="tiny footnote">成绩数据为 M1 模拟数据，真实成绩在 M2 接入。</p>
+    <p class="tiny footnote">成绩为模拟数据，真实成绩需接入教务系统。</p>
   </div>
 </template>
 

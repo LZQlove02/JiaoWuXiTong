@@ -27,7 +27,7 @@
       <EmptyState v-if="!examList.length" title="暂无考试安排" description="考试安排发布后会显示在这里。" />
     </div>
 
-    <p class="tiny footnote">M1 模拟数据，真实安排以教务处通知为准。</p>
+    <p class="tiny footnote">模拟数据，真实安排以教务处通知为准。</p>
   </div>
 </template>
 

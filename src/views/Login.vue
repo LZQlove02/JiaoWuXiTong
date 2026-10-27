@@ -35,7 +35,7 @@
         {{ auth.loading ? '登录中…' : '登录' }}
       </button>
 
-      <p class="hint">M1 演示模式：使用模拟数据，任意学号与密码均可登录。</p>
+      <p class="hint">演示模式：使用模拟数据，任意学号与密码均可登录。</p>
     </form>
   </div>
 </template>
