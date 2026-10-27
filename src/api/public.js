@@ -8,6 +8,14 @@ const SECTIONS = {
 
 const CACHE_PREFIX = 'lzpu.cache.public.v1.'
 const CALENDAR_PAGE = `${BASE}/ggfw/xl`
+
+function toHttpsUrl(src) {
+  if (!src) return ''
+  if (src.startsWith('//')) return `https:${src}`
+  if (src.startsWith('http://')) return `https://${src.slice(7)}`
+  if (src.startsWith('https://')) return src
+  return BASE + src
+}
 export const LIST_TTL_MS = 6 * 60 * 60 * 1000
 export const ARTICLE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 export const CALENDAR_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -198,7 +206,7 @@ export async function fetchCalendar() {
   }
 
   const src = image.getAttribute('src') || ''
-  const imageUrl = src.startsWith('http') ? src : BASE + src
+  const imageUrl = toHttpsUrl(src)
   const fetchedAt = new Date().toISOString()
   const cachedAt = Date.now()
 

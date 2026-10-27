@@ -12,8 +12,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
-import okhttp3.Call;
-import okhttp3.Callback;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -25,10 +24,17 @@ public class JwxtHttpPlugin extends Plugin {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-    private final OkHttpClient client = new OkHttpClient.Builder()
+    private static final int MAX_REDIRECTS = 5;
+
+    /**
+     * 公开内容客户端：关闭自动重定向，改为逐跳校验，避免被重定向到
+     * 非白名单主机或明文 HTTP。认证客户端待 6.5 验证后再按同一策略建立。
+     */
+    private final OkHttpClient publicClient = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
-            .followRedirects(true)
+            .followRedirects(false)
+            .followSslRedirects(false)
             .build();
 
     @PluginMethod
@@ -54,23 +60,27 @@ public class JwxtHttpPlugin extends Plugin {
             }
         }
 
-        client.newCall(builder.get().build()).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call requestCall, IOException e) {
-                call.reject(e.getMessage() == null ? "network error" : e.getMessage(), e);
-            }
+        final Request request = builder.get().build();
 
+        try {
+            HttpPolicy.PUBLIC.check(request.url());
+        } catch (IOException e) {
+            call.reject(e.getMessage());
+            return;
+        }
+
+        publicClient.dispatcher().executorService().execute(new Runnable() {
             @Override
-            public void onResponse(Call requestCall, Response response) {
-                try (Response closeable = response) {
-                    String body = closeable.body() == null ? "" : closeable.body().string();
+            public void run() {
+                try (Response response = execute(publicClient, request, HttpPolicy.PUBLIC)) {
+                    String body = response.body() == null ? "" : response.body().string();
                     JSObject result = new JSObject();
-                    result.put("status", closeable.code());
-                    result.put("url", closeable.request().url().toString());
+                    result.put("status", response.code());
+                    result.put("url", response.request().url().toString());
                     result.put("body", body);
                     call.resolve(result);
                 } catch (IOException e) {
-                    call.reject(e.getMessage() == null ? "read error" : e.getMessage(), e);
+                    call.reject(e.getMessage() == null ? "network error" : e.getMessage(), e);
                 }
             }
         });
@@ -86,34 +96,37 @@ public class JwxtHttpPlugin extends Plugin {
             return;
         }
 
-        Request request = new Request.Builder()
+        final Request request = new Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)
                 .build();
 
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call requestCall, IOException e) {
-                call.reject(e.getMessage() == null ? "download failed" : e.getMessage(), e);
-            }
+        try {
+            HttpPolicy.PUBLIC.check(request.url());
+        } catch (IOException e) {
+            call.reject(e.getMessage());
+            return;
+        }
 
+        final String targetName = filename;
+        publicClient.dispatcher().executorService().execute(new Runnable() {
             @Override
-            public void onResponse(Call requestCall, Response response) {
-                try (Response closeable = response) {
-                    if (!closeable.isSuccessful() || closeable.body() == null) {
-                        call.reject("download failed: " + closeable.code());
+            public void run() {
+                try (Response response = execute(publicClient, request, HttpPolicy.PUBLIC)) {
+                    if (!response.isSuccessful() || response.body() == null) {
+                        call.reject("download failed: " + response.code());
                         return;
                     }
-                    File target = new File(getContext().getFilesDir(), filename);
+                    File target = new File(getContext().getFilesDir(), targetName);
                     try (FileOutputStream output = new FileOutputStream(target)) {
-                        output.write(closeable.body().bytes());
+                        output.write(response.body().bytes());
                     }
                     JSObject result = new JSObject();
                     result.put("path", target.getAbsolutePath());
                     result.put("bytes", target.length());
                     call.resolve(result);
                 } catch (IOException e) {
-                    call.reject(e.getMessage() == null ? "write failed" : e.getMessage(), e);
+                    call.reject(e.getMessage() == null ? "download failed" : e.getMessage(), e);
                 }
             }
         });
@@ -130,5 +143,32 @@ public class JwxtHttpPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("exists", file.exists() && file.isFile() && file.length() > 0);
         call.resolve(result);
+    }
+
+    /**
+     * 手动跟随重定向：每一跳都校验协议、端口与允许主机，超过上限直接失败，
+     * 不把请求转发到非白名单目标。
+     */
+    private Response execute(OkHttpClient client, Request request, HttpPolicy policy) throws IOException {
+        Request current = request;
+        for (int i = 0; i <= MAX_REDIRECTS; i++) {
+            policy.check(current.url());
+            Response response = client.newCall(current).execute();
+            if (!isRedirect(response.code())) {
+                return response;
+            }
+            HttpUrl next;
+            try {
+                next = policy.resolveRedirect(current.url(), response.header("Location"));
+            } finally {
+                response.close();
+            }
+            current = current.newBuilder().url(next).build();
+        }
+        throw new IOException("重定向次数过多");
+    }
+
+    private static boolean isRedirect(int code) {
+        return code == 301 || code == 302 || code == 303 || code == 307 || code == 308;
     }
 }
