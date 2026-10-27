@@ -6,6 +6,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
@@ -72,5 +74,61 @@ public class JwxtHttpPlugin extends Plugin {
                 }
             }
         });
+    }
+
+    @PluginMethod
+    public void download(PluginCall call) {
+        String url = call.getString("url");
+        String filename = call.getString("filename");
+        if (url == null || url.isEmpty() || filename == null
+                || !filename.matches("[A-Za-z0-9._-]+")) {
+            call.reject("url and a safe filename are required");
+            return;
+        }
+
+        Request request = new Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call requestCall, IOException e) {
+                call.reject(e.getMessage() == null ? "download failed" : e.getMessage(), e);
+            }
+
+            @Override
+            public void onResponse(Call requestCall, Response response) {
+                try (Response closeable = response) {
+                    if (!closeable.isSuccessful() || closeable.body() == null) {
+                        call.reject("download failed: " + closeable.code());
+                        return;
+                    }
+                    File target = new File(getContext().getFilesDir(), filename);
+                    try (FileOutputStream output = new FileOutputStream(target)) {
+                        output.write(closeable.body().bytes());
+                    }
+                    JSObject result = new JSObject();
+                    result.put("path", target.getAbsolutePath());
+                    result.put("bytes", target.length());
+                    call.resolve(result);
+                } catch (IOException e) {
+                    call.reject(e.getMessage() == null ? "write failed" : e.getMessage(), e);
+                }
+            }
+        });
+    }
+
+    @PluginMethod
+    public void fileExists(PluginCall call) {
+        String path = call.getString("path");
+        if (path == null || path.isEmpty()) {
+            call.reject("path is required");
+            return;
+        }
+        File file = new File(path);
+        JSObject result = new JSObject();
+        result.put("exists", file.exists() && file.isFile() && file.length() > 0);
+        call.resolve(result);
     }
 }

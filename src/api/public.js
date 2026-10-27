@@ -1,4 +1,4 @@
-import { httpGet } from './nativeHttp'
+import { httpGet, downloadFile } from './nativeHttp'
 
 const BASE = 'https://www.lzpu.edu.cn'
 const SECTIONS = {
@@ -48,7 +48,7 @@ export function isCacheExpired(cachedAt, ttl) {
   return Date.now() - cachedAt > ttl
 }
 
-function parseList(html) {
+export function parseArticleList(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const items = []
   doc.querySelectorAll('ul.infoList li').forEach((li) => {
@@ -65,6 +65,32 @@ function parseList(html) {
     })
   })
   return items
+}
+
+export function parseArticle(html, { id, section, url }) {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const container =
+    doc.querySelector('.articleCon') || doc.querySelector('.content.main_content')
+  if (!container) return null
+
+  const heading = container.querySelector('h1, .articleTitle, .title')
+  const paragraphs = Array.from(container.querySelectorAll('p'))
+    .map((item) => item.textContent.trim())
+    .filter(Boolean)
+
+  return {
+    id,
+    section,
+    title:
+      (heading?.textContent || doc.querySelector('h1')?.textContent || '').trim() ||
+      '详情',
+    paragraphs,
+    text: paragraphs.length
+      ? ''
+      : (container.textContent || '').replace(/\s+/g, ' ').trim(),
+    source: '教务处官网',
+    url
+  }
 }
 
 export function getCachedList(section) {
@@ -104,7 +130,7 @@ export async function fetchArticleList(section) {
     throw new Error(`教务处官网返回 ${response.status}`)
   }
 
-  const items = parseList(response.body)
+  const items = parseArticleList(response.body)
   if (!items.length) {
     throw new Error('页面结构变化，未能解析出公告列表')
   }
@@ -130,35 +156,14 @@ export async function fetchArticle(section, id) {
     throw new Error(`教务处官网返回 ${response.status}`)
   }
 
-  const doc = new DOMParser().parseFromString(response.body, 'text/html')
-  const container =
-    doc.querySelector('.articleCon') || doc.querySelector('.content.main_content')
-  if (!container) {
+  const parsed = parseArticle(response.body, { id, section, url })
+  if (!parsed) {
     throw new Error('页面结构变化，未能解析正文')
   }
 
-  const heading = container.querySelector('h1, .articleTitle, .title')
-  const paragraphs = Array.from(container.querySelectorAll('p'))
-    .map((item) => item.textContent.trim())
-    .filter(Boolean)
-
   const fetchedAt = new Date().toISOString()
   const cachedAt = Date.now()
-  const data = {
-    id,
-    section,
-    title:
-      (heading?.textContent || doc.querySelector('h1')?.textContent || '').trim() ||
-      '详情',
-    paragraphs,
-    text: paragraphs.length
-      ? ''
-      : (container.textContent || '').replace(/\s+/g, ' ').trim(),
-    source: '教务处官网',
-    url,
-    fetchedAt,
-    cachedAt
-  }
+  const data = { ...parsed, fetchedAt, cachedAt }
 
   writeCache(articleKey(section, id), data)
   return data
@@ -170,6 +175,7 @@ export function getCachedCalendar() {
   return {
     title: cached.title || '校历',
     imageUrl: cached.imageUrl,
+    localPath: cached.localPath || '',
     pageUrl: cached.pageUrl,
     fetchedAt: cached.fetchedAt,
     cachedAt: cached.cachedAt,
@@ -195,9 +201,21 @@ export async function fetchCalendar() {
   const imageUrl = src.startsWith('http') ? src : BASE + src
   const fetchedAt = new Date().toISOString()
   const cachedAt = Date.now()
+
+  const previous = getCachedCalendar()
+  let localPath =
+    previous && previous.imageUrl === imageUrl ? previous.localPath || '' : ''
+  try {
+    const downloaded = await downloadFile(imageUrl, 'calendar.jpg')
+    localPath = downloaded.path || localPath
+  } catch (error) {
+    // 下载失败时保留旧文件（同图）或退回远程地址
+  }
+
   const data = {
     title: '校历',
     imageUrl,
+    localPath,
     pageUrl: CALENDAR_PAGE,
     fetchedAt,
     cachedAt

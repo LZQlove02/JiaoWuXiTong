@@ -24,6 +24,10 @@ onMounted(() => {
 
   CapApp.addListener('backButton', () => {
     const current = router.currentRoute.value
+    if (ui.hasOverlay) {
+      ui.closeOverlay()
+      return
+    }
     if (current.meta.tab) {
       if (current.path === '/') CapApp.exitApp()
       else router.replace('/')

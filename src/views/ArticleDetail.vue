@@ -15,7 +15,7 @@
 
     <article v-else-if="article" class="card detail">
       <h1 class="detail-title">{{ article.title }}</h1>
-      <p class="tiny meta">教务处官网 · {{ article.id }}</p>
+      <p class="tiny meta">教务处官网</p>
       <div class="divider"></div>
       <p
         v-for="(paragraph, index) in article.paragraphs"

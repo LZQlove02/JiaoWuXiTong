@@ -4,11 +4,7 @@ import {
   mockCourses,
   mockSessions,
   mockGrades,
-  mockExams,
-  mockNotices,
-  mockEvaluations,
-  mockCalendar,
-  mockGuides
+  mockExams
 } from '../mock/data'
 
 const delay = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -70,16 +66,6 @@ export class MockAcademicApi {
     return mockExams.map((item) => ({ ...item }))
   }
 
-  async getNotices() {
-    await delay()
-    return mockNotices.map((item) => ({ ...item }))
-  }
-
-  async getNotice(id) {
-    await delay(120)
-    return mockNotices.find((item) => item.id === id) || null
-  }
-
   async getCourse(id) {
     await delay(120)
     const course = mockCourses.find((item) => item.id === id)
@@ -88,20 +74,5 @@ export class MockAcademicApi {
       ...course,
       sessions: mockSessions.filter((item) => item.courseId === id)
     }
-  }
-
-  async getEvaluations() {
-    await delay()
-    return mockEvaluations.map((item) => ({ ...item }))
-  }
-
-  async getCalendar() {
-    await delay()
-    return mockCalendar.map((item) => ({ ...item }))
-  }
-
-  async getGuides() {
-    await delay()
-    return mockGuides.map((item) => ({ ...item }))
   }
 }

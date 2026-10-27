@@ -3,7 +3,7 @@
     <BackBar title="校历" />
 
     <p v-if="offline" class="cache-tip">
-      网络不可用，显示 {{ updatedLabel }} 的缓存（图片需联网查看{{ expired ? '，缓存已过期' : '' }}）
+      网络不可用，显示 {{ updatedLabel }} 的缓存{{ expired ? '，缓存已过期' : '' }}<template v-if="!localAvailable">（图片需联网查看）</template>
     </p>
 
     <div v-if="loading && !calendar" class="card state">正在加载校历…</div>
@@ -20,7 +20,13 @@
       </div>
 
       <div class="img-box" @click="openViewer">
-        <img :src="calendar.imageUrl" alt="校历" @error="imageError = true" />
+        <img
+          v-if="imageSrc"
+          :src="imageSrc"
+          alt="校历"
+          @load="imageError = false"
+          @error="imageError = true"
+        />
         <p v-if="imageError" class="img-error">图片加载失败，请联网后重试</p>
       </div>
 
@@ -36,23 +42,68 @@
         </button>
       </div>
       <div class="viewer-scroll">
-        <img :src="calendar.imageUrl" alt="校历" :class="{ zoomed: zoom }" />
+        <img :src="imageSrc" alt="校历" :class="{ zoomed: zoom }" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { Capacitor } from '@capacitor/core'
 import { usePublicCalendar } from '../composables/usePublicContent'
+import { fileExists } from '../api/nativeHttp'
+import { useUiStore } from '../stores/ui'
 import BackBar from '../components/BackBar.vue'
 
+const ui = useUiStore()
 const { calendar, loading, error, offline, expired, updatedLabel, hydrate, load } =
   usePublicCalendar()
 
 const viewer = ref(false)
 const zoom = ref(false)
 const imageError = ref(false)
+const imageSrc = ref('')
+const localAvailable = ref(false)
+
+async function resolveImage() {
+  const item = calendar.value
+  imageError.value = false
+  localAvailable.value = false
+  if (!item) {
+    imageSrc.value = ''
+    return
+  }
+  if (item.localPath && Capacitor.isNativePlatform()) {
+    try {
+      const result = await fileExists(item.localPath)
+      if (result.exists) {
+        localAvailable.value = true
+        imageSrc.value = `${Capacitor.convertFileSrc(item.localPath)}?v=${
+          item.cachedAt || ''
+        }`
+        return
+      }
+    } catch (error) {
+      // 本地文件不可用时退回远程地址
+    }
+  }
+  imageSrc.value = item.imageUrl
+}
+
+watch(calendar, resolveImage, { immediate: true })
+
+watch(viewer, (open) => {
+  if (open) {
+    ui.setOverlayCloser(() => {
+      viewer.value = false
+    })
+  } else {
+    ui.clearOverlayCloser()
+  }
+})
+
+onUnmounted(() => ui.clearOverlayCloser())
 
 function openViewer() {
   if (imageError.value) return

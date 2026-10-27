@@ -9,3 +9,15 @@ export async function httpGet(url, headers = {}) {
   const result = await JwxtHttp.get({ url, headers })
   return result
 }
+
+export async function downloadFile(url, filename) {
+  if (!Capacitor.isNativePlatform()) {
+    throw new Error('原生下载仅在 App 内可用')
+  }
+  return JwxtHttp.download({ url, filename })
+}
+
+export async function fileExists(path) {
+  if (!Capacitor.isNativePlatform()) return { exists: false }
+  return JwxtHttp.fileExists({ path })
+}

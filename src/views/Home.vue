@@ -5,7 +5,7 @@
         <p class="tiny">{{ greetingText }}，{{ auth.user?.name }}</p>
         <div class="title-line">
           <h1 class="page-title">柳职教务</h1>
-          <span v-if="isMock" class="mock-badge">模拟数据</span>
+          <span v-if="isMock" class="mock-badge">课表/成绩为模拟</span>
         </div>
         <p class="tiny">{{ currentTerm?.label }} · {{ weekLabel }}</p>
       </div>
@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -104,8 +104,10 @@ const {
   load: loadNotices
 } = usePublicList('tzgg')
 
-const greetingText = greeting()
-const weekday = getWeekday()
+const now = ref(new Date())
+let clockTimer = null
+const greetingText = computed(() => greeting(now.value.getHours()))
+const weekday = computed(() => getWeekday(now.value))
 
 const entries = [
   { path: '/exams', label: '考试', desc: '考试安排', icon: 'exam', color: '#C0392B' },
@@ -119,18 +121,20 @@ const entries = [
 const avatarText = computed(() => (auth.user?.name || '我').slice(-1))
 
 const week = computed(() =>
-  currentTerm.value ? getWeekNumber(currentTerm.value.startDate) : 1
+  currentTerm.value ? getWeekNumber(currentTerm.value.startDate, now.value) : 1
 )
 
 const weekLabel = computed(() => {
-  const date = formatDate()
-  return `${date} 周${['一', '二', '三', '四', '五', '六', '日'][weekday - 1]} · 第 ${week.value} 周`
+  const date = formatDate(now.value)
+  return `${date} 周${['一', '二', '三', '四', '五', '六', '日'][weekday.value - 1]} · 第 ${week.value} 周`
 })
 
 const todayCourses = computed(() => {
   const sessions = schedule.value?.sessions || []
   return sessions
-    .filter((item) => item.weekday === weekday && item.weeks.includes(week.value))
+    .filter(
+      (item) => item.weekday === weekday.value && item.weeks.includes(week.value)
+    )
     .sort((a, b) => a.startSection - b.startSection)
 })
 
@@ -154,11 +158,18 @@ function go(path) {
 }
 
 onMounted(async () => {
+  clockTimer = setInterval(() => {
+    now.value = new Date()
+  }, 60 * 1000)
   await academic.initTerms()
   academic.loadSchedule()
   academic.loadExams()
   hydrateNotices()
   await loadNotices()
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
 })
 </script>
 

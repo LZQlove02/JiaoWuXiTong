@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 
@@ -7,6 +7,22 @@ const STORAGE_KEY = 'lzpu.theme'
 
 export const useUiStore = defineStore('ui', () => {
   const theme = ref('system')
+  const overlayCloser = ref(null)
+  const hasOverlay = computed(() => Boolean(overlayCloser.value))
+
+  function setOverlayCloser(closer) {
+    overlayCloser.value = closer
+  }
+
+  function clearOverlayCloser() {
+    overlayCloser.value = null
+  }
+
+  function closeOverlay() {
+    const closer = overlayCloser.value
+    overlayCloser.value = null
+    if (typeof closer === 'function') closer()
+  }
 
   function resolveTheme(value) {
     if (value === 'light' || value === 'dark') return value
@@ -55,5 +71,5 @@ export const useUiStore = defineStore('ui', () => {
     applyTheme()
   }
 
-  return { theme, initTheme, setTheme }
+  return { theme, hasOverlay, setOverlayCloser, clearOverlayCloser, closeOverlay, initTheme, setTheme }
 })

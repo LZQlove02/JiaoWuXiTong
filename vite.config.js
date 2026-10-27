@@ -5,5 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     host: true
+  },
+  test: {
+    environment: 'happy-dom'
   }
 })
