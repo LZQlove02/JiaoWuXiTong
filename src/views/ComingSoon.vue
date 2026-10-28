@@ -6,7 +6,6 @@
       <span class="icon-wrap">
         <AppIcon :name="meta.icon" />
       </span>
-      <h2 class="title">{{ meta.title }}</h2>
       <p class="badge">建设中</p>
       <p class="desc">{{ meta.desc }}</p>
     </section>
@@ -47,12 +46,6 @@ const meta = computed(() => ({
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 4px;
 }
 
 .badge {

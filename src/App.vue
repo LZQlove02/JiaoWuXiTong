@@ -1,6 +1,6 @@
 <template>
   <div v-if="auth.restoring" class="boot">
-    <div class="boot-logo">柳</div>
+    <img class="boot-logo" src="./assets/app-icon.png" alt="" />
     <p class="boot-text">正在恢复登录状态…</p>
   </div>
   <div v-else class="app-shell">
@@ -71,13 +71,7 @@ onMounted(() => {
   width: 64px;
   height: 64px;
   border-radius: 18px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 30px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
 }
 
 .boot-text {

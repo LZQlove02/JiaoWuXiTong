@@ -1,6 +1,5 @@
 :root {
   --brand: #1B5FAA;
-  --brand-strong: #14497F;
   --brand-soft: rgba(27, 95, 170, 0.1);
   --bg: #f5f6f8;
   --card: #ffffff;
@@ -19,7 +18,6 @@
 
 [data-theme='dark'] {
   --brand: #4a9be8;
-  --brand-strong: #2f7fc7;
   --brand-soft: rgba(74, 155, 232, 0.16);
   --bg: #0f1216;
   --card: #171b20;

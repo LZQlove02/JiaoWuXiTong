@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { api, resetAcademicApi, setAcademicApi } from '../api'
+import { resetAcademicApi, setAcademicApi } from '../api'
 import { ZfAcademicApi, clearScheduleSnapshot } from '../api/zf'
 import { clearAuthCookies, loadAuthCookies } from '../api/nativeHttp'
 
-const STORAGE_KEY = 'lzpu.session'
 const RESTORE_TIMEOUT_MS = 15000
 
 // 冷启动恢复会话最多等待 15 秒，避免弱网时首屏长时间停在启动页
@@ -31,21 +30,13 @@ function restoreWithTimeout(api) {
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const loading = ref(false)
-  const sessionMode = ref('mock')
   const restoring = ref(false)
   const isLoggedIn = computed(() => Boolean(user.value))
   let bootstrapPromise = null
 
-  function restore() {
-    sessionMode.value = 'mock'
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) return
-      const saved = JSON.parse(raw)
-      if (saved && saved.user) user.value = saved.user
-    } catch (error) {
-      localStorage.removeItem(STORAGE_KEY)
-    }
+  async function resetAcademic() {
+    const { useAcademicStore } = await import('./academic')
+    useAcademicStore().reset()
   }
 
   async function restoreSession() {
@@ -68,14 +59,12 @@ export const useAuthStore = defineStore('auth', () => {
       // 仅在服务端明确判定会话失效时清除凭据；网络不可达或解析失败时保留，避免误登出
       if (error?.sessionExpired) await clearAuthCookies()
     }
-    restore()
-    return isLoggedIn.value
+    return false
   }
 
   function applyZfSession(zf, profile) {
     setAcademicApi(zf)
     user.value = profile
-    sessionMode.value = 'sso'
   }
 
   // 后台静默校验：成功则刷新页面数据，会话失效则清理并退回登录页
@@ -94,7 +83,6 @@ export const useAuthStore = defineStore('auth', () => {
         clearScheduleSnapshot()
         resetAcademicApi()
         user.value = null
-        sessionMode.value = 'mock'
       })
   }
 
@@ -111,23 +99,6 @@ export const useAuthStore = defineStore('auth', () => {
     return bootstrapPromise
   }
 
-  async function login(username, password) {
-    loading.value = true
-    try {
-      resetAcademicApi()
-      const profile = await api.login(username, password)
-      sessionMode.value = 'mock'
-      user.value = profile
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ user: profile, loginAt: Date.now() })
-      )
-      return profile
-    } finally {
-      loading.value = false
-    }
-  }
-
   async function loginWithSso() {
     loading.value = true
     try {
@@ -135,11 +106,8 @@ export const useAuthStore = defineStore('auth', () => {
       const zf = new ZfAcademicApi()
       const profile = await zf.loginWithSso()
       setAcademicApi(zf)
-      const { useAcademicStore } = await import('./academic')
-      useAcademicStore().reset()
+      await resetAcademic()
       user.value = profile
-      sessionMode.value = 'sso'
-      localStorage.removeItem(STORAGE_KEY)
       return profile
     } catch (error) {
       // 登录后校验未通过时丢弃这次无效会话，避免把坏 Cookie 留到下次启动
@@ -155,21 +123,16 @@ export const useAuthStore = defineStore('auth', () => {
     await clearAuthCookies()
     clearScheduleSnapshot()
     resetAcademicApi()
-    sessionMode.value = 'mock'
     user.value = null
-    localStorage.removeItem(STORAGE_KEY)
+    await resetAcademic()
   }
 
   return {
     user,
     loading,
-    sessionMode,
     restoring,
     isLoggedIn,
-    restore,
-    restoreSession,
     bootstrap,
-    login,
     loginWithSso,
     logout
   }

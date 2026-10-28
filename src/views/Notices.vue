@@ -7,14 +7,14 @@
     </p>
     <p v-else-if="loading && items.length" class="cache-tip">正在刷新…</p>
 
-    <div v-if="loading && !items.length" class="card state">正在加载教务处公告…</div>
+    <LoadState
+      :loading="loading && !items.length"
+      :error="error"
+      loading-text="正在加载教务处公告…"
+      @retry="load"
+    />
 
-    <div v-else-if="error" class="card state">
-      <p class="error-text">{{ error }}</p>
-      <button class="retry" @click="load">重新加载</button>
-    </div>
-
-    <section v-else class="card list">
+    <section v-if="!error && !(loading && !items.length)" class="card list">
       <button
         v-for="item in items"
         :key="item.id"
@@ -43,6 +43,7 @@ import { usePublicList } from '../composables/usePublicContent'
 import BackBar from '../components/BackBar.vue'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
+import LoadState from '../components/LoadState.vue'
 
 const router = useRouter()
 const { items, loading, error, offline, expired, updatedLabel, hydrate, load } =
@@ -59,33 +60,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.cache-tip {
-  font-size: 12px;
-  color: var(--warning);
-  margin-bottom: 10px;
-  text-align: center;
-}
-
-.state {
-  text-align: center;
-  color: var(--text-secondary);
-  padding: 32px 16px;
-}
-
-.error-text {
-  color: var(--danger);
-  font-size: 14px;
-  margin-bottom: 12px;
-}
-
-.retry {
-  padding: 8px 18px;
-  border-radius: 20px;
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-size: 14px;
-}
-
 .list {
   padding: 4px 16px;
 }
@@ -115,10 +89,5 @@ onMounted(() => {
   line-height: 1.45;
   color: var(--text);
   margin-bottom: 4px;
-}
-
-.footnote {
-  margin-top: 14px;
-  text-align: center;
 }
 </style>

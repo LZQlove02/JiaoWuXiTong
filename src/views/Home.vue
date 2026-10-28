@@ -2,11 +2,10 @@
   <div class="page">
     <header class="row header">
       <div>
-        <p class="tiny">{{ greetingText }}，{{ auth.user?.name }}</p>
+        <p class="tiny">{{ greetingText }}，{{ auth.user?.name || '同学' }}</p>
         <div class="title-line">
           <h1 class="page-title">柳职教务</h1>
-          <span v-if="isMock" class="mock-badge">课表/成绩为模拟</span>
-          <span v-else-if="isOffline" class="mock-badge">课表来自离线缓存</span>
+          <span v-if="isOffline" class="pill pill--warning">课表离线缓存</span>
         </div>
         <p class="tiny">{{ currentTerm?.label }} · {{ weekLabel }}</p>
       </div>
@@ -15,10 +14,11 @@
 
     <section class="card today-card">
       <div class="row">
-        <h2 class="section-title" style="margin: 0">今日课程</h2>
+        <h2 class="card-title">今日课程</h2>
         <router-link to="/schedule" class="link">查看课表</router-link>
       </div>
-      <div v-if="todayCourses.length" class="today-list">
+      <div v-if="academic.loading && !schedule" class="loading">正在加载今日课程…</div>
+      <div v-else-if="todayCourses.length" class="today-list">
         <div v-for="item in todayCourses" :key="item.courseId + item.startSection" class="course-row">
           <span class="course-time">{{ sectionRange(item.startSection, item.endSection) }}</span>
           <div class="course-main">
@@ -27,6 +27,14 @@
           </div>
         </div>
       </div>
+      <EmptyState
+        v-else-if="!hasSchedule"
+        icon="calendar"
+        :title="errors.schedule ? '课表加载失败' : '课表暂无课程'"
+        :description="errors.schedule || '课表同步后会显示在这里。'"
+        :action-label="errors.schedule ? '重试' : ''"
+        @action="academic.loadSchedule()"
+      />
       <EmptyState v-else icon="calendar" title="今天没有课" description="好好休息，或者去图书馆看看。" />
     </section>
 
@@ -57,7 +65,7 @@
 
     <section class="card notice-card">
       <div class="row">
-        <h2 class="section-title" style="margin: 0">最新通知</h2>
+        <h2 class="card-title">最新通知</h2>
         <router-link to="/notices" class="link">全部</router-link>
       </div>
       <p class="tiny source">
@@ -84,7 +92,6 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
-import { hasAnyImport } from '../api'
 import { usePublicList } from '../composables/usePublicContent'
 import { daysUntil, formatDate, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
 import AppIcon from '../components/AppIcon.vue'
@@ -93,9 +100,9 @@ import EmptyState from '../components/EmptyState.vue'
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const router = useRouter()
-const { schedule, exams, currentTerm } = storeToRefs(academic)
-const isMock = computed(() => !hasAnyImport() && auth.sessionMode !== 'sso')
+const { schedule, exams, currentTerm, errors } = storeToRefs(academic)
 const isOffline = computed(() => Boolean(schedule.value?.source?.includes('离线')))
+const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
 
 const {
   items: publicNotices,
@@ -186,14 +193,6 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.mock-badge {
-  font-size: 11px;
-  color: var(--warning);
-  background: var(--card-muted);
-  padding: 2px 8px;
-  border-radius: 20px;
-}
-
 .avatar {
   width: 42px;
   height: 42px;
@@ -220,6 +219,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.loading {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .course-row {

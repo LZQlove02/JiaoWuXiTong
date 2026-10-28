@@ -6,18 +6,15 @@
       网络不可用，显示 {{ updatedLabel }} 的缓存{{ expired ? '，缓存已过期' : '' }}<template v-if="!localAvailable">（图片需联网查看）</template>
     </p>
 
-    <div v-if="loading && !calendar" class="card state">正在加载校历…</div>
+    <LoadState
+      :loading="loading && !calendar"
+      :error="error"
+      loading-text="正在加载校历…"
+      @retry="load"
+    />
 
-    <div v-else-if="error" class="card state">
-      <p class="error-text">{{ error }}</p>
-      <button class="retry" @click="load">重新加载</button>
-    </div>
-
-    <section v-else-if="calendar" class="card">
-      <div class="head">
-        <p class="head-title">校历</p>
-        <p class="tiny">来源：柳州职业技术大学官网</p>
-      </div>
+    <section v-if="calendar && !error" class="card">
+      <p class="tiny calendar-source">来源：柳州职业技术大学官网</p>
 
       <div class="img-box" @click="openViewer">
         <img
@@ -55,6 +52,7 @@ import { usePublicCalendar } from '../composables/usePublicContent'
 import { fileExists } from '../api/nativeHttp'
 import { useUiStore } from '../stores/ui'
 import BackBar from '../components/BackBar.vue'
+import LoadState from '../components/LoadState.vue'
 
 const ui = useUiStore()
 const { calendar, loading, error, offline, expired, updatedLabel, hydrate, load } =
@@ -118,40 +116,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.cache-tip {
-  font-size: 12px;
-  color: var(--warning);
-  margin-bottom: 10px;
-  text-align: center;
-}
-
-.state {
-  text-align: center;
-  color: var(--text-secondary);
-  padding: 32px 16px;
-}
-
-.error-text {
-  color: var(--danger);
-  font-size: 14px;
+.calendar-source {
   margin-bottom: 12px;
-}
-
-.retry {
-  padding: 8px 18px;
-  border-radius: 20px;
-  background: var(--brand-soft);
-  color: var(--brand);
-  font-size: 14px;
-}
-
-.head {
-  margin-bottom: 12px;
-}
-
-.head-title {
-  font-size: 17px;
-  font-weight: 600;
 }
 
 .img-box {

@@ -1,47 +1,18 @@
 <template>
   <div class="login-page">
     <div class="brand">
-      <div class="logo">柳</div>
+      <img class="logo" src="../assets/app-icon.png" alt="柳职教务" />
       <h1 class="brand-title">柳职教务</h1>
       <p class="brand-sub">柳州职业技术大学 · 教务助手</p>
     </div>
 
-    <form class="card login-card" @submit.prevent="submit">
-      <button class="sso" type="button" :disabled="auth.loading || ssoLoading" @click="ssoLogin">
-        {{ ssoLoading ? '正在打开统一认证…' : '学校统一认证登录' }}
+    <section class="card login-card">
+      <button class="sso" type="button" :disabled="auth.loading" @click="ssoLogin">
+        {{ auth.loading ? '正在打开统一认证…' : '学校统一认证登录' }}
       </button>
-      <p class="divider">或使用演示模式</p>
-
-      <label class="field">
-        <span class="field-label">学号</span>
-        <input
-          v-model.trim="username"
-          class="field-input"
-          inputmode="numeric"
-          placeholder="请输入学号"
-          autocomplete="username"
-        />
-      </label>
-
-      <label class="field">
-        <span class="field-label">密码</span>
-        <input
-          v-model="password"
-          class="field-input"
-          type="password"
-          placeholder="请输入密码"
-          autocomplete="current-password"
-        />
-      </label>
-
+      <p class="hint">登录后可查看实时课表。</p>
       <p v-if="error" class="error">{{ error }}</p>
-
-      <button class="submit" type="submit" :disabled="auth.loading">
-        {{ auth.loading ? '登录中…' : '登录' }}
-      </button>
-
-      <p class="hint">演示模式：使用模拟数据，任意学号与密码均可登录。</p>
-    </form>
+    </section>
   </div>
 </template>
 
@@ -53,36 +24,15 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
-
-const username = ref('')
-const password = ref('')
 const error = ref('')
-const ssoLoading = ref(false)
 
 async function ssoLogin() {
   error.value = ''
-  ssoLoading.value = true
   try {
     await auth.loginWithSso()
     router.replace(route.query.redirect || '/')
   } catch (err) {
     error.value = err.message || '统一认证登录失败'
-  } finally {
-    ssoLoading.value = false
-  }
-}
-
-async function submit() {
-  error.value = ''
-  if (!username.value || !password.value) {
-    error.value = '请输入学号和密码'
-    return
-  }
-  try {
-    await auth.login(username.value, password.value)
-    router.replace(route.query.redirect || '/')
-  } catch (err) {
-    error.value = err.message || '登录失败，请重试'
   }
 }
 </script>
@@ -105,13 +55,7 @@ async function submit() {
   height: 64px;
   margin: 0 auto 14px;
   border-radius: 18px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 30px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
 }
 
 .brand-title {
@@ -144,67 +88,18 @@ async function submit() {
   opacity: 0.6;
 }
 
-.divider {
-  margin: 14px 0 16px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.field {
-  display: block;
-  margin-bottom: 16px;
-}
-
-.field-label {
-  display: block;
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-.field-input {
-  width: 100%;
-  height: 46px;
-  padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card-muted);
-  color: var(--text);
-  font-size: 15px;
-  outline: none;
-}
-
-.field-input:focus {
-  border-color: var(--brand);
-  background: var(--card);
-}
-
-.error {
-  color: var(--danger);
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
-.submit {
-  width: 100%;
-  height: 48px;
-  border-radius: 12px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.submit:disabled {
-  opacity: 0.6;
-}
-
 .hint {
-  margin-top: 14px;
+  margin-top: 16px;
   font-size: 12px;
   color: var(--text-tertiary);
   text-align: center;
   line-height: 1.6;
+}
+
+.error {
+  margin-top: 12px;
+  color: var(--danger);
+  font-size: 13px;
+  text-align: center;
 }
 </style>

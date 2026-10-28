@@ -10,7 +10,7 @@
       </button>
     </header>
 
-    <div class="week-bar card">
+    <div v-if="hasSchedule" class="week-bar card">
       <button class="week-btn" aria-label="上一周" @click="changeWeek(-1)">
         <AppIcon name="chevron-left" />
       </button>
@@ -24,6 +24,16 @@
     </div>
 
     <div v-if="academic.loading && !schedule" class="card loading">正在加载课表…</div>
+
+    <div v-else-if="!hasSchedule" class="card empty-card">
+      <EmptyState
+        icon="calendar"
+        :title="emptyTitle"
+        :description="emptyDescription"
+        :action-label="emptyActionLabel"
+        @action="emptyAction"
+      />
+    </div>
 
     <div v-else class="timetable-wrap card">
       <div class="timetable">
@@ -62,12 +72,12 @@
       </div>
     </div>
 
-    <p v-if="errors.schedule" class="load-error">
+    <p v-if="errors.schedule && hasSchedule" class="load-error">
       {{ errors.schedule }}
       <button class="retry" @click="reloadSchedule">重试</button>
     </p>
 
-    <p class="tiny legend">
+    <p v-if="hasSchedule" class="tiny legend">
       左右滑动查看周末 · 点击课程查看详情 ·
       {{ sourceLabel }}
     </p>
@@ -81,6 +91,7 @@ import { useRouter } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
 import { SECTION_TIMES, WEEKDAY_LABELS, formatDate, getWeekNumber, getWeekday } from '../utils/date'
 import AppIcon from '../components/AppIcon.vue'
+import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
 const router = useRouter()
@@ -92,7 +103,7 @@ let clockTimer = null
 const todayWeekday = computed(() => getWeekday(now.value))
 const currentWeek = computed(() =>
   currentTerm.value
-    ? Math.min(getWeekNumber(currentTerm.value.startDate, now.value), 20)
+    ? Math.min(Math.max(getWeekNumber(currentTerm.value.startDate, now.value), 1), 20)
     : 1
 )
 const selectedWeek = ref(1)
@@ -122,9 +133,23 @@ const visibleSessions = computed(() => {
   return sessions.filter((item) => item.weeks.includes(selectedWeek.value))
 })
 
+const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
+
 const sourceLabel = computed(() =>
-  schedule.value?.source ? `数据来源：${schedule.value.source}` : '数据来源：模拟数据'
+  schedule.value?.source ? `数据来源：${schedule.value.source}` : '数据来源：课表尚未同步'
 )
+
+const emptyTitle = computed(() => (errors.value.schedule ? '课表加载失败' : '课表暂无课程'))
+
+const emptyDescription = computed(
+  () => errors.value.schedule || '课表同步后会显示在这里。'
+)
+
+const emptyActionLabel = computed(() => (errors.value.schedule ? '重试' : ''))
+
+function emptyAction() {
+  reloadSchedule()
+}
 
 function courseName(courseId) {
   const course = schedule.value?.courses?.find((item) => item.id === courseId)
@@ -147,7 +172,7 @@ function openCourse(id) {
 }
 
 function reloadSchedule() {
-  academic.loadSchedule()
+  academic.loadSchedule(currentTerm.value)
 }
 
 onMounted(async () => {
@@ -155,7 +180,7 @@ onMounted(async () => {
     now.value = new Date()
   }, 60 * 1000)
   await academic.initTerms()
-  if (!schedule.value) await academic.loadSchedule()
+  if (!schedule.value) await academic.loadSchedule(currentTerm.value)
   selectedWeek.value = currentWeek.value
 })
 
@@ -311,6 +336,10 @@ onUnmounted(() => {
 .legend {
   margin-top: 10px;
   text-align: center;
+}
+
+.empty-card {
+  margin-top: 12px;
 }
 
 .load-error {

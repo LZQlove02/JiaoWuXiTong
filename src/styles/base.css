@@ -68,13 +68,64 @@ a {
   margin: 20px 0 10px;
 }
 
-.muted {
-  color: var(--text-secondary);
-}
-
 .tiny {
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+/* 公开内容页共用的加载、错误与缓存提示 */
+.cache-tip {
+  font-size: 12px;
+  color: var(--warning);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.state {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 32px 16px;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.retry {
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 14px;
+}
+
+.footnote {
+  margin-top: 14px;
+  text-align: center;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--card-muted);
+}
+
+.pill--warning {
+  color: var(--warning);
+}
+
+.card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .row {

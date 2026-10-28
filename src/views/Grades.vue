@@ -1,15 +1,8 @@
 <template>
   <div class="page">
-    <header class="row">
-      <h1 class="page-title">成绩</h1>
-      <select v-model="termIndex" class="term-select" @change="changeTerm">
-        <option v-for="(term, index) in terms" :key="term.label" :value="index">
-          {{ term.label }}
-        </option>
-      </select>
-    </header>
+    <h1 class="page-title">成绩</h1>
 
-    <section v-if="summary" class="card summary">
+    <section v-if="summary && summary.count" class="card summary">
       <div class="stat">
         <span class="stat-value">{{ summary.gpa.toFixed(2) }}</span>
         <span class="tiny">平均学分绩点</span>
@@ -36,59 +29,39 @@
           {{ item.score }}
         </span>
       </div>
-      <EmptyState v-if="!gradeList.length" title="暂无成绩" description="该学期还没有成绩记录。" />
+      <EmptyState
+        v-if="!gradeList.length"
+        icon="book"
+        :title="emptyTitle"
+        :description="emptyDescription"
+      />
     </section>
-
-    <p v-if="errors.grades" class="tiny footnote">{{ errors.grades }}</p>
-    <p v-else class="tiny footnote">
-      {{
-        grades?.source
-          ? '真实数据（网页导入）'
-          : '成绩为模拟数据，可在「我的 → 导入成绩」接入网页数据。'
-      }}
-    </p>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAcademicStore } from '../stores/academic'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { terms, grades, loading, errors } = storeToRefs(academic)
-const termIndex = ref(0)
+const { grades, loading, errors } = storeToRefs(academic)
 
 const gradeList = computed(() => grades.value?.grades || [])
 const summary = computed(() => grades.value?.summary || null)
-
-function changeTerm() {
-  const term = terms.value[termIndex.value]
-  if (term) academic.loadGrades(term)
-}
+const emptyTitle = computed(() => (errors.value.grades ? '成绩暂不可用' : '暂无成绩'))
+const emptyDescription = computed(
+  () => errors.value.grades || '该学期还没有成绩记录。'
+)
 
 onMounted(async () => {
   await academic.initTerms()
-  const index = terms.value.findIndex((item) => item.isCurrent)
-  termIndex.value = index >= 0 ? index : 0
-  if (!grades.value) await academic.loadGrades(terms.value[termIndex.value])
+  await academic.loadGrades()
 })
 </script>
 
 <style scoped>
-.term-select {
-  height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-  font-size: 12px;
-  outline: none;
-  max-width: 180px;
-}
-
 .summary {
   margin-top: 14px;
   display: flex;
@@ -146,10 +119,5 @@ onMounted(async () => {
 
 .grade-score.failed {
   color: var(--danger);
-}
-
-.footnote {
-  margin-top: 14px;
-  text-align: center;
 }
 </style>

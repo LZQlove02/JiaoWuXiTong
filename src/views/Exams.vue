@@ -24,17 +24,13 @@
           </p>
         </div>
       </article>
-      <EmptyState v-if="!examList.length" title="暂无考试安排" description="考试安排发布后会显示在这里。" />
+      <EmptyState
+        v-if="!examList.length"
+        icon="exam"
+        :title="emptyTitle"
+        :description="emptyDescription"
+      />
     </div>
-
-    <p v-if="errors.exams" class="tiny footnote">{{ errors.exams }}</p>
-    <p v-else class="tiny footnote">
-      {{
-        exams.source
-          ? '真实数据（网页导入）'
-          : '模拟数据，真实安排以教务处通知为准。'
-      }}
-    </p>
   </div>
 </template>
 
@@ -62,6 +58,14 @@ const examList = computed(() =>
     })
 )
 
+const emptyTitle = computed(() =>
+  errors.value.exams ? '考试安排暂不可用' : '暂无考试安排'
+)
+
+const emptyDescription = computed(
+  () => errors.value.exams || '考试安排发布后会显示在这里。'
+)
+
 function monthOf(item) {
   return item.dated ? `${Number(item.date.slice(5, 7))} 月` : '日期'
 }
@@ -80,7 +84,7 @@ function countdownText(days) {
 
 onMounted(async () => {
   await academic.initTerms()
-  if (!exams.value.length) await academic.loadExams()
+  await academic.loadExams()
 })
 </script>
 
@@ -163,10 +167,5 @@ onMounted(async () => {
   gap: 4px;
   font-size: 12px;
   color: var(--text-secondary);
-}
-
-.footnote {
-  margin-top: 16px;
-  text-align: center;
 }
 </style>

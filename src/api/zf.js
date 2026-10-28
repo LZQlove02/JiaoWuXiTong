@@ -1,5 +1,5 @@
 import { authGet, loginWithSso as nativeSsoLogin, setAuthCookies } from './nativeHttp'
-import { parseWeeks } from './importer'
+import { buildTerm, termParamsFor } from '../utils/term'
 
 const COURSE_COLORS = ['#1B5FAA', '#2F855A', '#B7791F', '#805AD5', '#C05621', '#2C7A7B']
 const SCHEDULE_ENDPOINT = 'https://zfjw.lzzy.net/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151'
@@ -37,12 +37,22 @@ export function clearScheduleSnapshot() {
   localStorage.removeItem(SNAPSHOT_KEY)
 }
 
-function termParamsFor(date = new Date()) {
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1
-  if (month >= 8) return { xnm: String(year), xqm: '3' }
-  if (month === 1) return { xnm: String(year - 1), xqm: '3' }
-  return { xnm: String(year - 1), xqm: '12' }
+function parseWeeks(text) {
+  if (!text) return Array.from({ length: 16 }, (_, index) => index + 1)
+  const weeks = new Set()
+  for (const match of text.matchAll(/(\d+)\s*[-~至]\s*(\d+)\s*周?/g)) {
+    const start = Number(match[1])
+    const end = Number(match[2])
+    for (let week = start; week <= end; week += 1) weeks.add(week)
+  }
+  for (const match of text.matchAll(/(\d+)\s*周/g)) {
+    weeks.add(Number(match[1]))
+  }
+  let result = [...weeks].sort((a, b) => a - b)
+  if (!result.length) result = Array.from({ length: 16 }, (_, index) => index + 1)
+  if (/单/.test(text) && !/双/.test(text)) result = result.filter((week) => week % 2 === 1)
+  if (/双/.test(text) && !/单/.test(text)) result = result.filter((week) => week % 2 === 0)
+  return result
 }
 
 function parseSections(text) {
@@ -77,7 +87,7 @@ function mapTerm(xsxx, params) {
     xnm,
     xqm,
     label: `${yearLabel} 学年${termLabel}`,
-    startDate: xqm === '3' ? `${xnm}-08-31` : `${Number(xnm) + 1}-02-23`,
+    startDate: buildTerm(xnm, xqm).startDate,
     isCurrent: true
   }
 }
@@ -116,6 +126,8 @@ export function mapSchedule(payload, term) {
 }
 
 export class ZfAcademicApi {
+  remote = true
+
   constructor() {
     this.profile = null
     this.term = null
@@ -256,11 +268,11 @@ export class ZfAcademicApi {
   }
 
   async getGrades() {
-    throw new Error('成绩接口尚未接入，当前不显示模拟成绩')
+    throw new Error('成绩接口尚未接入，暂不可用')
   }
 
   async getExams() {
-    throw new Error('考试接口尚未接入，当前不显示模拟考试')
+    throw new Error('考试接口尚未接入，暂不可用')
   }
 
   async getCourse(id) {

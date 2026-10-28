@@ -4,7 +4,6 @@
       <AppIcon name="arrow-left" />
     </button>
     <h1 class="bar-title">{{ title }}</h1>
-    <span class="bar-right"></span>
   </header>
 </template>
 
@@ -33,6 +32,12 @@ function goBack() {
   padding: 0 8px;
 }
 
+.back-bar::after {
+  content: '';
+  width: 40px;
+  flex: none;
+}
+
 .back-btn {
   width: 40px;
   height: 40px;
@@ -47,9 +52,5 @@ function goBack() {
   text-align: center;
   font-size: 17px;
   font-weight: 600;
-}
-
-.bar-right {
-  width: 40px;
 }
 </style>

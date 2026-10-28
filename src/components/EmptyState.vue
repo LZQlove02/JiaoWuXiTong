@@ -2,7 +2,10 @@
   <div class="empty">
     <AppIcon :name="icon" />
     <p class="empty-title">{{ title }}</p>
-    <p class="empty-desc">{{ description }}</p>
+    <p v-if="description" class="empty-desc">{{ description }}</p>
+    <button v-if="actionLabel" class="empty-action" type="button" @click="$emit('action')">
+      {{ actionLabel }}
+    </button>
   </div>
 </template>
 
@@ -12,8 +15,11 @@ import AppIcon from './AppIcon.vue'
 defineProps({
   icon: { type: String, default: 'info' },
   title: { type: String, default: '暂无数据' },
-  description: { type: String, default: '' }
+  description: { type: String, default: '' },
+  actionLabel: { type: String, default: '' }
 })
+
+defineEmits(['action'])
 </script>
 
 <style scoped>
@@ -33,5 +39,15 @@ defineProps({
 
 .empty-desc {
   font-size: 13px;
+}
+
+.empty-action {
+  margin-top: 10px;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
 }
 </style>

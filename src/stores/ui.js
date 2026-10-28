@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 
+const AppTheme = registerPlugin('AppTheme')
 const STORAGE_KEY = 'lzpu.theme'
 
 export const useUiStore = defineStore('ui', () => {
@@ -43,6 +44,12 @@ export const useUiStore = defineStore('ui', () => {
       })
     } catch (error) {
       // 状态栏在部分设备上不可控，忽略即可
+    }
+    try {
+      // 系统导航栏不归 StatusBar 插件管理，需单独同步主题色
+      await AppTheme.setNavigationBar({ dark: resolved === 'dark' })
+    } catch (error) {
+      // 导航栏在部分设备上不可控，忽略即可
     }
   }
 
