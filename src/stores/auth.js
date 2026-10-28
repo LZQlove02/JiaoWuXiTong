@@ -38,7 +38,8 @@ export const useAuthStore = defineStore('auth', () => {
         return true
       }
     } catch (error) {
-      await clearAuthCookies()
+      // 网络不可达时保留会话，避免下次联网后仍需重新登录
+      if (!error?.network) await clearAuthCookies()
     }
     restore()
     return isLoggedIn.value

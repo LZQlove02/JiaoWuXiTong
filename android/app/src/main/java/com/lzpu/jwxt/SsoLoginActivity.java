@@ -18,7 +18,10 @@ import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -44,11 +47,11 @@ public class SsoLoginActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
 
-        TextView title = new TextView(this);
-        title.setText("柳州职业技术大学统一认证");
-        title.setTextSize(16);
-        title.setPadding(32, 28, 32, 16);
-        root.addView(title);
+        TextView status = new TextView(this);
+        status.setText("柳州职业技术大学统一认证");
+        status.setTextSize(16);
+        status.setPadding(32, 28, 32, 16);
+        root.addView(status);
 
         webView = new WebView(this);
         root.addView(webView, new LinearLayout.LayoutParams(
@@ -124,23 +127,56 @@ public class SsoLoginActivity extends Activity {
             return;
         }
 
-        SslCertificate certificate = error.getCertificate();
-        String fingerprint = fingerprintOf(certificate);
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String pinned = prefs.getString(PIN_KEY, null);
-        if (pinned != null && pinned.equals(fingerprint)) {
-            handler.proceed();
+        CertInfo info = certInfoFrom(error.getCertificate());
+        if (info == null) {
+            showUnpinnedDialog(handler, error);
             return;
         }
 
-        String details = describe(certificate, fingerprint);
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String pinned = prefs.getString(PIN_KEY, null);
+        if (pinned != null && pinned.equals(info.sha256)) {
+            handler.proceed();
+            return;
+        }
+        showPinDialog(handler, prefs, info, pinned != null);
+    }
+
+    /**
+     * 直接从 WebView 的 SSL 错误中解析证书 DER，
+     * 无需额外的网络探测，避免探测超时导致无法固定指纹。
+     */
+    private CertInfo certInfoFrom(SslCertificate certificate) {
+        if (certificate == null) return null;
+        try {
+            Bundle state = SslCertificate.saveState(certificate);
+            byte[] der = state == null ? null : state.getByteArray("x509-certificate");
+            if (der == null || der.length == 0) return null;
+            X509Certificate parsed = (X509Certificate) CertificateFactory
+                    .getInstance("X.509")
+                    .generateCertificate(new ByteArrayInputStream(der));
+            return new CertInfo(
+                    parsed.getSubjectX500Principal().getName(),
+                    parsed.getIssuerX500Principal().getName(),
+                    parsed.getNotBefore().toString(),
+                    parsed.getNotAfter().toString(),
+                    sha256(parsed.getEncoded()));
+        } catch (Exception error) {
+            return null;
+        }
+    }
+
+    private void showPinDialog(SslErrorHandler handler, SharedPreferences prefs,
+                               CertInfo info, boolean changed) {
+        String title = changed ? "authserver 证书已变化" : "authserver 证书异常";
+        String action = changed
+                ? "与上次固定的指纹不一致。\n是否重新固定并继续？"
+                : "是否固定该证书并继续登录？";
         new AlertDialog.Builder(this)
-                .setTitle("authserver 证书异常")
-                .setMessage(details + "\n\n是否仅本次继续登录？")
-                .setPositiveButton("继续", (dialog, which) -> {
-                    if (fingerprint != null) {
-                        prefs.edit().putString(PIN_KEY, fingerprint).apply();
-                    }
+                .setTitle(title)
+                .setMessage(info.describe() + "\n\n" + action)
+                .setPositiveButton(changed ? "重新固定" : "继续", (dialog, which) -> {
+                    prefs.edit().putString(PIN_KEY, info.sha256).apply();
                     handler.proceed();
                 })
                 .setNegativeButton("取消", (dialog, which) -> {
@@ -151,36 +187,66 @@ public class SsoLoginActivity extends Activity {
                 .show();
     }
 
-    private String describe(SslCertificate certificate, String fingerprint) {
-        if (certificate == null) return "证书信息不可用";
-        String subject = certificate.getIssuedTo() == null
-                ? "" : certificate.getIssuedTo().getCName();
-        String issuer = certificate.getIssuedBy() == null
-                ? "" : certificate.getIssuedBy().getCName();
-        String notBefore = certificate.getValidNotBeforeDate() == null
-                ? "" : certificate.getValidNotBeforeDate().toString();
-        String notAfter = certificate.getValidNotAfterDate() == null
-                ? "" : certificate.getValidNotAfterDate().toString();
-        return "主题：" + subject
-                + "\n颁发者：" + issuer
-                + "\n有效期：" + notBefore + " - " + notAfter
-                + "\nSHA-256：" + (fingerprint == null ? "不可用" : fingerprint);
+    private void showUnpinnedDialog(SslErrorHandler handler, SslError error) {
+        SslCertificate certificate = error.getCertificate();
+        String details = "无法获取证书 SHA-256 指纹，无法完成固定校验。";
+        if (certificate != null) {
+            String subject = certificate.getIssuedTo() == null
+                    ? "" : certificate.getIssuedTo().getCName();
+            String issuer = certificate.getIssuedBy() == null
+                    ? "" : certificate.getIssuedBy().getCName();
+            details = "主题：" + subject
+                    + "\n颁发者：" + issuer
+                    + "\n有效期：" + certificate.getValidNotBeforeDate()
+                    + " - " + certificate.getValidNotAfterDate()
+                    + "\n\n无法获取 SHA-256 指纹。是否仍继续登录？";
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("无法固定证书指纹")
+                .setMessage(details)
+                .setPositiveButton("仍继续", (dialog, which) -> handler.proceed())
+                .setNegativeButton("取消", (dialog, which) -> {
+                    handler.cancel();
+                    cancel();
+                })
+                .setCancelable(false)
+                .show();
     }
 
-    private String fingerprintOf(SslCertificate certificate) {
+    private static String sha256(byte[] data) {
         try {
-            Bundle state = SslCertificate.saveState(certificate);
-            byte[] der = state == null ? null : state.getByteArray("x509cert");
-            if (der == null) return null;
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = digest.digest(der);
+            byte[] bytes = digest.digest(data);
             StringBuilder builder = new StringBuilder();
             for (byte value : bytes) {
                 builder.append(String.format("%02X:", value));
             }
             return builder.substring(0, builder.length() - 1);
         } catch (Exception error) {
-            return null;
+            return "";
+        }
+    }
+
+    private static final class CertInfo {
+        final String subject;
+        final String issuer;
+        final String notBefore;
+        final String notAfter;
+        final String sha256;
+
+        CertInfo(String subject, String issuer, String notBefore, String notAfter, String sha256) {
+            this.subject = subject;
+            this.issuer = issuer;
+            this.notBefore = notBefore;
+            this.notAfter = notAfter;
+            this.sha256 = sha256;
+        }
+
+        String describe() {
+            return "主题：" + subject
+                    + "\n颁发者：" + issuer
+                    + "\n有效期：" + notBefore + " - " + notAfter
+                    + "\nSHA-256：" + sha256;
         }
     }
 

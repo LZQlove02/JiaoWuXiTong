@@ -121,7 +121,14 @@ export class ZfAcademicApi {
 
   async fetchSchedule(params) {
     const url = `${SCHEDULE_ENDPOINT}&xnm=${encodeURIComponent(params.xnm)}&xqm=${encodeURIComponent(params.xqm)}`
-    const response = await authGet(url)
+    let response
+    try {
+      response = await authGet(url)
+    } catch (error) {
+      const failure = new Error('无法连接教务系统')
+      failure.network = true
+      throw failure
+    }
     if (response.status !== 200) {
       throw new Error(`课表接口返回 ${response.status}`)
     }

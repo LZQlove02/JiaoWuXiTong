@@ -38,7 +38,7 @@
           <span class="day-date">{{ dayDates[index] }}</span>
         </div>
 
-        <template v-for="section in 10" :key="`t${section}`">
+        <template v-for="section in 12" :key="`t${section}`">
           <div class="time-cell" :style="{ gridRow: section + 1 }">
             <span class="section-num">{{ section }}</span>
             <span class="section-time">{{ SECTION_TIMES[section].start }}</span>
@@ -199,7 +199,7 @@ onMounted(async () => {
 .timetable {
   display: grid;
   grid-template-columns: 40px repeat(7, 72px);
-  grid-template-rows: 44px repeat(10, 56px);
+  grid-template-rows: 44px repeat(12, 56px);
   gap: 3px;
   min-width: 564px;
   position: relative;
