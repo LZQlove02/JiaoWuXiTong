@@ -11,7 +11,8 @@ import ArticleDetail from '../views/ArticleDetail.vue'
 import CourseDetail from '../views/CourseDetail.vue'
 import Guide from '../views/Guide.vue'
 import Calendar from '../views/Calendar.vue'
-import ComingSoon from '../views/ComingSoon.vue'
+import Evaluation from '../views/Evaluation.vue'
+import CourseSelection from '../views/CourseSelection.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -38,14 +39,14 @@ const routes = [
   {
     path: '/courses',
     name: 'course-select',
-    component: ComingSoon,
-    meta: { title: '选课', icon: 'select', desc: '选课功能将在 M3 开放窗口期接入真实接口。' }
+    component: CourseSelection,
+    meta: { title: '选课' }
   },
   {
     path: '/evaluation',
     name: 'evaluation',
-    component: ComingSoon,
-    meta: { title: '评教', icon: 'evaluate', desc: '教学评价将在 M3 接入，开放期内可提交评教。' }
+    component: Evaluation,
+    meta: { title: '评教' }
   },
   {
     path: '/calendar',

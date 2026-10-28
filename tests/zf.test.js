@@ -3,7 +3,9 @@ import { authGet, authPost } from '../src/api/nativeHttp'
 import {
   ZfAcademicApi,
   clearScheduleSnapshot,
+  mapEvaluations,
   mapGrades,
+  parseCourseSelectionStatus,
   parseTermsFromHtml
 } from '../src/api/zf'
 
@@ -220,5 +222,95 @@ describe('成绩解析与学期列表', () => {
       'xnm=2026&xqm=3'
     )
     expect(result.summary).toEqual({ gpa: 4.2, totalCredits: 4, count: 1 })
+  })
+})
+
+describe('评教记录与选课状态（只读）', () => {
+  beforeEach(() => {
+    authGet.mockReset()
+    authPost.mockReset()
+  })
+
+  it('评教列表映射为只读记录并识别提交状态', () => {
+    const result = mapEvaluations({
+      totalResult: 23,
+      items: [
+        {
+          jxb_id: 'j1',
+          kcmc: '高等数学',
+          jzgmc: '张明',
+          jxbmc: '高数 1 班',
+          tjzt: '1',
+          tjztmc: '提交'
+        },
+        {
+          jxb_id: 'j2',
+          kcmc: '体育',
+          jzgmc: '刘强',
+          jxbmc: '体育 2 班',
+          tjzt: '0',
+          tjztmc: ''
+        },
+        { jxb_id: 'j3', kcmc: '', jzgmc: '赵敏' }
+      ]
+    })
+    expect(result.total).toBe(23)
+    expect(result.items).toHaveLength(2)
+    expect(result.items[0]).toMatchObject({
+      courseName: '高等数学',
+      teacher: '张明',
+      status: '已提交',
+      submitted: true
+    })
+    expect(result.items[1].submitted).toBe(false)
+    expect(result.source).toBe('教务系统（只读）')
+  })
+
+  it('评教 totalResult 缺失时回退为条目数', () => {
+    const result = mapEvaluations({ items: [{ kcmc: '课程 A' }] })
+    expect(result.total).toBe(1)
+  })
+
+  it('选课开关为 0 时显示未开放，为 1 时显示已开放', () => {
+    expect(parseCourseSelectionStatus('<input id="iskxk" value="0" />')).toMatchObject({
+      open: false,
+      label: '当前不在选课时间'
+    })
+    expect(parseCourseSelectionStatus('<input value="1" id="iskxk" />')).toMatchObject({
+      open: true,
+      label: '选课已开放'
+    })
+  })
+
+  it('缺失选课开关时按未开放处理', () => {
+    expect(parseCourseSelectionStatus('<html></html>').open).toBe(false)
+  })
+
+  it('getEvaluations 只调用列表查询，不包含任何提交动作', async () => {
+    authPost.mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({
+        totalResult: 1,
+        items: [{ jxb_id: 'j1', kcmc: '课程 A', tjzt: '1', tjztmc: '提交' }]
+      })
+    })
+    const api = new ZfAcademicApi()
+    api.term = term
+    const result = await api.getEvaluations()
+    expect(authPost).toHaveBeenCalledTimes(1)
+    const [url, body] = authPost.mock.calls[0]
+    expect(url).toContain('xspj_cxXspjIndex.html?doType=query')
+    expect(body).toBe('page=1&rows=10&sidx=&sord=asc')
+    expect(result.items[0].submitted).toBe(true)
+  })
+
+  it('getCourseSelectionStatus 只读取选课入口页', async () => {
+    authGet.mockResolvedValue({ status: 200, body: '<input id="iskxk" value="0">' })
+    const api = new ZfAcademicApi()
+    api.term = term
+    const result = await api.getCourseSelectionStatus()
+    expect(authGet).toHaveBeenCalledTimes(1)
+    expect(authGet.mock.calls[0][0]).toContain('gnmkdm=N253512')
+    expect(result.open).toBe(false)
   })
 })

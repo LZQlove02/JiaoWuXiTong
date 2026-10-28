@@ -2,7 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '../api'
 
-const EMPTY_ERRORS = { terms: '', schedule: '', grades: '', exams: '' }
+const EMPTY_ERRORS = {
+  terms: '',
+  schedule: '',
+  grades: '',
+  exams: '',
+  evaluations: '',
+  courseSelection: ''
+}
 
 export const useAcademicStore = defineStore('academic', () => {
   const terms = ref([])
@@ -10,6 +17,8 @@ export const useAcademicStore = defineStore('academic', () => {
   const schedule = ref(null)
   const grades = ref(null)
   const exams = ref([])
+  const evaluations = ref(null)
+  const courseSelection = ref(null)
   const course = ref(null)
   const loading = ref(false)
   const errors = ref({ ...EMPTY_ERRORS })
@@ -81,12 +90,38 @@ export const useAcademicStore = defineStore('academic', () => {
     course.value = await api.getCourse(id)
   }
 
+  async function loadEvaluations() {
+    loading.value = true
+    setError('evaluations', '')
+    try {
+      evaluations.value = await api.getEvaluations()
+    } catch (err) {
+      setError('evaluations', err.message || '评教记录加载失败')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadCourseSelection() {
+    loading.value = true
+    setError('courseSelection', '')
+    try {
+      courseSelection.value = await api.getCourseSelectionStatus()
+    } catch (err) {
+      setError('courseSelection', err.message || '选课状态加载失败')
+    } finally {
+      loading.value = false
+    }
+  }
+
   function reset() {
     terms.value = []
     currentTerm.value = null
     schedule.value = null
     grades.value = null
     exams.value = []
+    evaluations.value = null
+    courseSelection.value = null
     course.value = null
     loading.value = false
     errors.value = { ...EMPTY_ERRORS }
@@ -98,6 +133,8 @@ export const useAcademicStore = defineStore('academic', () => {
     schedule,
     grades,
     exams,
+    evaluations,
+    courseSelection,
     course,
     loading,
     errors,
@@ -105,6 +142,8 @@ export const useAcademicStore = defineStore('academic', () => {
     loadSchedule,
     loadGrades,
     loadExams,
+    loadEvaluations,
+    loadCourseSelection,
     loadCourse,
     reset
   }

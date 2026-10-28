@@ -6,6 +6,8 @@ const COURSE_COLORS = ['#1B5FAA', '#2F855A', '#B7791F', '#805AD5', '#C05621', '#
 const SCHEDULE_ENDPOINT = 'https://zfjw.lzzy.net/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151'
 const GRADE_PAGE_ENDPOINT = 'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005'
 const GRADES_ENDPOINT = 'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005'
+const EVALUATION_ENDPOINT = 'https://zfjw.lzzy.net/xspjgl/xspj_cxXspjIndex.html?doType=query&gnmkdm=N401605'
+const COURSE_SELECTION_PAGE = 'https://zfjw.lzzy.net/xsxk/zzxkyzb_cxZzxkYzbIndex.html?gnmkdm=N253512'
 const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
 
 const QUARTER_RANK = { 3: 0, 12: 1, 16: 2 }
@@ -284,6 +286,47 @@ export function mapGrades(payload, term) {
   }
 }
 
+// 评教记录只读解析：不包含任何提交动作，只把列表映射成展示模型
+export function mapEvaluations(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : []
+  const evaluations = items
+    .map((item, index) => {
+      const rawStatus = String(item?.tjztmc || '').trim()
+      const submitted = String(item?.tjzt) === '1' || /提交/.test(rawStatus)
+      return {
+        id: `${item?.jxb_id || item?.kch_id || 'evaluation'}_${index}`,
+        courseName: String(item?.kcmc || '').trim(),
+        teacher: String(item?.jzgmc || '').trim(),
+        className: String(item?.jxbmc || '').trim(),
+        status: submitted ? '已提交' : rawStatus || '未提交',
+        submitted
+      }
+    })
+    .filter((item) => item.courseName)
+  const total = Number(payload?.totalResult)
+  return {
+    total: Number.isFinite(total) && total >= evaluations.length ? total : evaluations.length,
+    items: evaluations,
+    source: '教务系统（只读）',
+    fetchedAt: new Date().toISOString()
+  }
+}
+
+// 选课只读状态：仅读取页面里的 iskxk 开关，不加载也不触发选课数据操作
+export function parseCourseSelectionStatus(html) {
+  const text = String(html || '')
+  const match = text.match(/id=["']iskxk["'][^>]*value=["']([^"']*)["']/i)
+    || text.match(/value=["']([^"']*)["'][^>]*id=["']iskxk["']/i)
+  const open = match?.[1] === '1'
+  return {
+    open,
+    label: open ? '选课已开放' : '当前不在选课时间',
+    description: open
+      ? '选课窗口已开放。本应用仅同步状态，不提供选课或退课操作。'
+      : '请在教务系统开放时间内完成选课或退课；本应用仅同步状态，不提供相关操作。'
+  }
+}
+
 export class ZfAcademicApi {
   remote = true
 
@@ -525,6 +568,87 @@ export class ZfAcademicApi {
 
   async getExams() {
     throw new Error('考试接口尚未接入，暂不可用')
+  }
+
+  async getEvaluations() {
+    if (!this.term) throw new Error('尚未登录')
+    let response
+    try {
+      response = await authPost(EVALUATION_ENDPOINT, 'page=1&rows=10&sidx=&sord=asc')
+    } catch (error) {
+      const message = String(error?.message || '')
+      if (message.includes('仅允许 HTTPS 请求')) {
+        const failure = new Error('登录会话已失效')
+        failure.sessionExpired = true
+        throw failure
+      }
+      const failure = new Error('无法连接教务系统')
+      failure.network = true
+      throw failure
+    }
+    if (response?.status !== 200) {
+      const failure = new Error(`评教接口返回 ${response?.status ?? '未知状态'}`)
+      failure.status = response?.status
+      failure.sessionExpired = response?.status === 401 || response?.status === 403
+      throw failure
+    }
+    const body = String(response.body || '').replace(/^\uFEFF/, '')
+    if (/^\s*</.test(body)) {
+      const expired = /login_slogin|统一身份认证|authserver/i.test(body)
+      const failure = new Error(expired ? '登录会话已失效' : '评教数据解析失败')
+      if (expired) failure.sessionExpired = true
+      else failure.parseError = true
+      throw failure
+    }
+    let payload
+    try {
+      payload = JSON.parse(body)
+    } catch (error) {
+      const failure = new Error('评教数据解析失败')
+      failure.parseError = true
+      throw failure
+    }
+    if (!payload || !Array.isArray(payload.items)) {
+      const failure = new Error('评教数据解析失败')
+      failure.parseError = true
+      throw failure
+    }
+    return mapEvaluations(payload)
+  }
+
+  async getCourseSelectionStatus() {
+    if (!this.term) throw new Error('尚未登录')
+    let response
+    try {
+      response = await authGet(COURSE_SELECTION_PAGE)
+    } catch (error) {
+      const message = String(error?.message || '')
+      if (message.includes('仅允许 HTTPS 请求')) {
+        const failure = new Error('登录会话已失效')
+        failure.sessionExpired = true
+        throw failure
+      }
+      const failure = new Error('无法连接教务系统')
+      failure.network = true
+      throw failure
+    }
+    if (response?.status !== 200) {
+      const failure = new Error(`选课状态返回 ${response?.status ?? '未知状态'}`)
+      failure.status = response?.status
+      failure.sessionExpired = response?.status === 401 || response?.status === 403
+      throw failure
+    }
+    const body = String(response.body || '').replace(/^\uFEFF/, '')
+    if (/^\s*</.test(body) && /login_slogin|统一身份认证|authserver/i.test(body)) {
+      const failure = new Error('登录会话已失效')
+      failure.sessionExpired = true
+      throw failure
+    }
+    return {
+      ...parseCourseSelectionStatus(body),
+      source: '教务系统（只读）',
+      fetchedAt: new Date().toISOString()
+    }
   }
 
   async getCourse(id) {
