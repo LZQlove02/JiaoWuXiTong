@@ -27,7 +27,7 @@
       <EmptyState v-if="!examList.length" title="暂无考试安排" description="考试安排发布后会显示在这里。" />
     </div>
 
-    <p v-if="error" class="tiny footnote">{{ error }}</p>
+    <p v-if="errors.exams" class="tiny footnote">{{ errors.exams }}</p>
     <p v-else class="tiny footnote">
       {{
         exams.source
@@ -48,7 +48,7 @@ import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { exams, loading, error } = storeToRefs(academic)
+const { exams, loading, errors } = storeToRefs(academic)
 
 const examList = computed(() =>
   exams.value

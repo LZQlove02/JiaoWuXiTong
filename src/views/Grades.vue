@@ -39,7 +39,7 @@
       <EmptyState v-if="!gradeList.length" title="暂无成绩" description="该学期还没有成绩记录。" />
     </section>
 
-    <p v-if="error" class="tiny footnote">{{ error }}</p>
+    <p v-if="errors.grades" class="tiny footnote">{{ errors.grades }}</p>
     <p v-else class="tiny footnote">
       {{
         grades?.source
@@ -57,7 +57,7 @@ import { useAcademicStore } from '../stores/academic'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { terms, grades, loading, error } = storeToRefs(academic)
+const { terms, grades, loading, errors } = storeToRefs(academic)
 const termIndex = ref(0)
 
 const gradeList = computed(() => grades.value?.grades || [])

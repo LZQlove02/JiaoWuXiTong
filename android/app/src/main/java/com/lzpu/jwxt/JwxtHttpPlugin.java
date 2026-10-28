@@ -10,6 +10,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.HttpUrl;
@@ -30,7 +33,7 @@ public class JwxtHttpPlugin extends Plugin {
 
     /**
      * 公开内容客户端：关闭自动重定向，改为逐跳校验，避免被重定向到
-     * 非白名单主机或明文 HTTP。认证客户端待 6.5 验证后再按同一策略建立。
+     * 非白名单主机或明文 HTTP。
      */
     private final OkHttpClient publicClient = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -39,7 +42,7 @@ public class JwxtHttpPlugin extends Plugin {
             .followSslRedirects(false)
             .build();
 
-    /** 登录后的教务业务请求：仅允许 zfjw HTTPS，Cookie 只保存在内存。 */
+    /** 登录后的教务业务请求：仅允许 zfjw HTTPS，Cookie 只在内存中维护并加密持久化。 */
     private final OkHttpClient authClient = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
@@ -47,7 +50,7 @@ public class JwxtHttpPlugin extends Plugin {
             .followSslRedirects(false)
             .build();
 
-    private String authCookieHeader = "";
+    private volatile String authCookieHeader = "";
 
     @PluginMethod
     public void get(PluginCall call) {
@@ -90,7 +93,7 @@ public class JwxtHttpPlugin extends Plugin {
         publicClient.dispatcher().executorService().execute(new Runnable() {
             @Override
             public void run() {
-                try (Response response = execute(publicClient, request, HttpPolicy.PUBLIC)) {
+                try (Response response = execute(publicClient, request, HttpPolicy.PUBLIC, false)) {
                     String body = response.body() == null ? "" : response.body().string();
                     JSObject result = new JSObject();
                     result.put("status", response.code());
@@ -136,7 +139,7 @@ public class JwxtHttpPlugin extends Plugin {
         publicClient.dispatcher().executorService().execute(new Runnable() {
             @Override
             public void run() {
-                try (Response response = execute(publicClient, request, HttpPolicy.PUBLIC)) {
+                try (Response response = execute(publicClient, request, HttpPolicy.PUBLIC, false)) {
                     if (!response.isSuccessful() || response.body() == null) {
                         call.reject("download failed: " + response.code());
                         return;
@@ -248,7 +251,7 @@ public class JwxtHttpPlugin extends Plugin {
         authClient.dispatcher().executorService().execute(new Runnable() {
             @Override
             public void run() {
-                try (Response response = execute(authClient, request, HttpPolicy.AUTH)) {
+                try (Response response = execute(authClient, request, HttpPolicy.AUTH, true)) {
                     String body = response.body() == null ? "" : response.body().string();
                     JSObject result = new JSObject();
                     result.put("status", response.code());
@@ -301,7 +304,7 @@ public class JwxtHttpPlugin extends Plugin {
         authClient.dispatcher().executorService().execute(new Runnable() {
             @Override
             public void run() {
-                try (Response response = execute(authClient, request, HttpPolicy.AUTH)) {
+                try (Response response = execute(authClient, request, HttpPolicy.AUTH, true)) {
                     String responseBody = response.body() == null ? "" : response.body().string();
                     JSObject result = new JSObject();
                     result.put("status", response.code());
@@ -317,13 +320,15 @@ public class JwxtHttpPlugin extends Plugin {
 
     /**
      * 手动跟随重定向：每一跳都校验协议、端口与允许主机，超过上限直接失败，
-     * 不把请求转发到非白名单目标。
+     * 不把请求转发到非白名单目标。keepCookies 为 true 时同步服务端下发的 Set-Cookie。
      */
-    private Response execute(OkHttpClient client, Request request, HttpPolicy policy) throws IOException {
+    private Response execute(OkHttpClient client, Request request, HttpPolicy policy,
+                             boolean keepCookies) throws IOException {
         Request current = request;
         for (int i = 0; i <= MAX_REDIRECTS; i++) {
             policy.check(current.url());
             Response response = client.newCall(current).execute();
+            if (keepCookies) updateAuthCookies(response);
             if (!isRedirect(response.code())) {
                 return response;
             }
@@ -339,9 +344,66 @@ public class JwxtHttpPlugin extends Plugin {
             if (code == 301 || code == 302 || code == 303) {
                 nextBuilder.get();
             }
+            String cookie = authCookieHeader;
+            if (keepCookies && !cookie.isEmpty()) {
+                nextBuilder.header("Cookie", cookie);
+            }
             current = nextBuilder.build();
         }
         throw new IOException("重定向次数过多");
+    }
+
+    /**
+     * 用响应中的 Set-Cookie 更新会话：只保留 name=value，值为空视为删除；
+     * 有变化才重新写入加密存储，避免每个请求都做一次 Keystore 加解密。
+     */
+    private synchronized void updateAuthCookies(Response response) {
+        List<String> setCookies = response.headers("Set-Cookie");
+        if (setCookies == null || setCookies.isEmpty()) return;
+
+        Map<String, String> jar = new LinkedHashMap<>();
+        putCookiePairs(jar, authCookieHeader);
+        for (String header : setCookies) {
+            String pair = header.split(";", 2)[0].trim();
+            int index = pair.indexOf('=');
+            if (index <= 0) continue;
+            String name = pair.substring(0, index).trim();
+            String value = pair.substring(index + 1).trim();
+            if (name.isEmpty()) continue;
+            if (value.isEmpty()) {
+                jar.remove(name);
+            } else {
+                jar.put(name, value);
+            }
+        }
+
+        String merged = joinCookies(jar);
+        if (merged.equals(authCookieHeader)) return;
+        authCookieHeader = merged;
+        if (merged.isEmpty()) {
+            AuthCookieStore.clear(getContext());
+        } else {
+            AuthCookieStore.save(getContext(), merged);
+        }
+    }
+
+    private static void putCookiePairs(Map<String, String> target, String header) {
+        if (header == null || header.isEmpty()) return;
+        for (String part : header.split(";")) {
+            String pair = part.trim();
+            int index = pair.indexOf('=');
+            if (index <= 0) continue;
+            target.put(pair.substring(0, index).trim(), pair.substring(index + 1).trim());
+        }
+    }
+
+    private static String joinCookies(Map<String, String> jar) {
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, String> entry : jar.entrySet()) {
+            if (builder.length() > 0) builder.append("; ");
+            builder.append(entry.getKey()).append('=').append(entry.getValue());
+        }
+        return builder.toString();
     }
 
     private static boolean isRedirect(int code) {

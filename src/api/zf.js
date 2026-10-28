@@ -3,6 +3,39 @@ import { parseWeeks } from './importer'
 
 const COURSE_COLORS = ['#1B5FAA', '#2F855A', '#B7791F', '#805AD5', '#C05621', '#2C7A7B']
 const SCHEDULE_ENDPOINT = 'https://zfjw.lzzy.net/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151'
+const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
+
+function readSnapshot() {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    if (!data || !data.profile || !data.term || !data.schedule) return null
+    return data
+  } catch (error) {
+    return null
+  }
+}
+
+function writeSnapshot(api) {
+  try {
+    localStorage.setItem(
+      SNAPSHOT_KEY,
+      JSON.stringify({
+        profile: api.profile,
+        term: api.term,
+        schedule: api.schedule,
+        fetchedAt: api.fetchedAt
+      })
+    )
+  } catch (error) {
+    // 空间不足时放弃快照，不影响本次使用
+  }
+}
+
+export function clearScheduleSnapshot() {
+  localStorage.removeItem(SNAPSHOT_KEY)
+}
 
 function termParamsFor(date = new Date()) {
   const year = date.getFullYear()
@@ -88,6 +121,7 @@ export class ZfAcademicApi {
     this.term = null
     this.schedule = null
     this.fetchedAt = ''
+    this.offline = false
   }
 
   async loginWithSso() {
@@ -98,29 +132,45 @@ export class ZfAcademicApi {
   }
 
   async restoreSession() {
+    const snapshot = readSnapshot()
     let params = termParamsFor()
-    let payload = await this.fetchSchedule(params)
-    if (!payload?.xsxx) {
-      const alternative = params.xqm === '3'
-        ? { xnm: params.xnm, xqm: '12' }
-        : { xnm: String(Number(params.xnm) + 1), xqm: '3' }
-      const second = await this.fetchSchedule(alternative)
-      if (second?.xsxx) {
-        params = alternative
-        payload = second
+    try {
+      let payload = await this.fetchSchedule(params)
+      if (!payload?.xsxx) {
+        const alternative = params.xqm === '3'
+          ? { xnm: params.xnm, xqm: '12' }
+          : { xnm: String(Number(params.xnm) + 1), xqm: '3' }
+        const second = await this.fetchSchedule(alternative)
+        if (second?.xsxx) {
+          params = alternative
+          payload = second
+        }
       }
-    }
-    if (!payload?.xsxx) {
-      const failure = new Error('课表数据缺少必要字段')
-      failure.parseError = true
-      throw failure
-    }
+      if (!payload?.xsxx) {
+        const failure = new Error('课表数据缺少必要字段')
+        failure.parseError = true
+        throw failure
+      }
 
-    this.profile = mapProfile(payload.xsxx)
-    this.term = mapTerm(payload.xsxx, params)
-    this.schedule = mapSchedule(payload, this.term)
-    this.fetchedAt = new Date().toISOString()
-    return this.profile
+      this.profile = mapProfile(payload.xsxx)
+      this.term = mapTerm(payload.xsxx, params)
+      this.schedule = mapSchedule(payload, this.term)
+      this.fetchedAt = new Date().toISOString()
+      this.offline = false
+      writeSnapshot(this)
+      return this.profile
+    } catch (error) {
+      // 网络不可达时用上次成功的快照保持登录态，避免离线冷启动被踢回登录页
+      if (error?.network && snapshot) {
+        this.profile = snapshot.profile
+        this.term = snapshot.term
+        this.schedule = snapshot.schedule
+        this.fetchedAt = snapshot.fetchedAt
+        this.offline = true
+        return this.profile
+      }
+      throw error
+    }
   }
 
   async fetchSchedule(params) {
@@ -175,8 +225,14 @@ export class ZfAcademicApi {
       this.term = nextTerm
       this.schedule = mapSchedule(payload, nextTerm)
       this.fetchedAt = new Date().toISOString()
+      this.offline = false
+      writeSnapshot(this)
     }
-    return { ...this.schedule, source: '教务系统（实时）', fetchedAt: this.fetchedAt }
+    return {
+      ...this.schedule,
+      source: this.offline ? '教务系统（离线缓存）' : '教务系统（实时）',
+      fetchedAt: this.fetchedAt
+    }
   }
 
   async getGrades() {

@@ -56,7 +56,7 @@ export function isCacheExpired(cachedAt, ttl) {
   return Date.now() - cachedAt > ttl
 }
 
-export function parseArticleList(html) {
+export function parseArticleList(html, baseUrl = BASE) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const items = []
   doc.querySelectorAll('ul.infoList li').forEach((li) => {
@@ -65,11 +65,17 @@ export function parseArticleList(html) {
     const href = link.getAttribute('href') || ''
     const id = href.split('/').pop()
     if (!id) return
+    let url
+    try {
+      url = new URL(href, baseUrl).toString()
+    } catch (error) {
+      return
+    }
     items.push({
       id,
       title: (link.textContent || '').trim(),
       date: (li.querySelector('.date')?.textContent || '').trim(),
-      url: BASE + href
+      url
     })
   })
   return items
@@ -138,7 +144,7 @@ export async function fetchArticleList(section) {
     throw new Error(`教务处官网返回 ${response.status}`)
   }
 
-  const items = parseArticleList(response.body)
+  const items = parseArticleList(response.body, `${BASE}${SECTIONS[section]}`)
   if (!items.length) {
     throw new Error('页面结构变化，未能解析出公告列表')
   }

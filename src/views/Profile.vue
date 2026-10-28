@@ -58,7 +58,7 @@
       </button>
       <button class="setting-row" @click="showAbout">
         <span class="setting-left"><AppIcon name="info" />关于</span>
-        <span class="tiny">v1.0.3</span>
+        <span v-if="version" class="tiny">v{{ version }}</span>
       </button>
     </section>
 
@@ -82,6 +82,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
 import { useUiStore } from '../stores/ui'
@@ -102,6 +104,7 @@ const themeOptions = [
 
 const avatarText = computed(() => (auth.user?.name || '我').slice(-1))
 const toast = ref('')
+const version = ref('')
 
 function showToast(message) {
   toast.value = message
@@ -118,7 +121,7 @@ function clearCache() {
 }
 
 function showAbout() {
-  showToast('柳职教务 v1.0.3 演示版')
+  showToast(version.value ? `柳职教务 v${version.value}` : '柳职教务')
 }
 
 const fileInput = ref(null)
@@ -170,6 +173,13 @@ function clearImportData() {
 
 onMounted(async () => {
   await academic.initTerms()
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    const info = await CapApp.getInfo()
+    version.value = info.version || ''
+  } catch (error) {
+    // 读取不到版本信息时不显示版本号
+  }
 })
 
 async function logout() {

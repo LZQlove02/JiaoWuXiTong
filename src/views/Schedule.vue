@@ -62,6 +62,11 @@
       </div>
     </div>
 
+    <p v-if="errors.schedule" class="load-error">
+      {{ errors.schedule }}
+      <button class="retry" @click="reloadSchedule">重试</button>
+    </p>
+
     <p class="tiny legend">
       左右滑动查看周末 · 点击课程查看详情 ·
       {{ sourceLabel }}
@@ -70,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
@@ -79,12 +84,16 @@ import AppIcon from '../components/AppIcon.vue'
 
 const academic = useAcademicStore()
 const router = useRouter()
-const { schedule, currentTerm, loading } = storeToRefs(academic)
+const { schedule, currentTerm, loading, errors } = storeToRefs(academic)
 
 const weekdayLabels = WEEKDAY_LABELS.map((item) => `周${item}`)
-const todayWeekday = getWeekday()
+const now = ref(new Date())
+let clockTimer = null
+const todayWeekday = computed(() => getWeekday(now.value))
 const currentWeek = computed(() =>
-  currentTerm.value ? Math.min(getWeekNumber(currentTerm.value.startDate), 20) : 1
+  currentTerm.value
+    ? Math.min(getWeekNumber(currentTerm.value.startDate, now.value), 20)
+    : 1
 )
 const selectedWeek = ref(1)
 
@@ -137,10 +146,21 @@ function openCourse(id) {
   router.push(`/course/${id}?week=${selectedWeek.value}`)
 }
 
+function reloadSchedule() {
+  academic.loadSchedule()
+}
+
 onMounted(async () => {
+  clockTimer = setInterval(() => {
+    now.value = new Date()
+  }, 60 * 1000)
   await academic.initTerms()
   if (!schedule.value) await academic.loadSchedule()
   selectedWeek.value = currentWeek.value
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
 })
 </script>
 
@@ -291,5 +311,23 @@ onMounted(async () => {
 .legend {
   margin-top: 10px;
   text-align: center;
+}
+
+.load-error {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.retry {
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
 }
 </style>

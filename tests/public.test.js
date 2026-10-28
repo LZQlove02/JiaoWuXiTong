@@ -55,6 +55,17 @@ describe('parseArticleList', () => {
   it('列表结构变化时返回空数组而不是抛错', () => {
     expect(parseArticleList('<html><body><div class="newList"><a href="/a">x</a></div></body></html>')).toEqual([])
   })
+
+  it('相对链接按列表页地址解析为完整 URL', () => {
+    const html = `
+      <ul class="infoList">
+        <li><span class="date">2025-03-17</span><a href="content_96182">关于转专业审核结果的公示</a></li>
+      </ul>
+    `
+    const items = parseArticleList(html, 'https://www.lzpu.edu.cn/jwysxglc/tzgg')
+    expect(items[0].id).toBe('content_96182')
+    expect(items[0].url).toBe('https://www.lzpu.edu.cn/jwysxglc/content_96182')
+  })
 })
 
 describe('parseArticle', () => {

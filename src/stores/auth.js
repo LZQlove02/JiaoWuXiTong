@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { api, resetAcademicApi, setAcademicApi } from '../api'
-import { ZfAcademicApi } from '../api/zf'
+import { ZfAcademicApi, clearScheduleSnapshot } from '../api/zf'
 import { clearAuthCookies, loadAuthCookies } from '../api/nativeHttp'
 
 const STORAGE_KEY = 'lzpu.session'
@@ -112,6 +112,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function loginWithSso() {
     loading.value = true
     try {
+      clearScheduleSnapshot()
       const zf = new ZfAcademicApi()
       const profile = await zf.loginWithSso()
       setAcademicApi(zf)
@@ -128,6 +129,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     await clearAuthCookies()
+    clearScheduleSnapshot()
     resetAcademicApi()
     sessionMode.value = 'mock'
     user.value = null
