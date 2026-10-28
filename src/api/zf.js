@@ -250,6 +250,24 @@ export function parseTermsFromHtml(html, currentTerm = null, options = {}) {
   return sortTerms([...terms.values()].filter((item) => !isAfterCurrent(item, currentTerm)))
 }
 
+function summarizeGrades(grades) {
+  let totalCredits = 0
+  let weighted = 0
+  let weight = 0
+  for (const item of grades) {
+    if (item.credit === null || item.credit <= 0) continue
+    totalCredits += item.credit
+    if (item.gradePoint === null) continue
+    weight += item.credit
+    weighted += item.gradePoint * item.credit
+  }
+  return {
+    gpa: weight > 0 ? Math.round((weighted / weight) * 100) / 100 : null,
+    totalCredits: Math.round(totalCredits * 10) / 10,
+    count: grades.length
+  }
+}
+
 export function mapGrades(payload, term) {
   const items = Array.isArray(payload?.items) ? payload.items : []
   const grades = items
@@ -269,25 +287,30 @@ export function mapGrades(payload, term) {
     })
     .filter((item) => item.courseName)
 
-  let totalCredits = 0
-  let weighted = 0
-  let weight = 0
-  for (const item of grades) {
-    if (item.credit === null || item.credit <= 0) continue
-    totalCredits += item.credit
-    if (item.gradePoint === null) continue
-    weight += item.credit
-    weighted += item.gradePoint * item.credit
-  }
-
   return {
     term: term ? { ...term } : null,
     grades,
-    summary: {
-      gpa: weight > 0 ? Math.round((weighted / weight) * 100) / 100 : null,
-      totalCredits: Math.round(totalCredits * 10) / 10,
-      count: grades.length
-    },
+    summary: summarizeGrades(grades),
+    source: '教务系统（实时）',
+    fetchedAt: new Date().toISOString()
+  }
+}
+
+// 汇总多个学期的成绩：只保留有成绩的学期，汇总绩点与学分
+export function mergeGradeGroups(results) {
+  const groups = (Array.isArray(results) ? results : [])
+    .filter((result) => result?.term && Array.isArray(result.grades))
+    .map((result) => ({
+      key: `${result.term.xnm}_${result.term.xqm}`,
+      termLabel: result.term.label,
+      grades: result.grades
+    }))
+    .filter((group) => group.grades.length)
+
+  return {
+    all: true,
+    groups,
+    summary: summarizeGrades(groups.flatMap((group) => group.grades)),
     source: '教务系统（实时）',
     fetchedAt: new Date().toISOString()
   }
@@ -571,6 +594,30 @@ export class ZfAcademicApi {
       throw failure
     }
     return mapGrades(payload, params)
+  }
+
+  // 全部学期：逐学期只读查询后汇总；单个学期失败时保留其余学期，并记录失败项
+  async getAllGrades(terms) {
+    if (!this.term) throw new Error('尚未登录')
+    const list = Array.isArray(terms) && terms.length ? terms : await this.getTerms()
+    const results = []
+    const partial = []
+    for (const term of list) {
+      try {
+        results.push(await this.getGrades(term))
+      } catch (error) {
+        if (error?.sessionExpired) throw error
+        partial.push({ termLabel: term.label, message: error?.message || '加载失败' })
+      }
+    }
+    if (!results.length && partial.length) {
+      const failure = new Error(partial[0].message || '成绩加载失败')
+      failure.network = true
+      throw failure
+    }
+    const merged = mergeGradeGroups(results)
+    merged.partial = partial
+    return merged
   }
 
   async getExams() {

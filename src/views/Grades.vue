@@ -23,9 +23,9 @@
       </div>
     </section>
 
-    <div v-if="loading && !gradeList.length" class="card loading">正在加载成绩…</div>
+    <div v-if="loading && !displayGroups.length" class="card loading">正在加载成绩…</div>
 
-    <section v-else-if="!gradeList.length" class="card">
+    <section v-else-if="!displayGroups.length" class="card">
       <EmptyState
         icon="book"
         :title="emptyTitle"
@@ -37,28 +37,31 @@
 
     <template v-else>
       <p v-if="errors.grades" class="error-text list-error">{{ errors.grades }}</p>
+      <p v-if="partialLabel" class="cache-tip">{{ partialLabel }}</p>
 
-      <div class="section-head">
-        <h2>课程成绩</h2>
-        <span class="pill">{{ gradeList.length }} 门</span>
-      </div>
-
-      <section class="card list">
-        <div v-for="item in gradeList" :key="item.id" class="grade-row">
-          <div class="grade-main">
-            <p class="grade-name">{{ item.courseName }}</p>
-            <p class="grade-meta">{{ metaLine(item) }}</p>
-          </div>
-          <div class="grade-side">
-            <span class="grade-score" :class="{ failed: isFailed(item) }">
-              {{ item.score || '—' }}
-            </span>
-            <span v-if="item.gradePoint !== null" class="grade-point">
-              绩点 {{ formatNumber(item.gradePoint) }}
-            </span>
-          </div>
+      <div v-for="group in displayGroups" :key="group.key" class="term-group">
+        <div class="section-head">
+          <h2>{{ group.title }}</h2>
+          <span class="pill">{{ group.grades.length }} 门</span>
         </div>
-      </section>
+
+        <section class="card list">
+          <div v-for="item in group.grades" :key="item.id" class="grade-row">
+            <div class="grade-main">
+              <p class="grade-name">{{ item.courseName }}</p>
+              <p class="grade-meta">{{ metaLine(item) }}</p>
+            </div>
+            <div class="grade-side">
+              <span class="grade-score" :class="{ failed: isFailed(item) }">
+                {{ item.score || '—' }}
+              </span>
+              <span v-if="item.gradePoint !== null" class="grade-point">
+                绩点 {{ formatNumber(item.gradePoint) }}
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <p class="footnote tiny">
         数据来源：{{ grades.source || '教务系统' }}<template v-if="fetchedLabel"> · 更新于 {{ fetchedLabel }}</template>
@@ -69,6 +72,10 @@
       <div class="sheet">
         <p class="sheet-title">选择学期</p>
         <div class="sheet-list">
+          <button type="button" class="sheet-row" @click="selectAll">
+            <span>全部学期</span>
+            <span v-if="allMode" class="check">✓</span>
+          </button>
           <button
             v-for="term in terms"
             :key="`${term.xnm}_${term.xqm}`"
@@ -99,21 +106,41 @@ const { terms, currentTerm, grades, loading, errors } = storeToRefs(academic)
 
 const selectedTerm = ref(null)
 const sheetOpen = ref(false)
+const allMode = ref(false)
 
 const gradeList = computed(() => grades.value?.grades || [])
 const summary = computed(() => grades.value?.summary || null)
-const selectedLabel = computed(
-  () => selectedTerm.value?.label || currentTerm.value?.label || '选择学期'
-)
+const displayGroups = computed(() => {
+  if (allMode.value) {
+    return (grades.value?.groups || []).map((group) => ({
+      key: group.key,
+      title: group.termLabel,
+      grades: group.grades
+    }))
+  }
+  return gradeList.value.length
+    ? [{ key: 'current', title: '课程成绩', grades: gradeList.value }]
+    : []
+})
+const selectedLabel = computed(() => {
+  if (allMode.value) return '全部学期'
+  return selectedTerm.value?.label || currentTerm.value?.label || '选择学期'
+})
+const partialLabel = computed(() => {
+  const partial = grades.value?.partial || []
+  if (!partial.length) return ''
+  return `部分学期加载失败：${partial.map((item) => item.termLabel).join('、')}`
+})
 const gpaLabel = computed(() => {
   const gpa = summary.value?.gpa
   return gpa === null || gpa === undefined ? '—' : Number(gpa).toFixed(2)
 })
 const creditsLabel = computed(() => formatNumber(summary.value?.totalCredits ?? 0))
 const emptyTitle = computed(() => (errors.value.grades ? '成绩暂不可用' : '暂无成绩'))
-const emptyDescription = computed(
-  () => errors.value.grades || '该学期还没有成绩记录。'
-)
+const emptyDescription = computed(() => {
+  if (errors.value.grades) return errors.value.grades
+  return allMode.value ? '该账号还没有任何学期成绩。' : '该学期还没有成绩记录。'
+})
 const fetchedLabel = computed(() => {
   const value = grades.value?.fetchedAt
   if (!value) return ''
@@ -164,14 +191,24 @@ function closeSheet() {
   sheetOpen.value = false
 }
 
+function selectAll() {
+  closeSheet()
+  if (allMode.value) return
+  allMode.value = true
+  selectedTerm.value = null
+  academic.loadAllGrades(terms.value)
+}
+
 function selectTerm(term) {
   closeSheet()
+  allMode.value = false
   if (selectedTerm.value && sameTerm(selectedTerm.value, term)) return
   selectedTerm.value = term
   academic.loadGrades(term)
 }
 
 function reload() {
+  if (allMode.value) return academic.loadAllGrades(terms.value)
   academic.loadGrades(selectedTerm.value || currentTerm.value)
 }
 

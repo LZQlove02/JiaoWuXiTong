@@ -17,6 +17,7 @@ export const api = {
   getTerms: (...args) => target.getTerms(...args),
   getSchedule: (...args) => target.getSchedule(...args),
   getGrades: (...args) => target.getGrades(...args),
+  getAllGrades: (...args) => target.getAllGrades(...args),
   getExams: (...args) => target.getExams(...args),
   getEvaluations: (...args) => target.getEvaluations(...args),
   getCourseSelectionStatus: (...args) => target.getCourseSelectionStatus(...args),

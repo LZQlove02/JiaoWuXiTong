@@ -73,6 +73,19 @@ export const useAcademicStore = defineStore('academic', () => {
     }
   }
 
+  async function loadAllGrades(termList = terms.value) {
+    loading.value = true
+    setError('grades', '')
+    grades.value = null
+    try {
+      grades.value = await api.getAllGrades(termList)
+    } catch (err) {
+      setError('grades', err.message || '成绩加载失败')
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function loadExams(term = currentTerm.value) {
     loading.value = true
     setError('exams', '')
@@ -141,6 +154,7 @@ export const useAcademicStore = defineStore('academic', () => {
     initTerms,
     loadSchedule,
     loadGrades,
+    loadAllGrades,
     loadExams,
     loadEvaluations,
     loadCourseSelection,

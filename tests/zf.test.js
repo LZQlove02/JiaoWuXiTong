@@ -5,6 +5,7 @@ import {
   clearScheduleSnapshot,
   mapEvaluations,
   mapGrades,
+  mergeGradeGroups,
   parseCourseSelectionStatus,
   parseTermsFromHtml
 } from '../src/api/zf'
@@ -215,6 +216,24 @@ describe('成绩解析与学期列表', () => {
     expect(terms.find((item) => item.xqm === '16').label).toContain('第三学期（暑期）')
   })
 
+  it('2026 级只显示入学当年与当前学期', () => {
+    const html = `
+      <select name="xnm">
+        <option value="2025">2025-2026</option>
+        <option value="2026">2026-2027</option>
+        <option value="2027">2027-2028</option>
+      </select>
+      <select name="xqm">
+        <option value="3">第一学期</option>
+        <option value="12">第二学期</option>
+        <option value="16">第三学期</option>
+      </select>
+    `
+    const current = { xnm: '2026', xqm: '3', label: '2026-2027 学年第一学期' }
+    const terms = parseTermsFromHtml(html, current, { enrollmentYear: 2026 })
+    expect(terms.map((item) => `${item.xnm}_${item.xqm}`)).toEqual(['2026_3'])
+  })
+
   it('成绩页不可用时按入学年份生成学期兜底', async () => {
     authGet.mockRejectedValue(networkError())
     const api = new ZfAcademicApi()
@@ -337,5 +356,66 @@ describe('评教记录与选课状态（只读）', () => {
     expect(authGet).toHaveBeenCalledTimes(1)
     expect(authGet.mock.calls[0][0]).toContain('gnmkdm=N253512')
     expect(result.open).toBe(false)
+  })
+})
+
+describe('全部学期成绩汇总', () => {
+  beforeEach(() => {
+    authGet.mockReset()
+    authPost.mockReset()
+  })
+
+  it('只保留有成绩的学期，并汇总全部学分与绩点', () => {
+    const merged = mergeGradeGroups([
+      {
+        term: { xnm: '2026', xqm: '3', label: '2026-2027 学年第一学期' },
+        grades: [{ id: 'a', credit: 2, gradePoint: 4, courseName: '课程 A' }]
+      },
+      {
+        term: { xnm: '2025', xqm: '12', label: '2025-2026 学年第二学期' },
+        grades: []
+      },
+      {
+        term: { xnm: '2025', xqm: '3', label: '2025-2026 学年第一学期' },
+        grades: [{ id: 'b', credit: 4, gradePoint: 3, courseName: '课程 B' }]
+      }
+    ])
+    expect(merged.groups).toHaveLength(2)
+    expect(merged.summary).toEqual({ gpa: 3.33, totalCredits: 6, count: 2 })
+    expect(merged.all).toBe(true)
+  })
+
+  it('getAllGrades 逐学期查询并保留部分失败信息', async () => {
+    authPost.mockImplementation((url, body) => {
+      if (body.includes('xqm=3')) {
+        return Promise.resolve({
+          status: 200,
+          body: JSON.stringify({
+            items: [{ key: 'a', kch: '1', kcmc: '课程 A', cj: '90', xf: '2', jd: '4' }]
+          })
+        })
+      }
+      if (body.includes('xqm=12')) {
+        return Promise.resolve({
+          status: 200,
+          body: JSON.stringify({
+            items: [{ key: 'b', kch: '2', kcmc: '课程 B', cj: '80', xf: '2', jd: '3' }]
+          })
+        })
+      }
+      return Promise.reject(new Error('网络错误'))
+    })
+    const api = new ZfAcademicApi()
+    api.term = term
+    const result = await api.getAllGrades([
+      { xnm: '2026', xqm: '3', label: '2026-2027 学年第一学期' },
+      { xnm: '2025', xqm: '12', label: '2025-2026 学年第二学期' },
+      { xnm: '2025', xqm: '16', label: '2025-2026 学年第三学期（暑期）' }
+    ])
+    expect(authPost).toHaveBeenCalledTimes(3)
+    expect(result.groups).toHaveLength(2)
+    expect(result.summary.count).toBe(2)
+    expect(result.partial).toHaveLength(1)
+    expect(result.partial[0].termLabel).toContain('第三学期')
   })
 })
