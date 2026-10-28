@@ -7,7 +7,7 @@ export function termParamsFor(date = new Date()) {
   return { xnm: String(year - 1), xqm: '12' }
 }
 
-const TERM_NAMES = { 3: '第一学期', 12: '第二学期', 16: '第三学期' }
+const TERM_NAMES = { 3: '第一学期', 12: '第二学期', 16: '第三学期（暑期）' }
 
 export function buildTerm(xnm, xqm, options = {}) {
   const year = String(xnm)

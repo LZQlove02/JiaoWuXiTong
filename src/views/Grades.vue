@@ -80,6 +80,7 @@
             <span v-if="isSelected(term)" class="check">✓</span>
           </button>
         </div>
+        <p class="sheet-tip">第三学期为暑期短学期，通常没有课程安排。</p>
       </div>
     </div>
   </div>
@@ -367,6 +368,13 @@ onUnmounted(() => ui.clearOverlayCloser())
   margin-bottom: 6px;
   font-size: 16px;
   font-weight: 600;
+  text-align: center;
+}
+
+.sheet-tip {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-tertiary);
   text-align: center;
 }
 

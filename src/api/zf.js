@@ -205,7 +205,7 @@ function isAfterCurrent(term, current) {
 }
 
 // 从成绩查询页的学年 / 学期下拉框解析全部学期；页面结构变化时返回空数组，由调用方兜底
-export function parseTermsFromHtml(html, currentTerm = null) {
+export function parseTermsFromHtml(html, currentTerm = null, options = {}) {
   const selects = parseSelects(html)
   const yearSelect = selects.find((select) => /xnm/i.test(select.name))
     || selects.find((select) => select.options.some((option) => /学年/.test(option.label)))
@@ -213,7 +213,14 @@ export function parseTermsFromHtml(html, currentTerm = null) {
 
   const quarterSelect = selects.find((select) => /xqm/i.test(select.name))
     || selects.find((select) => select.options.some((option) => /学期/.test(option.label)))
+  // 教务下拉框包含系统全部年份，按入学年份收口，避免出现入学前的学期
+  const enrollmentYear = Number(options?.enrollmentYear)
+  const currentYear = Number(currentTerm?.xnm) || new Date().getFullYear()
+  const minYear = Number.isFinite(enrollmentYear) && enrollmentYear >= 2000
+    ? enrollmentYear
+    : currentYear - 5
   const years = [...new Set(yearSelect.options.map(optionYear).filter(Boolean))]
+    .filter((year) => Number(year) >= minYear)
   let quarters = quarterSelect
     ? [...new Set(quarterSelect.options.map(optionQuarter).filter(Boolean))]
     : []
@@ -464,7 +471,7 @@ export class ZfAcademicApi {
       if (response?.status !== 200) return []
       const body = String(response.body || '').replace(/^\uFEFF/, '')
       if (!/^\s*</.test(body)) return []
-      return parseTermsFromHtml(body, this.term)
+      return parseTermsFromHtml(body, this.term, { enrollmentYear: this.profile?.enrollmentYear })
     } catch (error) {
       return []
     }

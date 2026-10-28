@@ -190,6 +190,31 @@ describe('成绩解析与学期列表', () => {
     expect(parseTermsFromHtml('<html><body></body></html>', term)).toEqual([])
   })
 
+  it('按入学年份过滤入学前的学期，并标注第三学期为暑期', () => {
+    const html = `
+      <select name="xnm">
+        <option value="2004">2004-2005</option>
+        <option value="2024">2024-2025</option>
+        <option value="2025">2025-2026</option>
+        <option value="2026">2026-2027</option>
+      </select>
+      <select name="xqm">
+        <option value="3">第一学期</option>
+        <option value="12">第二学期</option>
+        <option value="16">第三学期</option>
+      </select>
+    `
+    const terms = parseTermsFromHtml(html, term, { enrollmentYear: 2025 })
+    expect(terms.map((item) => `${item.xnm}_${item.xqm}`)).toEqual([
+      '2026_3',
+      '2025_16',
+      '2025_12',
+      '2025_3'
+    ])
+    expect(terms.every((item) => Number(item.xnm) >= 2025)).toBe(true)
+    expect(terms.find((item) => item.xqm === '16').label).toContain('第三学期（暑期）')
+  })
+
   it('成绩页不可用时按入学年份生成学期兜底', async () => {
     authGet.mockRejectedValue(networkError())
     const api = new ZfAcademicApi()
