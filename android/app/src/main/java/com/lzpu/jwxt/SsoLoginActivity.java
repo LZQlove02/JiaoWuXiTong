@@ -13,6 +13,7 @@ import android.webkit.CookieManager;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
+import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
@@ -254,11 +255,9 @@ public class SsoLoginActivity extends Activity {
         if (finished) return;
         finished = true;
 
+        // 只回传教务系统自身的会话 Cookie；统一认证侧的票据 Cookie 不得跨域发送。
         Map<String, String> cookies = new LinkedHashMap<>();
         collectCookies(cookies, "https://zfjw.lzzy.net");
-        collectCookies(cookies, "http://zfjw.lzzy.net");
-        collectCookies(cookies, "https://authserver.lzzy.net");
-        collectCookies(cookies, "http://authserver.lzzy.net");
 
         StringBuilder header = new StringBuilder();
         for (Map.Entry<String, String> entry : cookies.entrySet()) {
@@ -269,8 +268,25 @@ public class SsoLoginActivity extends Activity {
         Intent data = new Intent();
         data.putExtra("cookieHeader", header.toString());
         data.putExtra("finalUrl", webView.getUrl());
+        clearSessionData();
         setResult(RESULT_OK, data);
         finish();
+    }
+
+    /**
+     * 登录流程结束后清空 WebView 持有的 Cookie 与缓存，
+     * 避免会话明文残留在应用私有目录，会话本身由 AuthCookieStore 加密保存。
+     */
+    private void clearSessionData() {
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.removeAllCookies(null);
+        cookieManager.flush();
+        WebStorage.getInstance().deleteAllData();
+        if (webView == null) return;
+        webView.clearCache(true);
+        webView.clearHistory();
+        webView.clearFormData();
+        webView.loadUrl("about:blank");
     }
 
     private void collectCookies(Map<String, String> target, String url) {
@@ -288,6 +304,7 @@ public class SsoLoginActivity extends Activity {
     private void cancel() {
         if (finished) return;
         finished = true;
+        clearSessionData();
         setResult(RESULT_CANCELED);
         finish();
     }

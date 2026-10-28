@@ -110,7 +110,11 @@ export class ZfAcademicApi {
         payload = second
       }
     }
-    if (!payload?.xsxx) throw new Error('登录会话已失效')
+    if (!payload?.xsxx) {
+      const failure = new Error('课表数据缺少必要字段')
+      failure.parseError = true
+      throw failure
+    }
 
     this.profile = mapProfile(payload.xsxx)
     this.term = mapTerm(payload.xsxx, params)
@@ -130,12 +134,26 @@ export class ZfAcademicApi {
       throw failure
     }
     if (response.status !== 200) {
-      throw new Error(`课表接口返回 ${response.status}`)
+      const failure = new Error(`课表接口返回 ${response.status}`)
+      failure.status = response.status
+      failure.sessionExpired = response.status === 401 || response.status === 403
+      throw failure
+    }
+    const body = String(response.body || '')
+    // 会话失效时教务系统会返回 200 + 登录页 HTML，不能只按状态码判定成功
+    if (/^\s*</.test(body)) {
+      const expired = /login_slogin|统一身份认证|authserver/i.test(body)
+      const failure = new Error(expired ? '登录会话已失效' : '课表数据解析失败')
+      if (expired) failure.sessionExpired = true
+      else failure.parseError = true
+      throw failure
     }
     try {
-      return JSON.parse(response.body)
+      return JSON.parse(body)
     } catch (error) {
-      throw new Error('课表数据解析失败')
+      const failure = new Error('课表数据解析失败')
+      failure.parseError = true
+      throw failure
     }
   }
 

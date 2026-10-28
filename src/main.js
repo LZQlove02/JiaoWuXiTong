@@ -13,10 +13,7 @@ app.use(pinia)
 
 const auth = useAuthStore(pinia)
 
-async function bootstrap() {
-  await auth.restoreSession()
-  app.use(router)
-  app.mount('#app')
-}
-
-bootstrap()
+// 会话恢复在后台执行，页面立即挂载；路由守卫会等待恢复结果再决定去向
+auth.bootstrap()
+app.use(router)
+app.mount('#app')
