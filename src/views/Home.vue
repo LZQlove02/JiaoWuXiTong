@@ -52,9 +52,25 @@
       </div>
     </section>
 
-    <h2 class="section-title">快捷入口</h2>
-    <div class="grid">
-      <button v-for="entry in entries" :key="entry.path" class="entry card" @click="go(entry.path)">
+    <div class="section-head">
+      <h2 class="section-title">快捷入口</h2>
+      <span class="tiny sort-hint">长按拖动排序</span>
+    </div>
+    <div
+      ref="gridRef"
+      class="grid"
+      :class="{ 'grid--dragging': drag.active }"
+      @pointerdown="onPointerDown"
+      @contextmenu.prevent
+    >
+      <button
+        v-for="entry in orderedEntries"
+        :key="entry.path"
+        :data-path="entry.path"
+        class="entry card"
+        :class="{ 'entry--dragging': drag.active && drag.path === entry.path }"
+        @click="goEntry(entry)"
+      >
         <span class="entry-icon" :style="{ color: entry.color }">
           <AppIcon :name="entry.icon" />
         </span>
@@ -98,16 +114,27 @@
       </button>
       <p v-if="noticesError" class="tiny notice-error">{{ noticesError }}</p>
     </section>
+
+    <Teleport to="body">
+      <div v-if="drag.active && dragEntry" class="drag-ghost" :style="ghostStyle">
+        <span class="entry-icon" :style="{ color: dragEntry.color }">
+          <AppIcon :name="dragEntry.icon" />
+        </span>
+        <span class="entry-label">{{ dragEntry.label }}</span>
+        <span class="tiny">{{ dragEntry.desc }}</span>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
 import { daysUntil, formatDate, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
+import { mergeEntryOrder, movePath } from '../utils/entryOrder'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 
@@ -126,7 +153,9 @@ let clockTimer = null
 const greetingText = computed(() => greeting(now.value.getHours()))
 const weekday = computed(() => getWeekday(now.value))
 
-const entries = [
+const ORDER_KEY = 'lzpu.home.entryOrder.v1'
+
+const baseEntries = [
   { path: '/exams', label: '考试', desc: '考试安排', icon: 'exam', color: '#C0392B' },
   { path: '/notices', label: '通知', desc: '教务公告', icon: 'notice', color: '#1B5FAA' },
   { path: '/messages', label: '消息', desc: '调课提醒', icon: 'message', color: '#0E7490' },
@@ -135,6 +164,187 @@ const entries = [
   { path: '/calendar', label: '校历', desc: '学期安排', icon: 'calendar', color: '#0E7490' },
   { path: '/guide', label: '办事指南', desc: '流程说明', icon: 'guide', color: '#2E8B57' }
 ]
+
+function readSavedOrder() {
+  try {
+    const raw = localStorage.getItem(ORDER_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    return Array.isArray(list) ? list.filter((path) => typeof path === 'string') : []
+  } catch (error) {
+    return []
+  }
+}
+
+const savedOrder = ref(readSavedOrder())
+const orderedEntries = computed(() => mergeEntryOrder(baseEntries, savedOrder.value))
+
+function persistOrder(list) {
+  savedOrder.value = list
+  try {
+    localStorage.setItem(ORDER_KEY, JSON.stringify(list))
+  } catch (error) {
+    // 本地存储不可用时只影响本次排序的持久化
+  }
+}
+
+function moveEntryTo(path, targetIndex) {
+  const list = orderedEntries.value.map((entry) => entry.path)
+  const from = list.indexOf(path)
+  if (from < 0 || from === targetIndex) return
+  persistOrder(movePath(list, path, targetIndex))
+}
+
+const gridRef = ref(null)
+const drag = reactive({
+  active: false,
+  path: '',
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  offsetX: 0,
+  offsetY: 0
+})
+const dragEntry = computed(
+  () => orderedEntries.value.find((entry) => entry.path === drag.path) || null
+)
+const ghostStyle = computed(() => ({
+  width: `${drag.width}px`,
+  height: `${drag.height}px`,
+  left: `${drag.x - drag.offsetX}px`,
+  top: `${drag.y - drag.offsetY}px`
+}))
+
+let pointerId = null
+let pendingDrag = null
+let longPressTimer = null
+let suppressClick = false
+let suppressClickTimer = null
+let savedHtmlOverflow = ''
+let savedBodyOverflow = ''
+
+function lockPageScroll() {
+  savedHtmlOverflow = document.documentElement.style.overflow
+  savedBodyOverflow = document.body.style.overflow
+  document.documentElement.style.overflow = 'hidden'
+  document.body.style.overflow = 'hidden'
+}
+
+function unlockPageScroll() {
+  document.documentElement.style.overflow = savedHtmlOverflow
+  document.body.style.overflow = savedBodyOverflow
+}
+
+function clearLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+function preventScroll(event) {
+  if (drag.active) event.preventDefault()
+}
+
+function removeWindowListeners() {
+  window.removeEventListener('pointermove', onWindowPointerMove)
+  window.removeEventListener('pointerup', onWindowPointerUp)
+  window.removeEventListener('pointercancel', onWindowPointerCancel)
+}
+
+function cleanupPointer() {
+  clearLongPress()
+  removeWindowListeners()
+  document.removeEventListener('touchmove', preventScroll)
+  unlockPageScroll()
+  pointerId = null
+  pendingDrag = null
+}
+
+function onPointerDown(event) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  const card = event.target?.closest?.('.entry')
+  if (!card) return
+  const path = card.dataset.path
+  if (!path || pointerId !== null) return
+
+  pointerId = event.pointerId
+  pendingDrag = { path, card, startX: event.clientX, startY: event.clientY }
+  window.addEventListener('pointermove', onWindowPointerMove, { passive: false })
+  window.addEventListener('pointerup', onWindowPointerUp)
+  window.addEventListener('pointercancel', onWindowPointerCancel)
+  clearLongPress()
+  longPressTimer = setTimeout(() => {
+    if (pendingDrag) beginDrag(pendingDrag)
+  }, 400)
+}
+
+function beginDrag(pending) {
+  if (!pending?.card?.isConnected) return
+  const rect = pending.card.getBoundingClientRect()
+  drag.active = true
+  drag.path = pending.path
+  drag.width = rect.width
+  drag.height = rect.height
+  drag.offsetX = pending.startX - rect.left
+  drag.offsetY = pending.startY - rect.top
+  drag.x = pending.startX
+  drag.y = pending.startY
+  lockPageScroll()
+  document.addEventListener('touchmove', preventScroll, { passive: false })
+  if (navigator.vibrate) navigator.vibrate(10)
+}
+
+function onWindowPointerMove(event) {
+  if (event.pointerId !== pointerId) return
+  if (drag.active) {
+    event.preventDefault()
+    drag.x = event.clientX
+    drag.y = event.clientY
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest?.('.entry')
+    const targetPath = target?.dataset?.path
+    if (targetPath && targetPath !== drag.path) {
+      const targetIndex = orderedEntries.value.findIndex((entry) => entry.path === targetPath)
+      if (targetIndex >= 0) moveEntryTo(drag.path, targetIndex)
+    }
+    return
+  }
+  if (!pendingDrag) return
+  const dx = event.clientX - pendingDrag.startX
+  const dy = event.clientY - pendingDrag.startY
+  if (Math.hypot(dx, dy) > 8) cleanupPointer()
+}
+
+function onWindowPointerUp(event) {
+  if (event.pointerId !== pointerId) return
+  if (drag.active) {
+    drag.active = false
+    drag.path = ''
+    suppressClick = true
+    if (suppressClickTimer) clearTimeout(suppressClickTimer)
+    suppressClickTimer = setTimeout(() => {
+      suppressClick = false
+    }, 400)
+  }
+  cleanupPointer()
+}
+
+function onWindowPointerCancel(event) {
+  if (event.pointerId !== pointerId) return
+  if (drag.active) {
+    drag.active = false
+    drag.path = ''
+  }
+  cleanupPointer()
+}
+
+function goEntry(entry) {
+  if (drag.active || suppressClick) {
+    suppressClick = false
+    return
+  }
+  go(entry.path)
+}
 
 const avatarText = computed(() => (auth.user?.name || '我').slice(-1))
 
@@ -197,6 +407,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer)
+  cleanupPointer()
+  if (suppressClickTimer) clearTimeout(suppressClickTimer)
 })
 </script>
 
@@ -295,10 +507,54 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.section-head .section-title {
+  margin-bottom: 10px;
+}
+
+.sort-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.grid--dragging {
+  touch-action: none;
+}
+
+.entry--dragging {
+  opacity: 0.3;
+}
+
+.drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 12px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);
+  pointer-events: none;
+  opacity: 0.97;
+  transform: scale(1.04);
+  transform-origin: center;
 }
 
 .entry {
