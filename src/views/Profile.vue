@@ -83,7 +83,7 @@ function showToast(message) {
 
 function clearCache() {
   Object.keys(localStorage)
-    .filter((key) => key.startsWith('lzpu.cache'))
+    .filter((key) => key.startsWith('lzpu.cache') || key.startsWith('lzpu.portal.v1.'))
     .forEach((key) => localStorage.removeItem(key))
   showToast('已清除本地缓存')
 }

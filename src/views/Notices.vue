@@ -2,14 +2,26 @@
   <div class="page page--plain">
     <BackBar title="通知公告" />
 
+    <p v-if="portalNoticeListOffline" class="cache-tip">
+      网络不可用，显示缓存<template v-if="portalNoticeListCachedAt">（更新于 {{ formatDateTime(portalNoticeListCachedAt) }}）</template>
+    </p>
+
+    <p v-if="error && items.length" class="tiny error-tip">
+      刷新失败：{{ error }}（显示上次数据）
+    </p>
+    <p v-if="portalNoticeList?.truncated" class="tiny truncate-tip">
+      仅显示前 {{ items.length }} 条，共 {{ portalNoticeList.total }} 条
+    </p>
+
     <LoadState
-      :loading="loading && !items.length"
+      v-if="!items.length"
+      :loading="loading"
       :error="error"
       loading-text="正在加载教务通知…"
       @retry="academic.loadPortalNoticeList"
     />
 
-    <section v-if="!error && !(loading && !items.length)" class="card list">
+    <section v-if="items.length" class="card list">
       <button
         v-for="item in items"
         :key="item.id"
@@ -24,10 +36,15 @@
         </div>
         <AppIcon name="chevron-right" />
       </button>
-      <EmptyState v-if="!items.length" title="暂无通知" description="教务系统暂无通知公告。" />
     </section>
 
-    <p v-if="!error" class="tiny footnote">来源：教务系统（学生门户）</p>
+    <section v-else-if="!error && !loading" class="card">
+      <EmptyState title="暂无通知" description="教务系统暂无通知公告。" />
+    </section>
+
+    <p v-if="!error" class="tiny footnote">
+      来源：{{ portalNoticeList?.source || '教务系统（学生门户）' }}<template v-if="portalNoticeListCachedAt"> · 更新于 {{ formatDateTime(portalNoticeListCachedAt) }}</template>
+    </p>
   </div>
 </template>
 
@@ -36,6 +53,7 @@ import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
+import { formatDateTime } from '../utils/date'
 import BackBar from '../components/BackBar.vue'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -43,7 +61,9 @@ import LoadState from '../components/LoadState.vue'
 
 const router = useRouter()
 const academic = useAcademicStore()
-const { portalNoticeList, loading, errors } = storeToRefs(academic)
+const { portalNoticeList, portalNoticeListLoading, portalNoticeListOffline, portalNoticeListCachedAt, errors } =
+  storeToRefs(academic)
+const loading = portalNoticeListLoading
 
 const items = computed(() => portalNoticeList.value?.items || [])
 const error = computed(() => errors.value.portalNoticeList)
@@ -97,5 +117,15 @@ onMounted(() => {
   font-size: 11px;
   color: var(--danger);
   background: rgba(192, 57, 43, 0.1);
+}
+
+.error-tip {
+  margin-bottom: 10px;
+  color: var(--danger);
+}
+
+.truncate-tip {
+  margin-bottom: 8px;
+  color: var(--text-tertiary);
 }
 </style>

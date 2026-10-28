@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '../api'
+import { PORTAL_NOTICE_TTL, readPortalCache, writePortalCache } from '../utils/portalCache'
 
 const EMPTY_ERRORS = {
   terms: '',
@@ -22,9 +23,16 @@ export const useAcademicStore = defineStore('academic', () => {
   const exams = ref([])
   const evaluations = ref(null)
   const courseSelection = ref(null)
-  const portalNotices = ref([])
+  const portalNotices = ref(null)
   const portalNoticeList = ref(null)
   const messages = ref(null)
+  const portalNoticesLoading = ref(false)
+  const portalNoticeListLoading = ref(false)
+  const messagesLoading = ref(false)
+  const portalNoticesOffline = ref(false)
+  const portalNoticesCachedAt = ref('')
+  const portalNoticeListOffline = ref(false)
+  const portalNoticeListCachedAt = ref('')
   const course = ref(null)
   const loading = ref(false)
   const errors = ref({ ...EMPTY_ERRORS })
@@ -134,35 +142,64 @@ export const useAcademicStore = defineStore('academic', () => {
   }
 
   async function loadPortalNotices() {
+    const cached = readPortalCache('notices.index', PORTAL_NOTICE_TTL)
+    if (cached?.data) {
+      portalNotices.value = cached.data
+      portalNoticesCachedAt.value = cached.cachedAt
+    }
+    portalNoticesLoading.value = true
     setError('portalNotices', '')
     try {
-      portalNotices.value = await api.getPortalNotices()
+      const data = await api.getPortalNotices()
+      portalNotices.value = data
+      portalNoticesOffline.value = false
+      portalNoticesCachedAt.value = data.fetchedAt || new Date().toISOString()
+      writePortalCache('notices.index', data)
     } catch (err) {
-      setError('portalNotices', err.message || '教务通知加载失败')
+      if (portalNotices.value) {
+        portalNoticesOffline.value = true
+      } else {
+        setError('portalNotices', err.message || '教务通知加载失败')
+      }
+    } finally {
+      portalNoticesLoading.value = false
     }
   }
 
   async function loadPortalNoticeList() {
-    loading.value = true
+    const cached = readPortalCache('notices.list', PORTAL_NOTICE_TTL)
+    if (cached?.data) {
+      portalNoticeList.value = cached.data
+      portalNoticeListCachedAt.value = cached.cachedAt
+    }
+    portalNoticeListLoading.value = true
     setError('portalNoticeList', '')
     try {
-      portalNoticeList.value = await api.getPortalNoticeList()
+      const data = await api.getPortalNoticeList()
+      portalNoticeList.value = data
+      portalNoticeListOffline.value = false
+      portalNoticeListCachedAt.value = data.fetchedAt || new Date().toISOString()
+      writePortalCache('notices.list', data)
     } catch (err) {
-      setError('portalNoticeList', err.message || '教务通知加载失败')
+      if (portalNoticeList.value) {
+        portalNoticeListOffline.value = true
+      } else {
+        setError('portalNoticeList', err.message || '教务通知加载失败')
+      }
     } finally {
-      loading.value = false
+      portalNoticeListLoading.value = false
     }
   }
 
   async function loadMessages() {
-    loading.value = true
+    messagesLoading.value = true
     setError('messages', '')
     try {
       messages.value = await api.getMessages()
     } catch (err) {
       setError('messages', err.message || '消息加载失败')
     } finally {
-      loading.value = false
+      messagesLoading.value = false
     }
   }
 
@@ -174,9 +211,16 @@ export const useAcademicStore = defineStore('academic', () => {
     exams.value = []
     evaluations.value = null
     courseSelection.value = null
-    portalNotices.value = []
+    portalNotices.value = null
     portalNoticeList.value = null
     messages.value = null
+    portalNoticesLoading.value = false
+    portalNoticeListLoading.value = false
+    messagesLoading.value = false
+    portalNoticesOffline.value = false
+    portalNoticesCachedAt.value = ''
+    portalNoticeListOffline.value = false
+    portalNoticeListCachedAt.value = ''
     course.value = null
     loading.value = false
     errors.value = { ...EMPTY_ERRORS }
@@ -193,6 +237,13 @@ export const useAcademicStore = defineStore('academic', () => {
     portalNotices,
     portalNoticeList,
     messages,
+    portalNoticesLoading,
+    portalNoticeListLoading,
+    messagesLoading,
+    portalNoticesOffline,
+    portalNoticesCachedAt,
+    portalNoticeListOffline,
+    portalNoticeListCachedAt,
     course,
     loading,
     errors,

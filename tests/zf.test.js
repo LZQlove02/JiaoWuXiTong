@@ -456,7 +456,7 @@ describe('学生门户通知与消息（只读）', () => {
       <a href="/xtgl/xwck_ckXw.html?xwbh=ID1&doType=save">【置顶】 【通知】 关于做好2026-2027学年上学期课程重修工作的通知 2026-09-16</a>
       <a href="/xtgl/xwck_ckXw.html?xwbh=ID2&doType=save">【通知】 关于2026年下半年大学英语等级考试报名工作的通知 2026-09-15</a>
     `
-    const items = parsePortalNoticeIndex(html)
+    const items = parsePortalNoticeIndex(html).items
     expect(items).toHaveLength(2)
     expect(items[0]).toMatchObject({ id: 'ID1', date: '2026-09-16', pinned: true })
     expect(items[0].title).toBe('关于做好2026-2027学年上学期课程重修工作的通知')
@@ -511,5 +511,94 @@ describe('学生门户通知与消息（只读）', () => {
     expect(result.items[0].id).toBe('m2')
     expect(result.items[1].content).toBe('周一第 1-2 节调课')
     expect(result.source).toBe('教务系统（只读）')
+  })
+
+  it('结构无法识别时抛错，不伪装成暂无数据', () => {
+    expect(() => parsePortalNoticeIndex('<div>系统升级</div>')).toThrow()
+    expect(() => parsePortalNoticeList({ totalResult: 2, items: [] })).toThrow()
+    expect(() => parsePortalNoticeList({ totalResult: 1, items: [{ foo: 'bar' }] })).toThrow()
+    expect(() => parseMessages({ totalResult: 3, items: [] })).toThrow()
+    expect(() => parsePortalNoticeDetail('<div>没有标题</div>')).toThrow()
+  })
+
+  it('消息缺少 zjxx 时用标题与时间生成稳定 id', () => {
+    const payload = {
+      totalResult: 1,
+      items: [{ xxbt: '调课提醒 X', cjsj: '2026-10-01 10:00:00' }]
+    }
+    const first = parseMessages(payload).items[0].id
+    const second = parseMessages(payload).items[0].id
+    expect(first).toBe(second)
+    expect(first).toMatch(/^msg_/)
+  })
+
+  it('详情只有图片时仍可展示，并给出图片数量', () => {
+    const html = `
+      <h3>图片通知</h3>
+      <div class="news_con"><p><img src="a.png" /></p></div>
+    `
+    const detail = parsePortalNoticeDetail(html)
+    expect(detail.title).toBe('图片通知')
+    expect(detail.images).toBe(1)
+    expect(detail.paragraphs).toEqual([])
+  })
+})
+
+describe('学生门户请求与分页', () => {
+  beforeEach(() => {
+    authGet.mockReset()
+    authPost.mockReset()
+  })
+
+  it('通知列表按页拉取并合并，请求带 queryModel 参数', async () => {
+    const page1 = {
+      totalResult: 150,
+      items: Array.from({ length: 100 }, (_, index) => ({
+        xwbh: `a${index}`,
+        xwbtqc: `通知 A${index}`,
+        fbsj: '2026-09-16'
+      }))
+    }
+    const page2 = {
+      totalResult: 150,
+      items: Array.from({ length: 50 }, (_, index) => ({
+        xwbh: `b${index}`,
+        xwbtqc: `通知 B${index}`,
+        fbsj: '2026-09-15'
+      }))
+    }
+    authPost
+      .mockResolvedValueOnce({ status: 200, body: JSON.stringify(page1) })
+      .mockResolvedValueOnce({ status: 200, body: JSON.stringify(page2) })
+
+    const result = await new ZfAcademicApi().getPortalNoticeList()
+    expect(result.items).toHaveLength(150)
+    expect(result.truncated).toBe(false)
+    expect(authPost.mock.calls[0][1]).toContain('queryModel.showCount=100')
+    expect(authPost.mock.calls[0][1]).toContain('queryModel.currentPage=1')
+    expect(authPost.mock.calls[1][1]).toContain('queryModel.currentPage=2')
+  })
+
+  it('消息请求带 flag=1 & sfyy=1', async () => {
+    authPost.mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({
+        totalResult: 1,
+        items: [{ zjxx: 'm1', xxbt: '调课提醒', cjsj: '2026-10-08 15:56:39' }]
+      })
+    })
+    const result = await new ZfAcademicApi().getMessages()
+    expect(result.items).toHaveLength(1)
+    expect(authPost.mock.calls[0][1]).toContain('flag=1&sfyy=1')
+  })
+
+  it('返回登录页 HTML 时标记会话失效而不是解析失败', async () => {
+    authGet.mockResolvedValue({
+      status: 200,
+      body: '<html><body><form id="login_slogin"></form></body></html>'
+    })
+    await expect(new ZfAcademicApi().getPortalNotices()).rejects.toMatchObject({
+      sessionExpired: true
+    })
   })
 })

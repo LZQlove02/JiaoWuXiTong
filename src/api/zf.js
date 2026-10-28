@@ -380,6 +380,21 @@ function cleanNoticeTitle(text) {
     .trim()
 }
 
+function parseFailure(message) {
+  const failure = new Error(message)
+  failure.parseError = true
+  return failure
+}
+
+function hashString(value) {
+  let hash = 0
+  const text = String(value || '')
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) | 0
+  }
+  return Math.abs(hash).toString(36)
+}
+
 export function parsePortalNoticeIndex(html) {
   const text = String(html || '')
   const seen = new Set()
@@ -399,22 +414,49 @@ export function parsePortalNoticeIndex(html) {
       pinned: /【置顶】/.test(raw)
     })
   }
-  return items
+  if (!items.length) {
+    if (/xwck_ckXw\.html/.test(text)) {
+      throw parseFailure('通知列表结构无法识别')
+    }
+    if (!/暂无|无数据/.test(text)) {
+      throw parseFailure('通知列表结构无法识别')
+    }
+  }
+  return {
+    total: items.length,
+    items,
+    source: '教务系统（学生门户）',
+    fetchedAt: new Date().toISOString()
+  }
 }
 
 export function parsePortalNoticeList(payload) {
-  const items = (Array.isArray(payload?.items) ? payload.items : [])
-    .map((item, index) => ({
-      id: String(item?.xwbh || item?.row_id || index),
+  if (!Array.isArray(payload?.items)) {
+    throw parseFailure('通知数据缺少 items')
+  }
+  const rawItems = payload.items
+  const items = rawItems
+    .map((item) => ({
+      id: String(item?.xwbh || item?.row_id || '').trim(),
       title: String(item?.xwbtqc || item?.xwbt || '').trim(),
       date: String(item?.fbsj || '').slice(0, 10),
       publisher: String(item?.fbr || '').trim(),
       pinned: String(item?.sfzd) === '1'
     }))
-    .filter((item) => item.title)
+    .filter((item) => item.id && item.title)
+  if (rawItems.length > 0 && items.length === 0) {
+    throw parseFailure('通知数据字段无法识别')
+  }
   const total = Number(payload?.totalResult)
+  if (Number.isFinite(total) && total < items.length) {
+    throw parseFailure('通知数据总数异常')
+  }
+  const resolvedTotal = Number.isFinite(total) ? total : items.length
+  if (rawItems.length === 0 && resolvedTotal > 0) {
+    throw parseFailure('通知数据为空但总数非零')
+  }
   return {
-    total: Number.isFinite(total) && total >= items.length ? total : items.length,
+    total: resolvedTotal,
     items,
     source: '教务系统（学生门户）',
     fetchedAt: new Date().toISOString()
@@ -424,18 +466,11 @@ export function parsePortalNoticeList(payload) {
 export function parsePortalNoticeDetail(html) {
   const source = String(html || '')
   if (typeof DOMParser === 'undefined') {
-    return {
-      title: '',
-      publishedAt: '',
-      views: null,
-      paragraphs: source ? [htmlToText(source)] : [],
-      attachments: [],
-      source: '教务系统（学生门户）',
-      fetchedAt: new Date().toISOString()
-    }
+    throw parseFailure('通知详情解析环境不可用')
   }
   const doc = new DOMParser().parseFromString(source, 'text/html')
   const title = (doc.querySelector('h3')?.textContent || '').trim()
+  if (!title) throw parseFailure('通知详情缺少标题')
   const meta = (doc.querySelector('.news_title1')?.textContent || '').replace(/\s+/g, ' ')
   const publishedAt = (meta.match(/发布时间[:：]\s*([0-9-]+\s+[0-9:]+)/) || [])[1] || ''
   const views = Number((meta.match(/浏览人数[:：]\s*(\d+)/) || [])[1]) || null
@@ -451,6 +486,7 @@ export function parsePortalNoticeDetail(html) {
       if (text) paragraphs.push(text)
     }
   }
+  const images = content ? [...content.querySelectorAll('img')].length : 0
   const attachments = [...doc.querySelectorAll('a[href*="filename="]')]
     .map((a) => {
       const href = a.getAttribute('href') || ''
@@ -464,30 +500,54 @@ export function parsePortalNoticeDetail(html) {
       return { name: name || (a.textContent || '').trim(), href }
     })
     .filter((item) => item.name)
+  if (!paragraphs.length && !attachments.length && images === 0) {
+    throw parseFailure('通知详情没有可展示内容')
+  }
   return {
     title,
     publishedAt,
     views,
     paragraphs,
+    images,
     attachments,
     source: '教务系统（学生门户）',
     fetchedAt: new Date().toISOString()
   }
 }
 
+function messageId(item) {
+  const explicit = String(item?.zjxx || item?.id || item?.w_id || '').trim()
+  if (explicit) return explicit
+  return `msg_${hashString(`${item?.xxbt || ''}|${item?.cjsj || ''}`)}`
+}
+
 export function parseMessages(payload) {
-  const items = (Array.isArray(payload?.items) ? payload.items : [])
-    .map((item, index) => ({
-      id: String(item?.zjxx || item?.id || item?.w_id || index),
+  if (!Array.isArray(payload?.items)) {
+    throw parseFailure('消息数据缺少 items')
+  }
+  const rawItems = payload.items
+  const items = rawItems
+    .map((item) => ({
+      id: messageId(item),
       title: String(item?.xxbt || '').trim(),
       content: htmlToText(item?.xxnr || ''),
       time: String(item?.cjsj || '').trim()
     }))
     .filter((item) => item.title)
     .sort((a, b) => b.time.localeCompare(a.time))
+  if (rawItems.length > 0 && items.length === 0) {
+    throw parseFailure('消息数据字段无法识别')
+  }
   const total = Number(payload?.totalResult)
+  if (Number.isFinite(total) && total < items.length) {
+    throw parseFailure('消息数据总数异常')
+  }
+  const resolvedTotal = Number.isFinite(total) ? total : items.length
+  if (rawItems.length === 0 && resolvedTotal > 0) {
+    throw parseFailure('消息数据为空但总数非零')
+  }
   return {
-    total: Number.isFinite(total) && total >= items.length ? total : items.length,
+    total: resolvedTotal,
     items,
     source: '教务系统（只读）',
     fetchedAt: new Date().toISOString()
@@ -878,7 +938,7 @@ export class ZfAcademicApi {
       throw failure
     }
     const raw = String(response.body || '').replace(/^\uFEFF/, '')
-    if (/^\s*</.test(raw) && /login_slogin|统一身份认证/.test(raw)) {
+    if (/^\s*</.test(raw) && /login_slogin|统一身份认证|authserver/i.test(raw)) {
       const failure = new Error('登录会话已失效')
       failure.sessionExpired = true
       throw failure
@@ -894,42 +954,59 @@ export class ZfAcademicApi {
   }
 
   async getPortalNotices() {
-    if (!this.term) throw new Error('尚未登录')
     return this.requestPortal(PORTAL_NOTICE_INDEX, parsePortalNoticeIndex)
   }
 
+  async collectPortalPages(url, buildBody, parser) {
+    const items = []
+    const seen = new Set()
+    let total = 0
+    for (let page = 1; page <= 20; page += 1) {
+      const result = await this.requestPortal(url, parser, {
+        method: 'POST',
+        body: buildBody(page)
+      })
+      total = result.total
+      for (const item of result.items) {
+        if (seen.has(item.id)) continue
+        seen.add(item.id)
+        items.push(item)
+      }
+      if (items.length >= total || result.items.length < 100 || page >= 20) break
+    }
+    return { total, items, truncated: items.length < total }
+  }
+
   async getPortalNoticeList() {
-    if (!this.term) throw new Error('尚未登录')
     const parser = (raw) => {
       let payload
       try {
         payload = JSON.parse(raw)
       } catch (error) {
-        const failure = new Error('通知数据解析失败')
-        failure.parseError = true
-        throw failure
-      }
-      if (!payload || !Array.isArray(payload.items)) {
         const failure = new Error('通知数据解析失败')
         failure.parseError = true
         throw failure
       }
       return parsePortalNoticeList(payload)
     }
-    return this.requestPortal(PORTAL_NOTICE_LIST, parser, {
-      method: 'POST',
-      body: 'queryModel.showCount=100&queryModel.currentPage=1'
-    })
+    const result = await this.collectPortalPages(
+      PORTAL_NOTICE_LIST,
+      (page) => `queryModel.showCount=100&queryModel.currentPage=${page}`,
+      parser
+    )
+    return {
+      ...result,
+      source: '教务系统（学生门户）',
+      fetchedAt: new Date().toISOString()
+    }
   }
 
   async getPortalNoticeDetail(id) {
-    if (!this.term) throw new Error('尚未登录')
     const url = `${PORTAL_NOTICE_DETAIL}?xwbh=${encodeURIComponent(id)}`
     return this.requestPortal(url, parsePortalNoticeDetail)
   }
 
   async getMessages() {
-    if (!this.term) throw new Error('尚未登录')
     const parser = (raw) => {
       let payload
       try {
@@ -939,17 +1016,18 @@ export class ZfAcademicApi {
         failure.parseError = true
         throw failure
       }
-      if (!payload || !Array.isArray(payload.items)) {
-        const failure = new Error('消息数据解析失败')
-        failure.parseError = true
-        throw failure
-      }
       return parseMessages(payload)
     }
-    return this.requestPortal(PORTAL_MESSAGES, parser, {
-      method: 'POST',
-      body: 'flag=1&sfyy=1&queryModel.showCount=100&queryModel.currentPage=1'
-    })
+    const result = await this.collectPortalPages(
+      PORTAL_MESSAGES,
+      (page) => `flag=1&sfyy=1&queryModel.showCount=100&queryModel.currentPage=${page}`,
+      parser
+    )
+    return {
+      ...result,
+      source: '教务系统（只读）',
+      fetchedAt: new Date().toISOString()
+    }
   }
 
   async getCourse(id) {

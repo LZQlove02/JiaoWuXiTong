@@ -57,7 +57,6 @@
       <span class="tiny sort-hint">长按拖动排序</span>
     </div>
     <div
-      ref="gridRef"
       class="grid"
       :class="{ 'grid--dragging': drag.active }"
       @pointerdown="onPointerDown"
@@ -84,17 +83,21 @@
         <h2 class="card-title">最新消息</h2>
         <router-link to="/messages" class="link">全部</router-link>
       </div>
-      <p class="tiny source">来源：教务系统（学生门户）</p>
-      <button
-        v-for="msg in latestMessages"
-        :key="msg.id"
-        class="notice-row"
-        @click="openMessage(msg.id)"
-      >
-        <span class="notice-title message-title">{{ msg.title }}</span>
-        <span class="tiny">{{ shortTime(msg.time) }}</span>
-      </button>
-      <p v-if="messagesError" class="tiny notice-error">{{ messagesError }}</p>
+      <p class="tiny source">来源：{{ messages?.source || '教务系统（只读）' }}</p>
+      <div v-if="messagesLoading && !messages" class="loading">正在加载消息…</div>
+      <template v-else>
+        <button
+          v-for="msg in latestMessages"
+          :key="msg.id"
+          class="notice-row"
+          @click="openMessage(msg.id)"
+        >
+          <span class="notice-title message-title">{{ msg.title }}</span>
+          <span class="tiny">{{ shortTime(msg.time) }}</span>
+        </button>
+        <p v-if="!latestMessages.length && !messagesError" class="tiny notice-empty">暂无未阅消息</p>
+        <p v-if="messagesError" class="tiny notice-error">{{ messagesError }}</p>
+      </template>
     </section>
 
     <section class="card notice-card">
@@ -102,17 +105,23 @@
         <h2 class="card-title">最新通知</h2>
         <router-link to="/notices" class="link">全部</router-link>
       </div>
-      <p class="tiny source">来源：教务系统（学生门户）</p>
-      <button
-        v-for="notice in latestNotices"
-        :key="notice.id"
-        class="notice-row"
-        @click="go(`/notices/${notice.id}`)"
-      >
-        <span class="notice-title">{{ notice.title }}</span>
-        <span class="tiny">{{ notice.date }}</span>
-      </button>
-      <p v-if="noticesError" class="tiny notice-error">{{ noticesError }}</p>
+      <p class="tiny source">
+        来源：{{ portalNotices?.source || '教务系统（学生门户）' }}<template v-if="portalNoticesOffline">（网络不可用，显示缓存<template v-if="portalNoticesCachedAt">，更新于 {{ formatDateTime(portalNoticesCachedAt) }}</template>）</template><template v-else-if="portalNoticesCachedAt"> · 更新于 {{ formatDateTime(portalNoticesCachedAt) }}</template>
+      </p>
+      <div v-if="portalNoticesLoading && !portalNotices" class="loading">正在加载通知…</div>
+      <template v-else>
+        <button
+          v-for="notice in latestNotices"
+          :key="notice.id"
+          class="notice-row"
+          @click="go(`/notices/${notice.id}`)"
+        >
+          <span class="notice-title">{{ notice.title }}</span>
+          <span class="tiny">{{ notice.date }}</span>
+        </button>
+        <p v-if="!latestNotices.length && !noticesError" class="tiny notice-empty">暂无通知</p>
+        <p v-if="noticesError" class="tiny notice-error">{{ noticesError }}</p>
+      </template>
     </section>
 
     <Teleport to="body">
@@ -133,7 +142,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
-import { daysUntil, formatDate, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
+import { daysUntil, formatDate, formatDateTime, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
 import { mergeEntryOrder, movePath } from '../utils/entryOrder'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -141,7 +150,18 @@ import EmptyState from '../components/EmptyState.vue'
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const router = useRouter()
-const { schedule, exams, currentTerm, errors, portalNotices, messages } = storeToRefs(academic)
+const {
+  schedule,
+  exams,
+  currentTerm,
+  errors,
+  portalNotices,
+  portalNoticesLoading,
+  portalNoticesOffline,
+  portalNoticesCachedAt,
+  messages,
+  messagesLoading
+} = storeToRefs(academic)
 const isOffline = computed(() => Boolean(schedule.value?.source?.includes('离线')))
 const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
 
@@ -158,7 +178,7 @@ const ORDER_KEY = 'lzpu.home.entryOrder.v1'
 const baseEntries = [
   { path: '/exams', label: '考试', desc: '考试安排', icon: 'exam', color: '#C0392B' },
   { path: '/notices', label: '通知', desc: '教务公告', icon: 'notice', color: '#1B5FAA' },
-  { path: '/messages', label: '消息', desc: '调课提醒', icon: 'message', color: '#0E7490' },
+  { path: '/messages', label: '消息', desc: '教务消息', icon: 'message', color: '#0E7490' },
   { path: '/courses', label: '选课', desc: '课程选择', icon: 'select', color: '#B7791F' },
   { path: '/evaluation', label: '评教', desc: '教学评价', icon: 'evaluate', color: '#8E44AD' },
   { path: '/calendar', label: '校历', desc: '学期安排', icon: 'calendar', color: '#0E7490' },
@@ -178,10 +198,13 @@ function readSavedOrder() {
 const savedOrder = ref(readSavedOrder())
 const orderedEntries = computed(() => mergeEntryOrder(baseEntries, savedOrder.value))
 
-function persistOrder(list) {
+function applyOrder(list) {
   savedOrder.value = list
+}
+
+function commitOrder() {
   try {
-    localStorage.setItem(ORDER_KEY, JSON.stringify(list))
+    localStorage.setItem(ORDER_KEY, JSON.stringify(savedOrder.value))
   } catch (error) {
     // 本地存储不可用时只影响本次排序的持久化
   }
@@ -191,10 +214,9 @@ function moveEntryTo(path, targetIndex) {
   const list = orderedEntries.value.map((entry) => entry.path)
   const from = list.indexOf(path)
   if (from < 0 || from === targetIndex) return
-  persistOrder(movePath(list, path, targetIndex))
+  applyOrder(movePath(list, path, targetIndex))
 }
 
-const gridRef = ref(null)
 const drag = reactive({
   active: false,
   path: '',
@@ -218,8 +240,9 @@ const ghostStyle = computed(() => ({
 let pointerId = null
 let pendingDrag = null
 let longPressTimer = null
-let suppressClick = false
+let suppressPath = ''
 let suppressClickTimer = null
+let dragStartOrder = []
 let savedHtmlOverflow = ''
 let savedBodyOverflow = ''
 
@@ -282,6 +305,7 @@ function onPointerDown(event) {
 function beginDrag(pending) {
   if (!pending?.card?.isConnected) return
   const rect = pending.card.getBoundingClientRect()
+  dragStartOrder = savedOrder.value.slice()
   drag.active = true
   drag.path = pending.path
   drag.width = rect.width
@@ -292,7 +316,6 @@ function beginDrag(pending) {
   drag.y = pending.startY
   lockPageScroll()
   document.addEventListener('touchmove', preventScroll, { passive: false })
-  if (navigator.vibrate) navigator.vibrate(10)
 }
 
 function onWindowPointerMove(event) {
@@ -301,7 +324,9 @@ function onWindowPointerMove(event) {
     event.preventDefault()
     drag.x = event.clientX
     drag.y = event.clientY
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest?.('.entry')
+    const centerX = drag.x - drag.offsetX + drag.width / 2
+    const centerY = drag.y - drag.offsetY + drag.height / 2
+    const target = document.elementFromPoint(centerX, centerY)?.closest?.('.entry')
     const targetPath = target?.dataset?.path
     if (targetPath && targetPath !== drag.path) {
       const targetIndex = orderedEntries.value.findIndex((entry) => entry.path === targetPath)
@@ -318,12 +343,14 @@ function onWindowPointerMove(event) {
 function onWindowPointerUp(event) {
   if (event.pointerId !== pointerId) return
   if (drag.active) {
+    const draggedPath = drag.path
     drag.active = false
     drag.path = ''
-    suppressClick = true
+    suppressPath = draggedPath
+    commitOrder()
     if (suppressClickTimer) clearTimeout(suppressClickTimer)
     suppressClickTimer = setTimeout(() => {
-      suppressClick = false
+      suppressPath = ''
     }, 400)
   }
   cleanupPointer()
@@ -332,6 +359,7 @@ function onWindowPointerUp(event) {
 function onWindowPointerCancel(event) {
   if (event.pointerId !== pointerId) return
   if (drag.active) {
+    savedOrder.value = dragStartOrder.slice()
     drag.active = false
     drag.path = ''
   }
@@ -339,8 +367,8 @@ function onWindowPointerCancel(event) {
 }
 
 function goEntry(entry) {
-  if (drag.active || suppressClick) {
-    suppressClick = false
+  if (drag.active || suppressPath === entry.path) {
+    suppressPath = ''
     return
   }
   go(entry.path)
@@ -379,7 +407,7 @@ const nextExam = computed(() => {
   return list[0] || null
 })
 
-const latestNotices = computed(() => portalNotices.value.slice(0, 3))
+const latestNotices = computed(() => (portalNotices.value?.items || []).slice(0, 3))
 const latestMessages = computed(() => (messages.value?.items || []).slice(0, 3))
 
 function go(path) {
@@ -407,6 +435,10 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer)
+  if (drag.active) savedOrder.value = dragStartOrder.slice()
+  drag.active = false
+  drag.path = ''
+  suppressPath = ''
   cleanupPointer()
   if (suppressClickTimer) clearTimeout(suppressClickTimer)
 })
@@ -615,5 +647,10 @@ onUnmounted(() => {
 .notice-error {
   margin-top: 8px;
   color: var(--danger);
+}
+
+.notice-empty {
+  margin-top: 10px;
+  color: var(--text-tertiary);
 }
 </style>

@@ -54,6 +54,12 @@ export function formatDateFull(date = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+export function formatDateTime(value) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export function pad(n) {
   return String(n).padStart(2, '0')
 }

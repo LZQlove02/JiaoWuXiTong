@@ -20,6 +20,10 @@
         <span class="pill">共 {{ messages.total }} 条</span>
       </div>
 
+      <p v-if="messages.truncated" class="tiny truncate-tip">
+        仅显示前 {{ messages.items.length }} 条，共 {{ messages.total }} 条
+      </p>
+
       <section v-if="messages.items.length" class="card list">
         <article v-for="msg in messages.items" :key="msg.id" class="msg">
           <button class="msg-head" type="button" @click="toggle(msg.id)">
@@ -37,7 +41,7 @@
         <EmptyState icon="message" title="暂无未阅消息" description="教务系统当前没有未阅消息。" />
       </section>
 
-      <p class="tiny footnote">来源：教务系统（只读）</p>
+      <p class="tiny footnote">来源：{{ messages.source || '教务系统（只读）' }}</p>
     </template>
   </div>
 </template>
@@ -54,7 +58,8 @@ import LoadState from '../components/LoadState.vue'
 
 const route = useRoute()
 const academic = useAcademicStore()
-const { messages, loading, errors } = storeToRefs(academic)
+const { messages, messagesLoading, errors } = storeToRefs(academic)
+const loading = messagesLoading
 const error = computed(() => errors.value.messages)
 const expandedId = ref(route.query.id ? String(route.query.id) : '')
 
@@ -160,5 +165,10 @@ onMounted(reload)
 .footnote {
   margin-top: 14px;
   text-align: center;
+}
+
+.truncate-tip {
+  margin-bottom: 8px;
+  color: var(--text-tertiary);
 }
 </style>
