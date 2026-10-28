@@ -1,4 +1,5 @@
-import { authGet, loginWithSso as nativeSsoLogin, setAuthCookies } from './nativeHttp'
+import { authGet, isDebugBuild, loginWithSso as nativeSsoLogin, setAuthCookies } from './nativeHttp'
+import { probeZfjwEndpoints } from './probe'
 import { buildTerm, termParamsFor } from '../utils/term'
 
 const COURSE_COLORS = ['#1B5FAA', '#2F855A', '#B7791F', '#805AD5', '#C05621', '#2C7A7B']
@@ -35,6 +36,16 @@ function writeSnapshot(api) {
 
 export function clearScheduleSnapshot() {
   localStorage.removeItem(SNAPSHOT_KEY)
+}
+
+// 仅 debug 包：会话可用时探测成绩/考试/选课的真实入口，结果只进 logcat。
+// 探测失败不影响正常流程。
+function probeInDebugBuild(term) {
+  isDebugBuild()
+    .then((debug) => {
+      if (debug) probeZfjwEndpoints(term).catch(() => {})
+    })
+    .catch(() => {})
 }
 
 function parseWeeks(text) {
@@ -183,6 +194,7 @@ export class ZfAcademicApi {
       this.fetchedAt = new Date().toISOString()
       this.offline = false
       writeSnapshot(this)
+      probeInDebugBuild(this.term)
       return this.profile
     } catch (error) {
       // 网络不可达时用上次成功的快照保持登录态，避免离线冷启动被踢回登录页

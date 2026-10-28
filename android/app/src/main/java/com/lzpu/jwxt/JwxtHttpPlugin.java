@@ -1,5 +1,8 @@
 package com.lzpu.jwxt;
 
+import android.content.pm.ApplicationInfo;
+import android.util.Log;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -9,10 +12,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.HttpUrl;
@@ -30,6 +36,26 @@ public class JwxtHttpPlugin extends Plugin {
                     + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     private static final int MAX_REDIRECTS = 5;
+
+    private static final String DEBUG_TAG = "JwxtHttp";
+    /** debug 日志只保留能定位接口的参数值，其余查询值一律脱敏。 */
+    private static final Set<String> SAFE_QUERY_KEYS = new HashSet<>(Arrays.asList(
+            "gnmkdm", "doType", "xnm", "xqm", "type", "pageNum", "pageSize"));
+
+    private boolean isDebugBuild() {
+        return (getContext().getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    }
+
+    private static String debugUrl(HttpUrl url) {
+        HttpUrl.Builder builder = url.newBuilder();
+        for (int i = 0; i < url.querySize(); i++) {
+            String name = url.queryParameterName(i);
+            if (!SAFE_QUERY_KEYS.contains(name)) {
+                builder.setQueryParameter(name, "***");
+            }
+        }
+        return builder.build().toString();
+    }
 
     /**
      * 公开内容客户端：关闭自动重定向，改为逐跳校验，避免被重定向到
@@ -101,6 +127,9 @@ public class JwxtHttpPlugin extends Plugin {
                     result.put("body", body);
                     call.resolve(result);
                 } catch (IOException e) {
+                    if (isDebugBuild()) {
+                        Log.d(DEBUG_TAG, "失败 GET " + debugUrl(request.url()) + ": " + e.getMessage());
+                    }
                     call.reject(e.getMessage() == null ? "network error" : e.getMessage(), e);
                 }
             }
@@ -153,6 +182,9 @@ public class JwxtHttpPlugin extends Plugin {
                     result.put("bytes", target.length());
                     call.resolve(result);
                 } catch (IOException e) {
+                    if (isDebugBuild()) {
+                        Log.d(DEBUG_TAG, "失败 DOWNLOAD " + debugUrl(request.url()) + ": " + e.getMessage());
+                    }
                     call.reject(e.getMessage() == null ? "download failed" : e.getMessage(), e);
                 }
             }
@@ -182,6 +214,14 @@ public class JwxtHttpPlugin extends Plugin {
         }
         JSObject result = new JSObject();
         result.put("exists", file.isFile() && file.length() > 0);
+        call.resolve(result);
+    }
+
+    /** 供前端判断是否 debug 构建，仅在 debug 包中开启接口探测。 */
+    @PluginMethod
+    public void isDebugBuild(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("debug", isDebugBuild());
         call.resolve(result);
     }
 
@@ -259,6 +299,9 @@ public class JwxtHttpPlugin extends Plugin {
                     result.put("body", body);
                     call.resolve(result);
                 } catch (IOException e) {
+                    if (isDebugBuild()) {
+                        Log.d(DEBUG_TAG, "失败 GET " + debugUrl(request.url()) + ": " + e.getMessage());
+                    }
                     call.reject(e.getMessage() == null ? "network error" : e.getMessage(), e);
                 }
             }
@@ -312,6 +355,9 @@ public class JwxtHttpPlugin extends Plugin {
                     result.put("body", responseBody);
                     call.resolve(result);
                 } catch (IOException e) {
+                    if (isDebugBuild()) {
+                        Log.d(DEBUG_TAG, "失败 POST " + debugUrl(request.url()) + ": " + e.getMessage());
+                    }
                     call.reject(e.getMessage() == null ? "network error" : e.getMessage(), e);
                 }
             }
@@ -324,10 +370,18 @@ public class JwxtHttpPlugin extends Plugin {
      */
     private Response execute(OkHttpClient client, Request request, HttpPolicy policy,
                              boolean keepCookies) throws IOException {
+        boolean debug = isDebugBuild();
         Request current = request;
         for (int i = 0; i <= MAX_REDIRECTS; i++) {
             policy.check(current.url());
+            if (debug) {
+                Log.d(DEBUG_TAG, "请求 " + current.method() + " " + debugUrl(current.url()));
+            }
             Response response = client.newCall(current).execute();
+            if (debug) {
+                Log.d(DEBUG_TAG, "响应 " + response.code() + " " + current.method() + " "
+                        + debugUrl(current.url()) + " [" + response.header("Content-Type") + "]");
+            }
             if (keepCookies) updateAuthCookies(response);
             if (!isRedirect(response.code())) {
                 return response;
@@ -338,6 +392,9 @@ public class JwxtHttpPlugin extends Plugin {
                 next = policy.resolveRedirect(current.url(), response.header("Location"));
             } finally {
                 response.close();
+            }
+            if (debug) {
+                Log.d(DEBUG_TAG, "重定向 " + code + " -> " + debugUrl(next));
             }
             // 301/302/303 按 RFC 改为 GET 并丢弃请求体，避免把表单数据重放到新地址
             Request.Builder nextBuilder = current.newBuilder().url(next);

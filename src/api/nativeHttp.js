@@ -60,3 +60,9 @@ export async function authPost(url, body = '') {
   }
   return JwxtHttp.authPost({ url, body })
 }
+
+export async function isDebugBuild() {
+  if (!Capacitor.isNativePlatform()) return false
+  const result = await JwxtHttp.isDebugBuild()
+  return Boolean(result?.debug)
+}

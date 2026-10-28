@@ -4,6 +4,8 @@ import { ZfAcademicApi, clearScheduleSnapshot } from '../src/api/zf'
 
 vi.mock('../src/api/nativeHttp', () => ({
   authGet: vi.fn(),
+  authPost: vi.fn(),
+  isDebugBuild: vi.fn().mockResolvedValue(false),
   loginWithSso: vi.fn(),
   setAuthCookies: vi.fn()
 }))
