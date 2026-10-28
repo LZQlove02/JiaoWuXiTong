@@ -548,10 +548,9 @@ export class ZfAcademicApi {
     }
   }
 
-  async getGrades(term) {
-    if (!this.term) throw new Error('尚未登录')
-    const params = term || this.term
-    const form = `xnm=${encodeURIComponent(params.xnm)}&xqm=${encodeURIComponent(params.xqm)}`
+  async fetchGradesPage(term, page, pageSize = 100) {
+    const form = `xnm=${encodeURIComponent(term.xnm)}&xqm=${encodeURIComponent(term.xqm)}`
+      + `&queryModel.showCount=${pageSize}&queryModel.currentPage=${page}`
     let response
     try {
       response = await authPost(GRADES_ENDPOINT, form)
@@ -593,7 +592,21 @@ export class ZfAcademicApi {
       failure.parseError = true
       throw failure
     }
-    return mapGrades(payload, params)
+    return payload
+  }
+
+  // 正方成绩接口默认只返回 10 条，必须带 queryModel.showCount/currentPage 翻页
+  async getGrades(term) {
+    if (!this.term) throw new Error('尚未登录')
+    const params = term || this.term
+    const first = await this.fetchGradesPage(params, 1)
+    const items = [...first.items]
+    const totalPage = Math.min(Number(first.totalPage) || 1, 20)
+    for (let page = 2; page <= totalPage; page += 1) {
+      const next = await this.fetchGradesPage(params, page)
+      items.push(...next.items)
+    }
+    return mapGrades({ items, totalResult: first.totalResult }, params)
   }
 
   // 全部学期：逐学期只读查询后汇总；单个学期失败时保留其余学期，并记录失败项

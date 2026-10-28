@@ -263,9 +263,35 @@ describe('成绩解析与学期列表', () => {
     const result = await api.getGrades(term)
     expect(authPost).toHaveBeenCalledWith(
       'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005',
-      'xnm=2026&xqm=3'
+      'xnm=2026&xqm=3&queryModel.showCount=100&queryModel.currentPage=1'
     )
     expect(result.summary).toEqual({ gpa: 4.2, totalCredits: 4, count: 1 })
+  })
+
+  it('getGrades 按 totalPage 翻页并合并全部记录', async () => {
+    const makeItems = (start, count) => Array.from({ length: count }, (_, index) => ({
+      key: `k${start + index}`,
+      kch: String(1000 + start + index),
+      kcmc: `课程 ${start + index}`,
+      cj: '80',
+      xf: '1',
+      jd: '3'
+    }))
+    authPost.mockImplementation((url, body) => {
+      const page = Number(/queryModel.currentPage=(\d+)/.exec(body)?.[1] || 1)
+      const items = page === 1 ? makeItems(0, 10) : makeItems(10, 2)
+      return Promise.resolve({
+        status: 200,
+        body: JSON.stringify({ currentPage: page, totalPage: 2, totalResult: 12, items })
+      })
+    })
+    const api = new ZfAcademicApi()
+    api.term = term
+    const result = await api.getGrades(term)
+    expect(authPost).toHaveBeenCalledTimes(2)
+    expect(result.grades).toHaveLength(12)
+    expect(result.summary.count).toBe(12)
+    expect(result.grades[11].courseName).toBe('课程 11')
   })
 })
 
