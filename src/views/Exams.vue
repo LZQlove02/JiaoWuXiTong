@@ -7,8 +7,8 @@
     <div v-else class="exam-list">
       <article v-for="item in examList" :key="item.id" class="card exam-item">
         <div class="date-block">
-          <span class="date-month">{{ monthOf(item.date) }}</span>
-          <span class="date-day">{{ dayOf(item.date) }}</span>
+          <span class="date-month">{{ monthOf(item) }}</span>
+          <span class="date-day">{{ dayOf(item) }}</span>
         </div>
         <div class="exam-body">
           <div class="row">
@@ -52,19 +52,26 @@ const { exams, loading, error } = storeToRefs(academic)
 
 const examList = computed(() =>
   exams.value
-    .map((item) => ({ ...item, days: daysUntil(item.date) }))
-    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((item) => {
+      const days = daysUntil(item.date)
+      return { ...item, days, dated: !Number.isNaN(days) }
+    })
+    .sort((a, b) => {
+      if (a.dated !== b.dated) return a.dated ? -1 : 1
+      return a.dated ? a.days - b.days : 0
+    })
 )
 
-function monthOf(date) {
-  return `${Number(date.slice(5, 7))} 月`
+function monthOf(item) {
+  return item.dated ? `${Number(item.date.slice(5, 7))} 月` : '日期'
 }
 
-function dayOf(date) {
-  return date.slice(8, 10)
+function dayOf(item) {
+  return item.dated ? item.date.slice(8, 10) : '待定'
 }
 
 function countdownText(days) {
+  if (Number.isNaN(days)) return '待定'
   if (days < 0) return '已结束'
   if (days === 0) return '今天'
   if (days === 1) return '明天'

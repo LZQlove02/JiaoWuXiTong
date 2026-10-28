@@ -57,10 +57,16 @@ public class JwxtHttpPlugin extends Plugin {
             return;
         }
 
-        Request.Builder builder = new Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .header("Accept", "text/html,application/json;q=0.9,*/*;q=0.8");
+        Request.Builder builder;
+        try {
+            builder = new Request.Builder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "text/html,application/json;q=0.9,*/*;q=0.8");
+        } catch (IllegalArgumentException e) {
+            call.reject("url 无效");
+            return;
+        }
 
         JSObject headers = call.getObject("headers");
         if (headers != null) {
@@ -108,10 +114,16 @@ public class JwxtHttpPlugin extends Plugin {
             return;
         }
 
-        final Request request = new Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .build();
+        final Request request;
+        try {
+            request = new Request.Builder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
+                    .build();
+        } catch (IllegalArgumentException e) {
+            call.reject("url 无效");
+            return;
+        }
 
         try {
             HttpPolicy.PUBLIC.check(request.url());
@@ -151,9 +163,22 @@ public class JwxtHttpPlugin extends Plugin {
             call.reject("path is required");
             return;
         }
-        File file = new File(path);
+        final File file;
+        final File root;
+        try {
+            file = new File(path).getCanonicalFile();
+            root = getContext().getFilesDir().getCanonicalFile();
+        } catch (IOException e) {
+            call.reject("path 无效");
+            return;
+        }
+        // 只允许查询应用私有目录内的文件，避免被当作任意路径探测接口
+        if (!file.getPath().startsWith(root.getPath() + File.separator)) {
+            call.reject("path 超出应用私有目录");
+            return;
+        }
         JSObject result = new JSObject();
-        result.put("exists", file.exists() && file.isFile() && file.length() > 0);
+        result.put("exists", file.isFile() && file.length() > 0);
         call.resolve(result);
     }
 
@@ -198,14 +223,20 @@ public class JwxtHttpPlugin extends Plugin {
             return;
         }
 
-        Request.Builder builder = new Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8");
-        if (!authCookieHeader.isEmpty()) {
-            builder.header("Cookie", authCookieHeader);
+        final Request request;
+        try {
+            Request.Builder builder = new Request.Builder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8");
+            if (!authCookieHeader.isEmpty()) {
+                builder.header("Cookie", authCookieHeader);
+            }
+            request = builder.get().build();
+        } catch (IllegalArgumentException e) {
+            call.reject("url 无效");
+            return;
         }
-        final Request request = builder.get().build();
 
         try {
             HttpPolicy.AUTH.check(request.url());
@@ -243,16 +274,22 @@ public class JwxtHttpPlugin extends Plugin {
         RequestBody requestBody = RequestBody.create(
                 body == null ? "" : body,
                 MediaType.parse("application/x-www-form-urlencoded; charset=UTF-8"));
-        Request.Builder builder = new Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .header("User-Agent", USER_AGENT)
-                .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8")
-                .header("X-Requested-With", "XMLHttpRequest");
-        if (!authCookieHeader.isEmpty()) {
-            builder.header("Cookie", authCookieHeader);
+        final Request request;
+        try {
+            Request.Builder builder = new Request.Builder()
+                    .url(url)
+                    .post(requestBody)
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8")
+                    .header("X-Requested-With", "XMLHttpRequest");
+            if (!authCookieHeader.isEmpty()) {
+                builder.header("Cookie", authCookieHeader);
+            }
+            request = builder.build();
+        } catch (IllegalArgumentException e) {
+            call.reject("url 无效");
+            return;
         }
-        final Request request = builder.build();
 
         try {
             HttpPolicy.AUTH.check(request.url());
@@ -291,12 +328,18 @@ public class JwxtHttpPlugin extends Plugin {
                 return response;
             }
             HttpUrl next;
+            int code = response.code();
             try {
                 next = policy.resolveRedirect(current.url(), response.header("Location"));
             } finally {
                 response.close();
             }
-            current = current.newBuilder().url(next).build();
+            // 301/302/303 按 RFC 改为 GET 并丢弃请求体，避免把表单数据重放到新地址
+            Request.Builder nextBuilder = current.newBuilder().url(next);
+            if (code == 301 || code == 302 || code == 303) {
+                nextBuilder.get();
+            }
+            current = nextBuilder.build();
         }
         throw new IOException("重定向次数过多");
     }

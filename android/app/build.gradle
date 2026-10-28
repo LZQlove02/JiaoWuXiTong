@@ -34,9 +34,18 @@ android {
     }
     buildTypes {
         release {
-            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // 缺少正式签名配置时不回退 debug 签名，避免产出无法覆盖升级的正式包
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : null
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+if (!keystorePropertiesFile.exists()) {
+    gradle.taskGraph.whenReady { graph ->
+        if (graph.allTasks.any { it.name == 'assembleRelease' || it.name == 'bundleRelease' }) {
+            throw new GradleException('缺少 android/keystore.properties，无法生成正式包')
         }
     }
 }

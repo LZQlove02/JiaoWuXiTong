@@ -4,7 +4,6 @@ import { HybridAcademicApi, hasAnyImport } from './imported'
 // 个人教务数据默认使用 Mock；导入网页数据后优先使用导入结果。
 // 统一认证登录成功后，切换到 ZfAcademicApi 的实时数据。
 // 公开内容（通知/办事指南/校历）走 api/public.js。
-export const DATA_MODE = import.meta.env.VITE_DATA_MODE || 'mock'
 export { hasAnyImport }
 
 const defaultApi = new HybridAcademicApi(new MockAcademicApi())

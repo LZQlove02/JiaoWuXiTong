@@ -26,20 +26,23 @@
       </div>
     </section>
 
-    <h2 class="section-title">真实数据</h2>
+    <h2 class="section-title">数据来源</h2>
     <section class="card settings">
-      <button class="setting-row" @click="pickFile('schedule')">
-        <span class="setting-left"><AppIcon name="calendar" />导入课表</span>
-        <AppIcon name="chevron-right" />
-      </button>
-      <button class="setting-row" @click="pickFile('grades')">
-        <span class="setting-left"><AppIcon name="book" />导入成绩</span>
-        <AppIcon name="chevron-right" />
-      </button>
-      <button class="setting-row" @click="pickFile('exams')">
-        <span class="setting-left"><AppIcon name="exam" />导入考试</span>
-        <AppIcon name="chevron-right" />
-      </button>
+      <template v-if="auth.sessionMode !== 'sso'">
+        <button class="setting-row" @click="pickFile('schedule')">
+          <span class="setting-left"><AppIcon name="calendar" />导入课表</span>
+          <AppIcon name="chevron-right" />
+        </button>
+        <button class="setting-row" @click="pickFile('grades')">
+          <span class="setting-left"><AppIcon name="book" />导入成绩</span>
+          <AppIcon name="chevron-right" />
+        </button>
+        <button class="setting-row" @click="pickFile('exams')">
+          <span class="setting-left"><AppIcon name="exam" />导入考试</span>
+          <AppIcon name="chevron-right" />
+        </button>
+      </template>
+      <p v-else class="import-note tiny">当前使用统一认证的实时数据，无需网页导入。</p>
       <button v-if="hasImported" class="setting-row" @click="clearImportData">
         <span class="setting-left"><AppIcon name="trash" />清除导入数据</span>
         <AppIcon name="chevron-right" />
@@ -64,7 +67,11 @@
       退出登录
     </button>
 
-    <p class="tiny footer">数据来源：柳州职业技术大学教务系统（个人数据为模拟或网页导入）</p>
+    <p class="tiny footer">
+      数据来源：柳州职业技术大学教务系统（{{
+        auth.sessionMode === 'sso' ? '实时' : '模拟或网页导入'
+      }}）
+    </p>
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
@@ -238,6 +245,10 @@ async function logout() {
 
 .setting-row:last-child {
   border-bottom: none;
+}
+
+.import-note {
+  padding: 14px 0;
 }
 
 .setting-left {

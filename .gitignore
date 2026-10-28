@@ -12,4 +12,6 @@ android/keystore.properties
 *.keystore
 *.log
 .DS_Store
+.idea/
+.screenshots/
 .trae-html-share-packages

@@ -64,7 +64,7 @@
 
     <p class="tiny legend">
       左右滑动查看周末 · 点击课程查看详情 ·
-      {{ schedule?.source ? '真实数据（网页导入）' : '模拟数据' }}
+      {{ sourceLabel }}
     </p>
   </div>
 </template>
@@ -112,6 +112,10 @@ const visibleSessions = computed(() => {
   const sessions = schedule.value?.sessions || []
   return sessions.filter((item) => item.weeks.includes(selectedWeek.value))
 })
+
+const sourceLabel = computed(() =>
+  schedule.value?.source ? `数据来源：${schedule.value.source}` : '数据来源：模拟数据'
+)
 
 function courseName(courseId) {
   const course = schedule.value?.courses?.find((item) => item.id === courseId)
