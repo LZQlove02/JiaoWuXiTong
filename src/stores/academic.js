@@ -8,7 +8,10 @@ const EMPTY_ERRORS = {
   grades: '',
   exams: '',
   evaluations: '',
-  courseSelection: ''
+  courseSelection: '',
+  portalNotices: '',
+  portalNoticeList: '',
+  messages: ''
 }
 
 export const useAcademicStore = defineStore('academic', () => {
@@ -19,6 +22,9 @@ export const useAcademicStore = defineStore('academic', () => {
   const exams = ref([])
   const evaluations = ref(null)
   const courseSelection = ref(null)
+  const portalNotices = ref([])
+  const portalNoticeList = ref(null)
+  const messages = ref(null)
   const course = ref(null)
   const loading = ref(false)
   const errors = ref({ ...EMPTY_ERRORS })
@@ -127,6 +133,39 @@ export const useAcademicStore = defineStore('academic', () => {
     }
   }
 
+  async function loadPortalNotices() {
+    setError('portalNotices', '')
+    try {
+      portalNotices.value = await api.getPortalNotices()
+    } catch (err) {
+      setError('portalNotices', err.message || '教务通知加载失败')
+    }
+  }
+
+  async function loadPortalNoticeList() {
+    loading.value = true
+    setError('portalNoticeList', '')
+    try {
+      portalNoticeList.value = await api.getPortalNoticeList()
+    } catch (err) {
+      setError('portalNoticeList', err.message || '教务通知加载失败')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadMessages() {
+    loading.value = true
+    setError('messages', '')
+    try {
+      messages.value = await api.getMessages()
+    } catch (err) {
+      setError('messages', err.message || '消息加载失败')
+    } finally {
+      loading.value = false
+    }
+  }
+
   function reset() {
     terms.value = []
     currentTerm.value = null
@@ -135,6 +174,9 @@ export const useAcademicStore = defineStore('academic', () => {
     exams.value = []
     evaluations.value = null
     courseSelection.value = null
+    portalNotices.value = []
+    portalNoticeList.value = null
+    messages.value = null
     course.value = null
     loading.value = false
     errors.value = { ...EMPTY_ERRORS }
@@ -148,6 +190,9 @@ export const useAcademicStore = defineStore('academic', () => {
     exams,
     evaluations,
     courseSelection,
+    portalNotices,
+    portalNoticeList,
+    messages,
     course,
     loading,
     errors,
@@ -158,6 +203,9 @@ export const useAcademicStore = defineStore('academic', () => {
     loadExams,
     loadEvaluations,
     loadCourseSelection,
+    loadPortalNotices,
+    loadPortalNoticeList,
+    loadMessages,
     loadCourse,
     reset
   }

@@ -8,6 +8,10 @@ const GRADE_PAGE_ENDPOINT = 'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?gnmkd
 const GRADES_ENDPOINT = 'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005'
 const EVALUATION_ENDPOINT = 'https://zfjw.lzzy.net/xspjgl/xspj_cxXspjIndex.html?doType=query&gnmkdm=N401605'
 const COURSE_SELECTION_PAGE = 'https://zfjw.lzzy.net/xsxk/zzxkyzb_cxZzxkYzbIndex.html?gnmkdm=N253512'
+const PORTAL_NOTICE_INDEX = 'https://zfjw.lzzy.net/xtgl/index_cxNews.html?localeKey=zh_CN'
+const PORTAL_NOTICE_LIST = 'https://zfjw.lzzy.net/xtgl/xwck_cxMoreXwList.html?doType=query'
+const PORTAL_NOTICE_DETAIL = 'https://zfjw.lzzy.net/xtgl/xwck_ckXw.html'
+const PORTAL_MESSAGES = 'https://zfjw.lzzy.net/xtgl/index_cxDbsy.html?doType=query'
 const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
 
 const QUARTER_RANK = { 3: 0, 12: 1, 16: 2 }
@@ -354,6 +358,139 @@ export function parseCourseSelectionStatus(html) {
     description: open
       ? '选课窗口已开放。本应用仅同步状态，不提供选课或退课操作。'
       : '请在教务系统开放时间内完成选课或退课；本应用仅同步状态，不提供相关操作。'
+  }
+}
+
+// 学生门户通知 / 消息的只读解析，不包含任何“标记已读”或提交动作
+function htmlToText(html) {
+  const source = String(html || '')
+  if (typeof DOMParser === 'undefined') {
+    return source.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  }
+  const doc = new DOMParser().parseFromString(source, 'text/html')
+  return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+function cleanNoticeTitle(text) {
+  return String(text || '')
+    .replace(/\d{4}-\d{2}-\d{2}/g, ' ')
+    .replace(/【置顶】/g, ' ')
+    .replace(/【通知】/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function parsePortalNoticeIndex(html) {
+  const text = String(html || '')
+  const seen = new Set()
+  const items = []
+  for (const match of text.matchAll(/<a[^>]+href=["']([^"']*xwck_ckXw\.html\?xwbh=([^"'&]+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const id = match[2]
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const raw = htmlToText(match[3])
+    const dateMatch = raw.match(/\d{4}-\d{2}-\d{2}/)
+    const title = cleanNoticeTitle(raw)
+    if (!title) continue
+    items.push({
+      id,
+      title,
+      date: dateMatch ? dateMatch[0] : '',
+      pinned: /【置顶】/.test(raw)
+    })
+  }
+  return items
+}
+
+export function parsePortalNoticeList(payload) {
+  const items = (Array.isArray(payload?.items) ? payload.items : [])
+    .map((item, index) => ({
+      id: String(item?.xwbh || item?.row_id || index),
+      title: String(item?.xwbtqc || item?.xwbt || '').trim(),
+      date: String(item?.fbsj || '').slice(0, 10),
+      publisher: String(item?.fbr || '').trim(),
+      pinned: String(item?.sfzd) === '1'
+    }))
+    .filter((item) => item.title)
+  const total = Number(payload?.totalResult)
+  return {
+    total: Number.isFinite(total) && total >= items.length ? total : items.length,
+    items,
+    source: '教务系统（学生门户）',
+    fetchedAt: new Date().toISOString()
+  }
+}
+
+export function parsePortalNoticeDetail(html) {
+  const source = String(html || '')
+  if (typeof DOMParser === 'undefined') {
+    return {
+      title: '',
+      publishedAt: '',
+      views: null,
+      paragraphs: source ? [htmlToText(source)] : [],
+      attachments: [],
+      source: '教务系统（学生门户）',
+      fetchedAt: new Date().toISOString()
+    }
+  }
+  const doc = new DOMParser().parseFromString(source, 'text/html')
+  const title = (doc.querySelector('h3')?.textContent || '').trim()
+  const meta = (doc.querySelector('.news_title1')?.textContent || '').replace(/\s+/g, ' ')
+  const publishedAt = (meta.match(/发布时间[:：]\s*([0-9-]+\s+[0-9:]+)/) || [])[1] || ''
+  const views = Number((meta.match(/浏览人数[:：]\s*(\d+)/) || [])[1]) || null
+  const content = doc.querySelector('.news_con')
+  const paragraphs = []
+  if (content) {
+    for (const p of content.querySelectorAll('p')) {
+      const text = (p.textContent || '').replace(/\s+/g, ' ').trim()
+      if (text) paragraphs.push(text)
+    }
+    if (!paragraphs.length) {
+      const text = (content.textContent || '').replace(/\s+/g, ' ').trim()
+      if (text) paragraphs.push(text)
+    }
+  }
+  const attachments = [...doc.querySelectorAll('a[href*="filename="]')]
+    .map((a) => {
+      const href = a.getAttribute('href') || ''
+      const match = href.match(/filename=([^&]+)/)
+      let name = ''
+      try {
+        name = match ? decodeURIComponent(match[1]) : ''
+      } catch (error) {
+        name = ''
+      }
+      return { name: name || (a.textContent || '').trim(), href }
+    })
+    .filter((item) => item.name)
+  return {
+    title,
+    publishedAt,
+    views,
+    paragraphs,
+    attachments,
+    source: '教务系统（学生门户）',
+    fetchedAt: new Date().toISOString()
+  }
+}
+
+export function parseMessages(payload) {
+  const items = (Array.isArray(payload?.items) ? payload.items : [])
+    .map((item, index) => ({
+      id: String(item?.zjxx || item?.id || item?.w_id || index),
+      title: String(item?.xxbt || '').trim(),
+      content: htmlToText(item?.xxnr || ''),
+      time: String(item?.cjsj || '').trim()
+    }))
+    .filter((item) => item.title)
+    .sort((a, b) => b.time.localeCompare(a.time))
+  const total = Number(payload?.totalResult)
+  return {
+    total: Number.isFinite(total) && total >= items.length ? total : items.length,
+    items,
+    source: '教务系统（只读）',
+    fetchedAt: new Date().toISOString()
   }
 }
 
@@ -716,6 +853,103 @@ export class ZfAcademicApi {
       source: '教务系统（只读）',
       fetchedAt: new Date().toISOString()
     }
+  }
+
+  async requestPortal(url, parser, options = {}) {
+    const { method = 'GET', body = '' } = options
+    let response
+    try {
+      response = method === 'POST' ? await authPost(url, body) : await authGet(url)
+    } catch (error) {
+      const message = String(error?.message || '')
+      if (message.includes('仅允许 HTTPS 请求')) {
+        const failure = new Error('登录会话已失效')
+        failure.sessionExpired = true
+        throw failure
+      }
+      const failure = new Error('无法连接教务系统')
+      failure.network = true
+      throw failure
+    }
+    if (response?.status !== 200) {
+      const failure = new Error(`接口返回 ${response?.status ?? '未知状态'}`)
+      failure.status = response?.status
+      failure.sessionExpired = response?.status === 401 || response?.status === 403
+      throw failure
+    }
+    const raw = String(response.body || '').replace(/^\uFEFF/, '')
+    if (/^\s*</.test(raw) && /login_slogin|统一身份认证/.test(raw)) {
+      const failure = new Error('登录会话已失效')
+      failure.sessionExpired = true
+      throw failure
+    }
+    try {
+      return parser(raw)
+    } catch (error) {
+      if (error?.parseError || error?.sessionExpired) throw error
+      const failure = new Error('数据解析失败')
+      failure.parseError = true
+      throw failure
+    }
+  }
+
+  async getPortalNotices() {
+    if (!this.term) throw new Error('尚未登录')
+    return this.requestPortal(PORTAL_NOTICE_INDEX, parsePortalNoticeIndex)
+  }
+
+  async getPortalNoticeList() {
+    if (!this.term) throw new Error('尚未登录')
+    const parser = (raw) => {
+      let payload
+      try {
+        payload = JSON.parse(raw)
+      } catch (error) {
+        const failure = new Error('通知数据解析失败')
+        failure.parseError = true
+        throw failure
+      }
+      if (!payload || !Array.isArray(payload.items)) {
+        const failure = new Error('通知数据解析失败')
+        failure.parseError = true
+        throw failure
+      }
+      return parsePortalNoticeList(payload)
+    }
+    return this.requestPortal(PORTAL_NOTICE_LIST, parser, {
+      method: 'POST',
+      body: 'queryModel.showCount=100&queryModel.currentPage=1'
+    })
+  }
+
+  async getPortalNoticeDetail(id) {
+    if (!this.term) throw new Error('尚未登录')
+    const url = `${PORTAL_NOTICE_DETAIL}?xwbh=${encodeURIComponent(id)}`
+    return this.requestPortal(url, parsePortalNoticeDetail)
+  }
+
+  async getMessages() {
+    if (!this.term) throw new Error('尚未登录')
+    const parser = (raw) => {
+      let payload
+      try {
+        payload = JSON.parse(raw)
+      } catch (error) {
+        const failure = new Error('消息数据解析失败')
+        failure.parseError = true
+        throw failure
+      }
+      if (!payload || !Array.isArray(payload.items)) {
+        const failure = new Error('消息数据解析失败')
+        failure.parseError = true
+        throw failure
+      }
+      return parseMessages(payload)
+    }
+    return this.requestPortal(PORTAL_MESSAGES, parser, {
+      method: 'POST',
+      body: 'flag=1&sfyy=1&queryModel.showCount=100&queryModel.currentPage=1'
+    })
   }
 
   async getCourse(id) {

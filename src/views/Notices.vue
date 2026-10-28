@@ -2,16 +2,11 @@
   <div class="page page--plain">
     <BackBar title="通知公告" />
 
-    <p v-if="offline" class="cache-tip">
-      网络不可用，显示缓存（更新于 {{ updatedLabel }}{{ expired ? '，已过期' : '' }}）
-    </p>
-    <p v-else-if="loading && items.length" class="cache-tip">正在刷新…</p>
-
     <LoadState
       :loading="loading && !items.length"
       :error="error"
-      loading-text="正在加载教务处公告…"
-      @retry="load"
+      loading-text="正在加载教务通知…"
+      @retry="academic.loadPortalNoticeList"
     />
 
     <section v-if="!error && !(loading && !items.length)" class="card list">
@@ -22,40 +17,43 @@
         @click="open(item.id)"
       >
         <div class="notice-main">
-          <p class="notice-title">{{ item.title }}</p>
-          <p class="tiny">{{ item.date }}</p>
+          <p class="notice-title">
+            <span v-if="item.pinned" class="pin">置顶</span>{{ item.title }}
+          </p>
+          <p class="tiny">{{ item.date }}<template v-if="item.publisher"> · {{ item.publisher }}</template></p>
         </div>
         <AppIcon name="chevron-right" />
       </button>
-      <EmptyState v-if="!items.length" title="暂无公告" />
+      <EmptyState v-if="!items.length" title="暂无通知" description="教务系统暂无通知公告。" />
     </section>
 
-    <p v-if="!offline && updatedLabel" class="tiny footnote">
-      来源：教务处官网 · 更新于 {{ updatedLabel }}
-    </p>
+    <p v-if="!error" class="tiny footnote">来源：教务系统（学生门户）</p>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
-import { usePublicList } from '../composables/usePublicContent'
+import { useAcademicStore } from '../stores/academic'
 import BackBar from '../components/BackBar.vue'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadState from '../components/LoadState.vue'
 
 const router = useRouter()
-const { items, loading, error, offline, expired, updatedLabel, hydrate, load } =
-  usePublicList('tzgg')
+const academic = useAcademicStore()
+const { portalNoticeList, loading, errors } = storeToRefs(academic)
+
+const items = computed(() => portalNoticeList.value?.items || [])
+const error = computed(() => errors.value.portalNoticeList)
 
 function open(id) {
   router.push(`/notices/${id}`)
 }
 
 onMounted(() => {
-  hydrate()
-  load()
+  academic.loadPortalNoticeList()
 })
 </script>
 
@@ -89,5 +87,15 @@ onMounted(() => {
   line-height: 1.45;
   color: var(--text);
   margin-bottom: 4px;
+}
+
+.pin {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--danger);
+  background: rgba(192, 57, 43, 0.1);
 }
 </style>

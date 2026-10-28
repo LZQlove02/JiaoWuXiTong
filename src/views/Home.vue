@@ -68,10 +68,7 @@
         <h2 class="card-title">最新通知</h2>
         <router-link to="/notices" class="link">全部</router-link>
       </div>
-      <p class="tiny source">
-        来源：教务处官网<template v-if="noticesOffline">（网络不可用，显示缓存）</template>
-        <template v-else-if="noticesUpdated">· 更新于 {{ noticesUpdated }}</template>
-      </p>
+      <p class="tiny source">来源：教务系统（学生门户）</p>
       <button
         v-for="notice in latestNotices"
         :key="notice.id"
@@ -92,7 +89,6 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
-import { usePublicList } from '../composables/usePublicContent'
 import { daysUntil, formatDate, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -100,18 +96,11 @@ import EmptyState from '../components/EmptyState.vue'
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const router = useRouter()
-const { schedule, exams, currentTerm, errors } = storeToRefs(academic)
+const { schedule, exams, currentTerm, errors, portalNotices } = storeToRefs(academic)
 const isOffline = computed(() => Boolean(schedule.value?.source?.includes('离线')))
 const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
 
-const {
-  items: publicNotices,
-  offline: noticesOffline,
-  error: noticesError,
-  updatedLabel: noticesUpdated,
-  hydrate: hydrateNotices,
-  load: loadNotices
-} = usePublicList('tzgg')
+const noticesError = computed(() => errors.value.portalNotices)
 
 const now = ref(new Date())
 let clockTimer = null
@@ -121,6 +110,7 @@ const weekday = computed(() => getWeekday(now.value))
 const entries = [
   { path: '/exams', label: '考试', desc: '考试安排', icon: 'exam', color: '#C0392B' },
   { path: '/notices', label: '通知', desc: '教务公告', icon: 'notice', color: '#1B5FAA' },
+  { path: '/messages', label: '消息', desc: '调课提醒', icon: 'message', color: '#0E7490' },
   { path: '/courses', label: '选课', desc: '课程选择', icon: 'select', color: '#B7791F' },
   { path: '/evaluation', label: '评教', desc: '教学评价', icon: 'evaluate', color: '#8E44AD' },
   { path: '/calendar', label: '校历', desc: '学期安排', icon: 'calendar', color: '#0E7490' },
@@ -160,7 +150,7 @@ const nextExam = computed(() => {
   return list[0] || null
 })
 
-const latestNotices = computed(() => publicNotices.value.slice(0, 3))
+const latestNotices = computed(() => portalNotices.value.slice(0, 3))
 
 function go(path) {
   router.push(path)
@@ -173,8 +163,7 @@ onMounted(async () => {
   await academic.initTerms()
   academic.loadSchedule()
   academic.loadExams()
-  hydrateNotices()
-  await loadNotices()
+  await academic.loadPortalNotices()
 })
 
 onUnmounted(() => {

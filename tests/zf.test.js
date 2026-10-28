@@ -7,6 +7,10 @@ import {
   mapGrades,
   mergeGradeGroups,
   parseCourseSelectionStatus,
+  parseMessages,
+  parsePortalNoticeDetail,
+  parsePortalNoticeIndex,
+  parsePortalNoticeList,
   parseTermsFromHtml
 } from '../src/api/zf'
 
@@ -443,5 +447,69 @@ describe('全部学期成绩汇总', () => {
     expect(result.summary.count).toBe(2)
     expect(result.partial).toHaveLength(1)
     expect(result.partial[0].termLabel).toContain('第三学期')
+  })
+})
+
+describe('学生门户通知与消息（只读）', () => {
+  it('解析首页通知列表，去掉置顶/通知前缀与日期', () => {
+    const html = `
+      <a href="/xtgl/xwck_ckXw.html?xwbh=ID1&doType=save">【置顶】 【通知】 关于做好2026-2027学年上学期课程重修工作的通知 2026-09-16</a>
+      <a href="/xtgl/xwck_ckXw.html?xwbh=ID2&doType=save">【通知】 关于2026年下半年大学英语等级考试报名工作的通知 2026-09-15</a>
+    `
+    const items = parsePortalNoticeIndex(html)
+    expect(items).toHaveLength(2)
+    expect(items[0]).toMatchObject({ id: 'ID1', date: '2026-09-16', pinned: true })
+    expect(items[0].title).toBe('关于做好2026-2027学年上学期课程重修工作的通知')
+    expect(items[1].pinned).toBe(false)
+  })
+
+  it('解析通知列表分页结果', () => {
+    const result = parsePortalNoticeList({
+      totalResult: 8,
+      items: [
+        { xwbh: 'ID1', xwbtqc: '通知 A', fbsj: '2026-09-16', fbr: '教务处', sfzd: '1' },
+        { xwbh: 'ID2', xwbtqc: '通知 B', fbsj: '2026-09-15', fbr: '教务处', sfzd: '0' }
+      ]
+    })
+    expect(result.total).toBe(8)
+    expect(result.items[0]).toMatchObject({
+      id: 'ID1',
+      title: '通知 A',
+      date: '2026-09-16',
+      pinned: true
+    })
+    expect(result.source).toContain('学生门户')
+  })
+
+  it('解析通知正文、发布时间、浏览数与附件名', () => {
+    const html = `
+      <h3>关于做好重修工作的通知</h3>
+      <h5 class="news_title1"><span>发布时间：2026-09-16 10:00:00</span><span>浏览人数：3001</span></h5>
+      <div class="news_con">
+        <p>各二级学院：</p>
+        <p>请及时查看通知。</p>
+      </div>
+      <a href="../ftp/x.pdf?filename=%E9%99%84%E4%BB%B61.pdf">附件1</a>
+    `
+    const detail = parsePortalNoticeDetail(html)
+    expect(detail.title).toBe('关于做好重修工作的通知')
+    expect(detail.publishedAt).toBe('2026-09-16 10:00:00')
+    expect(detail.views).toBe(3001)
+    expect(detail.paragraphs).toEqual(['各二级学院：', '请及时查看通知。'])
+    expect(detail.attachments[0].name).toBe('附件1.pdf')
+  })
+
+  it('解析消息列表，正文转纯文本并按时间倒序', () => {
+    const result = parseMessages({
+      totalResult: 2,
+      items: [
+        { zjxx: 'm1', xxbt: '调课提醒 A', xxnr: '<p>周一第 1-2 节调课</p>', cjsj: '2026-09-20 10:00:00' },
+        { zjxx: 'm2', xxbt: '补课提醒 B', xxnr: '周五补课', cjsj: '2026-10-08 15:56:39' }
+      ]
+    })
+    expect(result.total).toBe(2)
+    expect(result.items[0].id).toBe('m2')
+    expect(result.items[1].content).toBe('周一第 1-2 节调课')
+    expect(result.source).toBe('教务系统（只读）')
   })
 })

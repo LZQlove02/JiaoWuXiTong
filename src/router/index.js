@@ -7,6 +7,8 @@ import Profile from '../views/Profile.vue'
 import Login from '../views/Login.vue'
 import Exams from '../views/Exams.vue'
 import Notices from '../views/Notices.vue'
+import PortalNoticeDetail from '../views/PortalNoticeDetail.vue'
+import Messages from '../views/Messages.vue'
 import ArticleDetail from '../views/ArticleDetail.vue'
 import CourseDetail from '../views/CourseDetail.vue'
 import Guide from '../views/Guide.vue'
@@ -25,9 +27,10 @@ const routes = [
   {
     path: '/notices/:id',
     name: 'notice-detail',
-    component: ArticleDetail,
-    meta: { title: '通知详情', section: 'tzgg' }
+    component: PortalNoticeDetail,
+    meta: { title: '通知详情' }
   },
+  { path: '/messages', name: 'messages', component: Messages },
   { path: '/guide', name: 'guide', component: Guide },
   {
     path: '/guide/:id',

@@ -21,5 +21,9 @@ export const api = {
   getExams: (...args) => target.getExams(...args),
   getEvaluations: (...args) => target.getEvaluations(...args),
   getCourseSelectionStatus: (...args) => target.getCourseSelectionStatus(...args),
+  getPortalNotices: (...args) => target.getPortalNotices(...args),
+  getPortalNoticeList: (...args) => target.getPortalNoticeList(...args),
+  getPortalNoticeDetail: (...args) => target.getPortalNoticeDetail(...args),
+  getMessages: (...args) => target.getMessages(...args),
   getCourse: (...args) => target.getCourse(...args)
 }
