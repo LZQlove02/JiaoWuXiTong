@@ -1,15 +1,19 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { api } from '../api'
+import { api, resetAcademicApi, setAcademicApi } from '../api'
+import { ZfAcademicApi } from '../api/zf'
+import { clearAuthCookies, loadAuthCookies } from '../api/nativeHttp'
 
 const STORAGE_KEY = 'lzpu.session'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const loading = ref(false)
+  const sessionMode = ref('mock')
   const isLoggedIn = computed(() => Boolean(user.value))
 
   function restore() {
+    sessionMode.value = 'mock'
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return
@@ -20,10 +24,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function restoreSession() {
+    try {
+      const restored = await loadAuthCookies()
+      if (restored && restored.restored) {
+        const zf = new ZfAcademicApi()
+        const profile = await zf.restoreSession()
+        setAcademicApi(zf)
+        const { useAcademicStore } = await import('./academic')
+        useAcademicStore().reset()
+        user.value = profile
+        sessionMode.value = 'sso'
+        return true
+      }
+    } catch (error) {
+      await clearAuthCookies()
+    }
+    restore()
+    return isLoggedIn.value
+  }
+
   async function login(username, password) {
     loading.value = true
     try {
+      resetAcademicApi()
       const profile = await api.login(username, password)
+      sessionMode.value = 'mock'
       user.value = profile
       localStorage.setItem(
         STORAGE_KEY,
@@ -35,11 +61,40 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function loginWithSso() {
+    loading.value = true
+    try {
+      const zf = new ZfAcademicApi()
+      const profile = await zf.loginWithSso()
+      setAcademicApi(zf)
+      const { useAcademicStore } = await import('./academic')
+      useAcademicStore().reset()
+      user.value = profile
+      sessionMode.value = 'sso'
+      localStorage.removeItem(STORAGE_KEY)
+      return profile
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function logout() {
-    await api.logout()
+    await clearAuthCookies()
+    resetAcademicApi()
+    sessionMode.value = 'mock'
     user.value = null
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  return { user, loading, isLoggedIn, restore, login, logout }
+  return {
+    user,
+    loading,
+    sessionMode,
+    isLoggedIn,
+    restore,
+    restoreSession,
+    login,
+    loginWithSso,
+    logout
+  }
 })

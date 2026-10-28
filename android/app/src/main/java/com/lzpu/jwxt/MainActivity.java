@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(JwxtHttpPlugin.class);
+        registerPlugin(SsoLoginPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

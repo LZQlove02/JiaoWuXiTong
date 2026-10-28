@@ -26,6 +26,27 @@
       </div>
     </section>
 
+    <h2 class="section-title">真实数据</h2>
+    <section class="card settings">
+      <button class="setting-row" @click="pickFile('schedule')">
+        <span class="setting-left"><AppIcon name="calendar" />导入课表</span>
+        <AppIcon name="chevron-right" />
+      </button>
+      <button class="setting-row" @click="pickFile('grades')">
+        <span class="setting-left"><AppIcon name="book" />导入成绩</span>
+        <AppIcon name="chevron-right" />
+      </button>
+      <button class="setting-row" @click="pickFile('exams')">
+        <span class="setting-left"><AppIcon name="exam" />导入考试</span>
+        <AppIcon name="chevron-right" />
+      </button>
+      <button v-if="hasImported" class="setting-row" @click="clearImportData">
+        <span class="setting-left"><AppIcon name="trash" />清除导入数据</span>
+        <AppIcon name="chevron-right" />
+      </button>
+    </section>
+    <input ref="fileInput" type="file" accept=".html,.htm,text/html" hidden @change="onFile" />
+
     <h2 class="section-title">通用</h2>
     <section class="card settings">
       <button class="setting-row" @click="clearCache">
@@ -43,7 +64,7 @@
       退出登录
     </button>
 
-    <p class="tiny footer">数据来源：柳州职业技术大学教务系统（个人数据为模拟）</p>
+    <p class="tiny footer">数据来源：柳州职业技术大学教务系统（个人数据为模拟或网页导入）</p>
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
@@ -52,13 +73,17 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useAcademicStore } from '../stores/academic'
 import { useUiStore } from '../stores/ui'
+import { clearImports, hasAnyImport, saveImport } from '../api/imported'
+import { parseExamsHtml, parseGradesHtml, parseScheduleHtml } from '../api/importer'
 import AppIcon from '../components/AppIcon.vue'
 
 const auth = useAuthStore()
+const academic = useAcademicStore()
 const ui = useUiStore()
 const router = useRouter()
 
@@ -88,6 +113,57 @@ function clearCache() {
 function showAbout() {
   showToast('柳职教务 v1.0.3 演示版')
 }
+
+const fileInput = ref(null)
+const pendingKind = ref('')
+const hasImported = ref(hasAnyImport())
+const KIND_LABELS = { schedule: '课表', grades: '成绩', exams: '考试' }
+
+function pickFile(kind) {
+  if (!academic.currentTerm) {
+    showToast('学期信息未就绪，请稍后再试')
+    return
+  }
+  pendingKind.value = kind
+  fileInput.value.value = ''
+  fileInput.value.click()
+}
+
+async function onFile(event) {
+  const file = event.target.files && event.target.files[0]
+  if (!file) return
+  const kind = pendingKind.value
+  try {
+    const html = await file.text()
+    const parsed =
+      kind === 'schedule'
+        ? parseScheduleHtml(html)
+        : kind === 'grades'
+          ? parseGradesHtml(html)
+          : parseExamsHtml(html)
+    const isEmpty = Array.isArray(parsed)
+      ? !parsed.length
+      : !parsed || !((parsed.grades || []).length || (parsed.sessions || []).length)
+    if (isEmpty) throw new Error('未识别到对应表格，请确认保存的是查询结果页面')
+    saveImport(academic.currentTerm, kind, parsed)
+    hasImported.value = true
+    showToast(`${KIND_LABELS[kind]}导入成功，正在刷新`)
+    setTimeout(() => location.reload(), 900)
+  } catch (error) {
+    showToast(error.message || '导入失败')
+  }
+}
+
+function clearImportData() {
+  clearImports()
+  hasImported.value = false
+  showToast('已清除导入数据')
+  setTimeout(() => location.reload(), 700)
+}
+
+onMounted(async () => {
+  await academic.initTerms()
+})
 
 async function logout() {
   await auth.logout()

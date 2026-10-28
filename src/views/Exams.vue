@@ -27,7 +27,14 @@
       <EmptyState v-if="!examList.length" title="暂无考试安排" description="考试安排发布后会显示在这里。" />
     </div>
 
-    <p class="tiny footnote">模拟数据，真实安排以教务处通知为准。</p>
+    <p v-if="error" class="tiny footnote">{{ error }}</p>
+    <p v-else class="tiny footnote">
+      {{
+        exams.source
+          ? '真实数据（网页导入）'
+          : '模拟数据，真实安排以教务处通知为准。'
+      }}
+    </p>
   </div>
 </template>
 
@@ -41,7 +48,7 @@ import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { exams, loading } = storeToRefs(academic)
+const { exams, loading, error } = storeToRefs(academic)
 
 const examList = computed(() =>
   exams.value

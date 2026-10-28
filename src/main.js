@@ -10,6 +10,13 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-useAuthStore(pinia).restore()
-app.use(router)
-app.mount('#app')
+
+const auth = useAuthStore(pinia)
+
+async function bootstrap() {
+  await auth.restoreSession()
+  app.use(router)
+  app.mount('#app')
+}
+
+bootstrap()

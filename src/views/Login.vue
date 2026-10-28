@@ -7,6 +7,11 @@
     </div>
 
     <form class="card login-card" @submit.prevent="submit">
+      <button class="sso" type="button" :disabled="auth.loading || ssoLoading" @click="ssoLogin">
+        {{ ssoLoading ? '正在打开统一认证…' : '学校统一认证登录' }}
+      </button>
+      <p class="divider">或使用演示模式</p>
+
       <label class="field">
         <span class="field-label">学号</span>
         <input
@@ -52,6 +57,20 @@ const route = useRoute()
 const username = ref('')
 const password = ref('')
 const error = ref('')
+const ssoLoading = ref(false)
+
+async function ssoLogin() {
+  error.value = ''
+  ssoLoading.value = true
+  try {
+    await auth.loginWithSso()
+    router.replace(route.query.redirect || '/')
+  } catch (err) {
+    error.value = err.message || '统一认证登录失败'
+  } finally {
+    ssoLoading.value = false
+  }
+}
 
 async function submit() {
   error.value = ''
@@ -109,6 +128,27 @@ async function submit() {
 
 .login-card {
   padding: 20px;
+}
+
+.sso {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  background: #1f7a5a;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sso:disabled {
+  opacity: 0.6;
+}
+
+.divider {
+  margin: 14px 0 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .field {

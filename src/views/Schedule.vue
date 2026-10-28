@@ -62,7 +62,10 @@
       </div>
     </div>
 
-    <p class="tiny legend">左右滑动查看周末 · 点击课程查看详情 · 模拟数据</p>
+    <p class="tiny legend">
+      左右滑动查看周末 · 点击课程查看详情 ·
+      {{ schedule?.source ? '真实数据（网页导入）' : '模拟数据' }}
+    </p>
   </div>
 </template>
 

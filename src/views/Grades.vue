@@ -39,7 +39,14 @@
       <EmptyState v-if="!gradeList.length" title="暂无成绩" description="该学期还没有成绩记录。" />
     </section>
 
-    <p class="tiny footnote">成绩为模拟数据，真实成绩需接入教务系统。</p>
+    <p v-if="error" class="tiny footnote">{{ error }}</p>
+    <p v-else class="tiny footnote">
+      {{
+        grades?.source
+          ? '真实数据（网页导入）'
+          : '成绩为模拟数据，可在「我的 → 导入成绩」接入网页数据。'
+      }}
+    </p>
   </div>
 </template>
 
@@ -50,7 +57,7 @@ import { useAcademicStore } from '../stores/academic'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { terms, grades, loading } = storeToRefs(academic)
+const { terms, grades, loading, error } = storeToRefs(academic)
 const termIndex = ref(0)
 
 const gradeList = computed(() => grades.value?.grades || [])

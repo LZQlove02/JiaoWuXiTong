@@ -13,8 +13,10 @@ import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.HttpUrl;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 @CapacitorPlugin(name = "JwxtHttp")
@@ -36,6 +38,16 @@ public class JwxtHttpPlugin extends Plugin {
             .followRedirects(false)
             .followSslRedirects(false)
             .build();
+
+    /** 登录后的教务业务请求：仅允许 zfjw HTTPS，Cookie 只保存在内存。 */
+    private final OkHttpClient authClient = new OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build();
+
+    private String authCookieHeader = "";
 
     @PluginMethod
     public void get(PluginCall call) {
@@ -143,6 +155,127 @@ public class JwxtHttpPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("exists", file.exists() && file.isFile() && file.length() > 0);
         call.resolve(result);
+    }
+
+    @PluginMethod
+    public void setAuthCookies(PluginCall call) {
+        String cookie = call.getString("cookie");
+        authCookieHeader = cookie == null ? "" : cookie;
+        if (!authCookieHeader.isEmpty()) {
+            AuthCookieStore.save(getContext(), authCookieHeader);
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void loadAuthCookies(PluginCall call) {
+        String cookie = AuthCookieStore.load(getContext());
+        boolean restored = cookie != null && !cookie.isEmpty();
+        if (restored) {
+            authCookieHeader = cookie;
+        }
+        JSObject result = new JSObject();
+        result.put("restored", restored);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void clearAuthCookies(PluginCall call) {
+        authCookieHeader = "";
+        AuthCookieStore.clear(getContext());
+        call.resolve();
+    }
+
+    /**
+     * 登录后的业务请求。只允许 zfjw HTTPS，Cookie 从 WebView 登录结果传入，
+     * 内存中使用，并通过 Android Keystore 加密后持久化。
+     */
+    @PluginMethod
+    public void authGet(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || url.isEmpty()) {
+            call.reject("url is required");
+            return;
+        }
+
+        Request.Builder builder = new Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8");
+        if (!authCookieHeader.isEmpty()) {
+            builder.header("Cookie", authCookieHeader);
+        }
+        final Request request = builder.get().build();
+
+        try {
+            HttpPolicy.AUTH.check(request.url());
+        } catch (IOException e) {
+            call.reject(e.getMessage());
+            return;
+        }
+
+        authClient.dispatcher().executorService().execute(new Runnable() {
+            @Override
+            public void run() {
+                try (Response response = execute(authClient, request, HttpPolicy.AUTH)) {
+                    String body = response.body() == null ? "" : response.body().string();
+                    JSObject result = new JSObject();
+                    result.put("status", response.code());
+                    result.put("url", response.request().url().toString());
+                    result.put("body", body);
+                    call.resolve(result);
+                } catch (IOException e) {
+                    call.reject(e.getMessage() == null ? "network error" : e.getMessage(), e);
+                }
+            }
+        });
+    }
+
+    @PluginMethod
+    public void authPost(PluginCall call) {
+        String url = call.getString("url");
+        String body = call.getString("body");
+        if (url == null || url.isEmpty()) {
+            call.reject("url is required");
+            return;
+        }
+
+        RequestBody requestBody = RequestBody.create(
+                body == null ? "" : body,
+                MediaType.parse("application/x-www-form-urlencoded; charset=UTF-8"));
+        Request.Builder builder = new Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8")
+                .header("X-Requested-With", "XMLHttpRequest");
+        if (!authCookieHeader.isEmpty()) {
+            builder.header("Cookie", authCookieHeader);
+        }
+        final Request request = builder.build();
+
+        try {
+            HttpPolicy.AUTH.check(request.url());
+        } catch (IOException e) {
+            call.reject(e.getMessage());
+            return;
+        }
+
+        authClient.dispatcher().executorService().execute(new Runnable() {
+            @Override
+            public void run() {
+                try (Response response = execute(authClient, request, HttpPolicy.AUTH)) {
+                    String responseBody = response.body() == null ? "" : response.body().string();
+                    JSObject result = new JSObject();
+                    result.put("status", response.code());
+                    result.put("url", response.request().url().toString());
+                    result.put("body", responseBody);
+                    call.resolve(result);
+                } catch (IOException e) {
+                    call.reject(e.getMessage() == null ? "network error" : e.getMessage(), e);
+                }
+            }
+        });
     }
 
     /**

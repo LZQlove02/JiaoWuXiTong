@@ -83,7 +83,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
-import { DATA_MODE } from '../api'
+import { DATA_MODE, hasAnyImport } from '../api'
 import { usePublicList } from '../composables/usePublicContent'
 import { daysUntil, formatDate, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
 import AppIcon from '../components/AppIcon.vue'
@@ -93,7 +93,7 @@ const auth = useAuthStore()
 const academic = useAcademicStore()
 const router = useRouter()
 const { schedule, exams, currentTerm } = storeToRefs(academic)
-const isMock = DATA_MODE === 'mock'
+const isMock = DATA_MODE === 'mock' && !hasAnyImport() && auth.sessionMode !== 'sso'
 
 const {
   items: publicNotices,

@@ -60,6 +60,17 @@ export const useAcademicStore = defineStore('academic', () => {
     course.value = await api.getCourse(id)
   }
 
+  function reset() {
+    terms.value = []
+    currentTerm.value = null
+    schedule.value = null
+    grades.value = null
+    exams.value = []
+    course.value = null
+    loading.value = false
+    error.value = ''
+  }
+
   return {
     terms,
     currentTerm,
@@ -73,6 +84,7 @@ export const useAcademicStore = defineStore('academic', () => {
     loadSchedule,
     loadGrades,
     loadExams,
-    loadCourse
+    loadCourse,
+    reset
   }
 })
