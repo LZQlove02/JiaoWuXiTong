@@ -1,10 +1,14 @@
-import { authGet, isDebugBuild, loginWithSso as nativeSsoLogin, setAuthCookies } from './nativeHttp'
+import { authGet, authPost, isDebugBuild, loginWithSso as nativeSsoLogin, setAuthCookies } from './nativeHttp'
 import { probeZfjwEndpoints } from './probe'
 import { buildTerm, termParamsFor } from '../utils/term'
 
 const COURSE_COLORS = ['#1B5FAA', '#2F855A', '#B7791F', '#805AD5', '#C05621', '#2C7A7B']
 const SCHEDULE_ENDPOINT = 'https://zfjw.lzzy.net/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151'
+const GRADE_PAGE_ENDPOINT = 'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005'
+const GRADES_ENDPOINT = 'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005'
 const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
+
+const QUARTER_RANK = { 3: 0, 12: 1, 16: 2 }
 
 function readSnapshot() {
   try {
@@ -79,13 +83,21 @@ function cleanRoom(value) {
 }
 
 function mapProfile(xsxx) {
+  const id = String(xsxx.XH || '')
+  const yearFromGrade = Number(String(xsxx.NJDM_ID || xsxx.NJMC || '').match(/\d{4}/)?.[0])
+  const yearFromId = Number(id.slice(0, 4))
   return {
-    id: xsxx.XH || '',
+    id,
     name: xsxx.XM || '',
     className: xsxx.BJMC || '',
     major: xsxx.ZYMC || '',
     college: xsxx.JGMC || '',
-    avatar: ''
+    avatar: '',
+    enrollmentYear: Number.isFinite(yearFromGrade) && yearFromGrade >= 2000
+      ? yearFromGrade
+      : Number.isFinite(yearFromId) && yearFromId >= 2000
+        ? yearFromId
+        : null
   }
 }
 
@@ -136,6 +148,142 @@ export function mapSchedule(payload, term) {
   return { term, courses: [...courses.values()], sessions }
 }
 
+function toNumber(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const num = Number(text)
+  return Number.isFinite(num) ? num : null
+}
+
+function parseSelects(html) {
+  const selects = []
+  for (const match of String(html || '').matchAll(/<select\b([^>]*)>([\s\S]*?)<\/select>/gi)) {
+    const attr = match[1].match(/(?:name|id)\s*=\s*["']([^"']+)["']/i)
+    const options = []
+    for (const option of match[2].matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi)) {
+      const value = option[1].match(/value\s*=\s*["']([^"']*)["']/i)
+      options.push({
+        value: value ? value[1] : '',
+        label: option[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+      })
+    }
+    selects.push({ name: attr ? attr[1] : '', options })
+  }
+  return selects
+}
+
+function optionYear(option) {
+  const match = `${option.value} ${option.label}`.match(/\d{4}/)
+  const year = match ? Number(match[0]) : NaN
+  return Number.isFinite(year) && year >= 2000 && year <= 2100 ? String(year) : ''
+}
+
+function optionQuarter(option) {
+  if (/第一/.test(option.label)) return '3'
+  if (/第二/.test(option.label)) return '12'
+  if (/第三/.test(option.label)) return '16'
+  const value = String(option.value || '').trim()
+  if (['3', '12', '16'].includes(value)) return value
+  if (value === '1') return '3'
+  if (value === '2') return '12'
+  return ''
+}
+
+function sortTerms(terms) {
+  return terms.sort((a, b) => Number(b.xnm) - Number(a.xnm)
+    || (QUARTER_RANK[b.xqm] ?? 0) - (QUARTER_RANK[a.xqm] ?? 0))
+}
+
+function isAfterCurrent(term, current) {
+  if (!current?.xnm || !current?.xqm) return false
+  const year = Number(term.xnm)
+  const currentYear = Number(current.xnm)
+  if (year !== currentYear) return year > currentYear
+  return (QUARTER_RANK[term.xqm] ?? 0) > (QUARTER_RANK[current.xqm] ?? 0)
+}
+
+// 从成绩查询页的学年 / 学期下拉框解析全部学期；页面结构变化时返回空数组，由调用方兜底
+export function parseTermsFromHtml(html, currentTerm = null) {
+  const selects = parseSelects(html)
+  const yearSelect = selects.find((select) => /xnm/i.test(select.name))
+    || selects.find((select) => select.options.some((option) => /学年/.test(option.label)))
+  if (!yearSelect) return []
+
+  const quarterSelect = selects.find((select) => /xqm/i.test(select.name))
+    || selects.find((select) => select.options.some((option) => /学期/.test(option.label)))
+  const years = [...new Set(yearSelect.options.map(optionYear).filter(Boolean))]
+  let quarters = quarterSelect
+    ? [...new Set(quarterSelect.options.map(optionQuarter).filter(Boolean))]
+    : []
+  if (!quarters.length) quarters = ['3', '12']
+  if (quarters.length === 1) quarters = ['3', '12']
+
+  const terms = new Map()
+  const add = (xnm, xqm) => {
+    if (!xnm || !xqm) return
+    const isCurrent = currentTerm
+      && String(currentTerm.xnm) === String(xnm)
+      && String(currentTerm.xqm) === String(xqm)
+    const built = buildTerm(xnm, xqm)
+    terms.set(`${xnm}_${xqm}`, {
+      xnm: String(xnm),
+      xqm: String(xqm),
+      label: built.label,
+      startDate: built.startDate,
+      isCurrent: Boolean(isCurrent)
+    })
+  }
+  for (const year of years) {
+    for (const quarter of quarters) add(year, quarter)
+  }
+  if (currentTerm?.xnm && currentTerm?.xqm) add(currentTerm.xnm, currentTerm.xqm)
+  // 学期下拉可能包含尚未开始的学期，只保留当前及以前的学期
+  return sortTerms([...terms.values()].filter((item) => !isAfterCurrent(item, currentTerm)))
+}
+
+export function mapGrades(payload, term) {
+  const items = Array.isArray(payload?.items) ? payload.items : []
+  const grades = items
+    .map((item, index) => {
+      const score = String(item.cj ?? '').trim()
+      return {
+        id: `${item.key || item.row_id || item.kch || 'course'}_${index}`,
+        courseId: String(item.kch || ''),
+        courseName: String(item.kcmc || '').trim(),
+        score,
+        credit: toNumber(item.xf),
+        gradePoint: toNumber(item.jd),
+        category: String(item.kclbmc || '').trim(),
+        examType: String(item.ksxz || '').trim(),
+        teacher: String(item.jsxm || '').trim()
+      }
+    })
+    .filter((item) => item.courseName)
+
+  let totalCredits = 0
+  let weighted = 0
+  let weight = 0
+  for (const item of grades) {
+    if (item.credit === null || item.credit <= 0) continue
+    totalCredits += item.credit
+    if (item.gradePoint === null) continue
+    weight += item.credit
+    weighted += item.gradePoint * item.credit
+  }
+
+  return {
+    term: term ? { ...term } : null,
+    grades,
+    summary: {
+      gpa: weight > 0 ? Math.round((weighted / weight) * 100) / 100 : null,
+      totalCredits: Math.round(totalCredits * 10) / 10,
+      count: grades.length
+    },
+    source: '教务系统（实时）',
+    fetchedAt: new Date().toISOString()
+  }
+}
+
 export class ZfAcademicApi {
   remote = true
 
@@ -145,6 +293,7 @@ export class ZfAcademicApi {
     this.schedule = null
     this.fetchedAt = ''
     this.offline = false
+    this.terms = null
   }
 
   // 冷启动先用本地快照渲染，随后由后台刷新替换为实时数据
@@ -233,7 +382,7 @@ export class ZfAcademicApi {
       failure.sessionExpired = response.status === 401 || response.status === 403
       throw failure
     }
-    const body = String(response.body || '')
+    const body = String(response.body || '').replace(/^\uFEFF/, '')
     // 会话失效时教务系统会返回 200 + 登录页 HTML，不能只按状态码判定成功
     if (/^\s*</.test(body)) {
       const expired = /login_slogin|统一身份认证|authserver/i.test(body)
@@ -258,7 +407,54 @@ export class ZfAcademicApi {
 
   async getTerms() {
     if (!this.term) throw new Error('尚未登录')
-    return [{ ...this.term }]
+    if (this.terms?.length) return this.terms.map((term) => ({ ...term }))
+    const fromPage = await this.fetchTerms()
+    const terms = fromPage.length ? fromPage : this.buildFallbackTerms()
+    this.terms = terms
+    return terms.map((term) => ({ ...term }))
+  }
+
+  // 成绩查询页的学年 / 学期下拉框包含全部可选学期
+  async fetchTerms() {
+    try {
+      const response = await authGet(GRADE_PAGE_ENDPOINT)
+      if (response?.status !== 200) return []
+      const body = String(response.body || '').replace(/^\uFEFF/, '')
+      if (!/^\s*</.test(body)) return []
+      return parseTermsFromHtml(body, this.term)
+    } catch (error) {
+      return []
+    }
+  }
+
+  // 页面结构无法解析时，按入学年份推算到当前学期，保证学期选择始终可用
+  buildFallbackTerms() {
+    const currentXnm = Number(this.term?.xnm) || new Date().getFullYear()
+    const currentXqm = String(this.term?.xqm || '3')
+    const enrollmentYear = Number(this.profile?.enrollmentYear)
+    const start = Number.isFinite(enrollmentYear)
+      && enrollmentYear >= 2000
+      && enrollmentYear <= currentXnm
+      ? enrollmentYear
+      : currentXnm - 3
+    const currentRank = QUARTER_RANK[currentXqm] ?? 0
+    const terms = []
+    for (let year = start; year <= currentXnm; year += 1) {
+      const quarters = year < currentXnm
+        ? ['3', '12']
+        : ['3', '12', '16'].filter((quarter) => (QUARTER_RANK[quarter] ?? 0) <= currentRank)
+      for (const quarter of quarters) {
+        const built = buildTerm(year, quarter)
+        terms.push({
+          xnm: String(year),
+          xqm: quarter,
+          label: built.label,
+          startDate: built.startDate,
+          isCurrent: year === currentXnm && quarter === currentXqm
+        })
+      }
+    }
+    return sortTerms(terms)
   }
 
   async getSchedule(term) {
@@ -279,8 +475,52 @@ export class ZfAcademicApi {
     }
   }
 
-  async getGrades() {
-    throw new Error('成绩接口尚未接入，暂不可用')
+  async getGrades(term) {
+    if (!this.term) throw new Error('尚未登录')
+    const params = term || this.term
+    const form = `xnm=${encodeURIComponent(params.xnm)}&xqm=${encodeURIComponent(params.xqm)}`
+    let response
+    try {
+      response = await authPost(GRADES_ENDPOINT, form)
+    } catch (error) {
+      const message = String(error?.message || '')
+      if (message.includes('仅允许 HTTPS 请求')) {
+        const failure = new Error('登录会话已失效')
+        failure.sessionExpired = true
+        throw failure
+      }
+      const failure = new Error('无法连接教务系统')
+      failure.network = true
+      throw failure
+    }
+    if (response?.status !== 200) {
+      const failure = new Error(`成绩接口返回 ${response?.status ?? '未知状态'}`)
+      failure.status = response?.status
+      failure.sessionExpired = response?.status === 401 || response?.status === 403
+      throw failure
+    }
+    const body = String(response.body || '').replace(/^\uFEFF/, '')
+    if (/^\s*</.test(body)) {
+      const expired = /login_slogin|统一身份认证|authserver/i.test(body)
+      const failure = new Error(expired ? '登录会话已失效' : '成绩数据解析失败')
+      if (expired) failure.sessionExpired = true
+      else failure.parseError = true
+      throw failure
+    }
+    let payload
+    try {
+      payload = JSON.parse(body)
+    } catch (error) {
+      const failure = new Error('成绩数据解析失败')
+      failure.parseError = true
+      throw failure
+    }
+    if (!payload || !Array.isArray(payload.items)) {
+      const failure = new Error('成绩数据解析失败')
+      failure.parseError = true
+      throw failure
+    }
+    return mapGrades(payload, params)
   }
 
   async getExams() {

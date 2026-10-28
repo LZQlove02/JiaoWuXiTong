@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { authGet } from '../src/api/nativeHttp'
-import { ZfAcademicApi, clearScheduleSnapshot } from '../src/api/zf'
+import { authGet, authPost } from '../src/api/nativeHttp'
+import {
+  ZfAcademicApi,
+  clearScheduleSnapshot,
+  mapGrades,
+  parseTermsFromHtml
+} from '../src/api/zf'
 
 vi.mock('../src/api/nativeHttp', () => ({
   authGet: vi.fn(),
@@ -92,5 +97,128 @@ describe('ZfAcademicApi 离线快照', () => {
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
     clearScheduleSnapshot()
     expect(localStorage.getItem(SNAPSHOT_KEY)).toBeNull()
+  })
+})
+
+describe('成绩解析与学期列表', () => {
+  beforeEach(() => {
+    authGet.mockReset()
+    authPost.mockReset()
+  })
+
+  it('汇总学分与绩点，兼容文本成绩', () => {
+    const payload = {
+      items: [
+        {
+          key: 'a',
+          kch: '1001',
+          kcmc: '高等数学',
+          cj: '92',
+          xf: '4',
+          jd: '4.2',
+          kclbmc: '必修',
+          ksxz: '正常考试',
+          jsxm: '张明'
+        },
+        {
+          key: 'b',
+          kch: '1002',
+          kcmc: '体育',
+          cj: '58',
+          xf: '1',
+          jd: '0',
+          kclbmc: '必修',
+          ksxz: '正常考试',
+          jsxm: '刘强'
+        },
+        {
+          key: 'c',
+          kch: '1003',
+          kcmc: '形势与政策',
+          cj: '优秀',
+          xf: '2',
+          jd: '',
+          kclbmc: '必修',
+          ksxz: '考查',
+          jsxm: '赵敏'
+        }
+      ]
+    }
+
+    const result = mapGrades(payload, term)
+    expect(result.grades).toHaveLength(3)
+    expect(result.grades[2].score).toBe('优秀')
+    expect(result.grades[2].gradePoint).toBeNull()
+    expect(result.summary).toEqual({ gpa: 3.36, totalCredits: 7, count: 3 })
+    expect(result.source).toBe('教务系统（实时）')
+  })
+
+  it('缺少 items 时按空列表处理', () => {
+    const result = mapGrades({}, term)
+    expect(result.grades).toEqual([])
+    expect(result.summary).toEqual({ gpa: null, totalCredits: 0, count: 0 })
+  })
+
+  it('从成绩页下拉框解析全部学期并标记当前学期', () => {
+    const html = `
+      <select name="xnm">
+        <option value="2026">2026-2027</option>
+        <option value="2025">2025-2026</option>
+        <option value="2024">2024-2025</option>
+      </select>
+      <select name="xqm">
+        <option value="3">第一学期</option>
+        <option value="12">第二学期</option>
+      </select>
+    `
+    const terms = parseTermsFromHtml(html, term)
+    expect(terms.map((item) => `${item.xnm}_${item.xqm}`)).toEqual([
+      '2026_3',
+      '2025_12',
+      '2025_3',
+      '2024_12',
+      '2024_3'
+    ])
+    expect(terms[0].isCurrent).toBe(true)
+    expect(terms[0].label).toBe('2026-2027 学年第一学期')
+    expect(terms[0].startDate).toBe('2026-08-31')
+  })
+
+  it('页面没有学期下拉时返回空列表', () => {
+    expect(parseTermsFromHtml('<html><body></body></html>', term)).toEqual([])
+  })
+
+  it('成绩页不可用时按入学年份生成学期兜底', async () => {
+    authGet.mockRejectedValue(networkError())
+    const api = new ZfAcademicApi()
+    api.term = term
+    api.profile = { enrollmentYear: 2025 }
+    const terms = await api.getTerms()
+    expect(terms.map((item) => `${item.xnm}_${item.xqm}`)).toEqual([
+      '2026_3',
+      '2025_12',
+      '2025_3'
+    ])
+    expect(terms[0].isCurrent).toBe(true)
+    expect(terms[0].startDate).toBe('2026-08-31')
+  })
+
+  it('getGrades 按学期请求成绩接口并复用解析结果', async () => {
+    authPost.mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({
+        items: [
+          { key: 'a', kch: '1001', kcmc: '高等数学', cj: '92', xf: '4', jd: '4.2' }
+        ]
+      })
+    })
+    const api = new ZfAcademicApi()
+    api.term = term
+    const result = await api.getGrades(term)
+    expect(authPost).toHaveBeenCalledWith(
+      'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005',
+      'xnm=2026&xqm=3'
+    )
+    expect(result.summary).toEqual({ gpa: 4.2, totalCredits: 4, count: 1 })
   })
 })

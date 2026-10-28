@@ -44,6 +44,15 @@ export const useAcademicStore = defineStore('academic', () => {
   }
 
   async function loadGrades(term = currentTerm.value) {
+    // 切换学期时先清掉旧学期数据，避免加载失败后仍显示上一学期的成绩
+    if (
+      term
+      && grades.value?.term
+      && (String(term.xnm) !== String(grades.value.term.xnm)
+        || String(term.xqm) !== String(grades.value.term.xqm))
+    ) {
+      grades.value = null
+    }
     loading.value = true
     setError('grades', '')
     try {

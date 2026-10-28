@@ -7,13 +7,16 @@ export function termParamsFor(date = new Date()) {
   return { xnm: String(year - 1), xqm: '12' }
 }
 
+const TERM_NAMES = { 3: '第一学期', 12: '第二学期', 16: '第三学期' }
+
 export function buildTerm(xnm, xqm, options = {}) {
   const year = String(xnm)
   const quarter = String(xqm)
   return {
     xnm: year,
     xqm: quarter,
-    label: options.label || `${year}-${Number(year) + 1} 学年${quarter === '3' ? '第一学期' : '第二学期'}`,
+    label: options.label
+      || `${year}-${Number(year) + 1} 学年${TERM_NAMES[quarter] || `第${quarter}学期`}`,
     startDate: quarter === '3' ? `${year}-08-31` : `${Number(year) + 1}-02-23`,
     isCurrent: Boolean(options.isCurrent)
   }
