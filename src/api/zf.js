@@ -124,14 +124,27 @@ export class ZfAcademicApi {
     this.offline = false
   }
 
+  // 冷启动先用本地快照渲染，随后由后台刷新替换为实时数据
+  applySnapshot() {
+    const snapshot = readSnapshot()
+    if (!snapshot) return null
+    this.profile = snapshot.profile
+    this.term = snapshot.term
+    this.schedule = snapshot.schedule
+    this.fetchedAt = snapshot.fetchedAt
+    this.offline = true
+    return this.profile
+  }
+
   async loginWithSso() {
     const result = await nativeSsoLogin()
     if (!result?.cookieHeader) throw new Error('未获取到登录会话')
     await setAuthCookies(result.cookieHeader)
-    return this.restoreSession()
+    // 刚登录必须现场校验会话，不能回退到旧快照，否则会把登录失败伪装成成功
+    return this.restoreSession({ allowSnapshot: false })
   }
 
-  async restoreSession() {
+  async restoreSession({ allowSnapshot = true } = {}) {
     const snapshot = readSnapshot()
     let params = termParamsFor()
     try {
@@ -161,7 +174,7 @@ export class ZfAcademicApi {
       return this.profile
     } catch (error) {
       // 网络不可达时用上次成功的快照保持登录态，避免离线冷启动被踢回登录页
-      if (error?.network && snapshot) {
+      if (error?.network && allowSnapshot && snapshot) {
         this.profile = snapshot.profile
         this.term = snapshot.term
         this.schedule = snapshot.schedule
@@ -179,6 +192,13 @@ export class ZfAcademicApi {
     try {
       response = await authGet(url)
     } catch (error) {
+      const message = String(error?.message || '')
+      // 未登录时教务系统会 302 到 http 登录页，被网络策略拦截，应判定为会话失效
+      if (message.includes('仅允许 HTTPS 请求')) {
+        const failure = new Error('登录会话已失效')
+        failure.sessionExpired = true
+        throw failure
+      }
       const failure = new Error('无法连接教务系统')
       failure.network = true
       throw failure

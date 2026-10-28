@@ -6,15 +6,6 @@ import { clearAuthCookies, loadAuthCookies } from '../api/nativeHttp'
 
 const STORAGE_KEY = 'lzpu.session'
 const RESTORE_TIMEOUT_MS = 15000
-const COOKIE_SCOPE_KEY = 'lzpu.auth.cookieScope'
-const COOKIE_SCOPE_VERSION = '2'
-
-// 旧版本把统一认证 Cookie 一并加密保存，升级后清空一次，强制重新登录以丢弃跨域票据
-async function migrateCookieScope() {
-  if (localStorage.getItem(COOKIE_SCOPE_KEY) === COOKIE_SCOPE_VERSION) return
-  await clearAuthCookies()
-  localStorage.setItem(COOKIE_SCOPE_KEY, COOKIE_SCOPE_VERSION)
-}
 
 // 冷启动恢复会话最多等待 15 秒，避免弱网时首屏长时间停在启动页
 function restoreWithTimeout(api) {
@@ -59,16 +50,18 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function restoreSession() {
     try {
-      await migrateCookieScope()
       const restored = await loadAuthCookies()
       if (restored && restored.restored) {
         const zf = new ZfAcademicApi()
+        const cached = zf.applySnapshot()
+        if (cached) {
+          applyZfSession(zf, cached)
+          // 先用快照渲染首屏，实时校验放到后台，避免启动被网络请求卡住
+          refreshInBackground(zf)
+          return true
+        }
         const profile = await restoreWithTimeout(zf)
-        setAcademicApi(zf)
-        const { useAcademicStore } = await import('./academic')
-        useAcademicStore().reset()
-        user.value = profile
-        sessionMode.value = 'sso'
+        applyZfSession(zf, profile)
         return true
       }
     } catch (error) {
@@ -77,6 +70,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
     restore()
     return isLoggedIn.value
+  }
+
+  function applyZfSession(zf, profile) {
+    setAcademicApi(zf)
+    user.value = profile
+    sessionMode.value = 'sso'
+  }
+
+  // 后台静默校验：成功则刷新页面数据，会话失效则清理并退回登录页
+  function refreshInBackground(zf) {
+    restoreWithTimeout(zf)
+      .then(async () => {
+        const { useAcademicStore } = await import('./academic')
+        const academic = useAcademicStore()
+        academic.reset()
+        await academic.initTerms()
+        await academic.loadSchedule()
+      })
+      .catch(async (error) => {
+        if (!error?.sessionExpired) return
+        await clearAuthCookies()
+        clearScheduleSnapshot()
+        resetAcademicApi()
+        user.value = null
+        sessionMode.value = 'mock'
+      })
   }
 
   // 启动时后台恢复会话，页面先挂载，路由守卫等待该结果后再决定去向
@@ -122,6 +141,11 @@ export const useAuthStore = defineStore('auth', () => {
       sessionMode.value = 'sso'
       localStorage.removeItem(STORAGE_KEY)
       return profile
+    } catch (error) {
+      // 登录后校验未通过时丢弃这次无效会话，避免把坏 Cookie 留到下次启动
+      await clearAuthCookies()
+      if (error?.sessionExpired) throw new Error('登录未生效，请重试')
+      throw error
     } finally {
       loading.value = false
     }

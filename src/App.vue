@@ -10,7 +10,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
@@ -23,6 +23,14 @@ const router = useRouter()
 const ui = useUiStore()
 const auth = useAuthStore()
 const showTabBar = computed(() => route.meta.tab === true)
+
+// 后台校验发现会话失效时会清空登录态，这里统一退回登录页
+watch(
+  () => auth.isLoggedIn,
+  (loggedIn) => {
+    if (!loggedIn) router.replace('/login')
+  }
+)
 
 onMounted(() => {
   ui.initTheme()

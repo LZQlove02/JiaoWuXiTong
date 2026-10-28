@@ -13,7 +13,6 @@ import android.webkit.CookieManager;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
-import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
@@ -274,14 +273,14 @@ public class SsoLoginActivity extends Activity {
     }
 
     /**
-     * 登录流程结束后清空 WebView 持有的 Cookie 与缓存，
-     * 避免会话明文残留在应用私有目录，会话本身由 AuthCookieStore 加密保存。
+     * 登录流程结束后清空 WebView 持有的 Cookie 与页面缓存，
+     * 避免会话明文残留在应用私有目录。不清 WebStorage，否则会连带清掉
+     * 应用自身的 localStorage（主题、导入数据、课表快照）。
      */
     private void clearSessionData() {
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.removeAllCookies(null);
         cookieManager.flush();
-        WebStorage.getInstance().deleteAllData();
         if (webView == null) return;
         webView.clearCache(true);
         webView.clearHistory();

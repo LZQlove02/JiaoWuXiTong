@@ -6,6 +6,7 @@
         <div class="title-line">
           <h1 class="page-title">柳职教务</h1>
           <span v-if="isMock" class="mock-badge">课表/成绩为模拟</span>
+          <span v-else-if="isOffline" class="mock-badge">课表来自离线缓存</span>
         </div>
         <p class="tiny">{{ currentTerm?.label }} · {{ weekLabel }}</p>
       </div>
@@ -94,6 +95,7 @@ const academic = useAcademicStore()
 const router = useRouter()
 const { schedule, exams, currentTerm } = storeToRefs(academic)
 const isMock = computed(() => !hasAnyImport() && auth.sessionMode !== 'sso')
+const isOffline = computed(() => Boolean(schedule.value?.source?.includes('离线')))
 
 const {
   items: publicNotices,
