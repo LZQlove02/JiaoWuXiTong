@@ -45,16 +45,18 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRoute } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
 import BackBar from '../components/BackBar.vue'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadState from '../components/LoadState.vue'
 
+const route = useRoute()
 const academic = useAcademicStore()
 const { messages, loading, errors } = storeToRefs(academic)
 const error = computed(() => errors.value.messages)
-const expandedId = ref('')
+const expandedId = ref(route.query.id ? String(route.query.id) : '')
 
 function toggle(id) {
   expandedId.value = expandedId.value === id ? '' : id

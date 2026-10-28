@@ -65,6 +65,24 @@
 
     <section class="card notice-card">
       <div class="row">
+        <h2 class="card-title">最新消息</h2>
+        <router-link to="/messages" class="link">全部</router-link>
+      </div>
+      <p class="tiny source">来源：教务系统（学生门户）</p>
+      <button
+        v-for="msg in latestMessages"
+        :key="msg.id"
+        class="notice-row"
+        @click="openMessage(msg.id)"
+      >
+        <span class="notice-title message-title">{{ msg.title }}</span>
+        <span class="tiny">{{ shortTime(msg.time) }}</span>
+      </button>
+      <p v-if="messagesError" class="tiny notice-error">{{ messagesError }}</p>
+    </section>
+
+    <section class="card notice-card">
+      <div class="row">
         <h2 class="card-title">最新通知</h2>
         <router-link to="/notices" class="link">全部</router-link>
       </div>
@@ -96,11 +114,12 @@ import EmptyState from '../components/EmptyState.vue'
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const router = useRouter()
-const { schedule, exams, currentTerm, errors, portalNotices } = storeToRefs(academic)
+const { schedule, exams, currentTerm, errors, portalNotices, messages } = storeToRefs(academic)
 const isOffline = computed(() => Boolean(schedule.value?.source?.includes('离线')))
 const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
 
 const noticesError = computed(() => errors.value.portalNotices)
+const messagesError = computed(() => errors.value.messages)
 
 const now = ref(new Date())
 let clockTimer = null
@@ -151,9 +170,19 @@ const nextExam = computed(() => {
 })
 
 const latestNotices = computed(() => portalNotices.value.slice(0, 3))
+const latestMessages = computed(() => (messages.value?.items || []).slice(0, 3))
 
 function go(path) {
   router.push(path)
+}
+
+function openMessage(id) {
+  router.push({ path: '/messages', query: { id } })
+}
+
+function shortTime(value) {
+  const text = String(value || '')
+  return text.length >= 16 ? text.slice(5, 16) : text
 }
 
 onMounted(async () => {
@@ -163,7 +192,7 @@ onMounted(async () => {
   await academic.initTerms()
   academic.loadSchedule()
   academic.loadExams()
-  await academic.loadPortalNotices()
+  await Promise.all([academic.loadPortalNotices(), academic.loadMessages()])
 })
 
 onUnmounted(() => {
@@ -313,6 +342,13 @@ onUnmounted(() => {
 .notice-title {
   font-size: 14px;
   line-height: 1.45;
+}
+
+.message-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .source {
