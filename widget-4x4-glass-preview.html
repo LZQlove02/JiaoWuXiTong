@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>4×4 小组件 · 课程块材质（液态玻璃 / 毛玻璃灰）</title>
+<style>
+  :root {
+    --ink: #101820;
+    --ink-2: #3c4a57;
+    --ink-3: #6b7885;
+    --w: 340px;
+    --h: 414px;
+    --r-blk: 8px;
+    --grid-line: rgba(16, 30, 50, .075);
+    --today-bg: rgba(27, 95, 170, .13);
+    --today-ink: #14508f;
+    --s: 1.55;   /* 预览缩放：按真机 985px 宽放大，布局与测量仍按 340dp 计算 */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #f2f4f7;
+    color: var(--ink);
+    font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1360px; margin: 0 auto; padding: 34px 32px 60px; }
+  h1 { font-size: 21px; margin: 0 0 6px; letter-spacing: .2px; }
+  .sub { margin: 0; color: #5b6773; font-size: 13px; }
+  .controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
+    margin: 22px 0 6px; padding: 12px 16px;
+    background: #fff; border: 1px solid #e6e9ee; border-radius: 12px;
+  }
+  .ctl { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #3c4a57; }
+  .seg { display: inline-flex; border: 1px solid #dbe0e7; border-radius: 9px; overflow: hidden; }
+  .seg button {
+    border: 0; background: #fff; color: #46525f; font: inherit; font-size: 12.5px;
+    padding: 5px 12px; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid #e3e7ed; }
+  .seg button[aria-pressed="true"] { background: #2f4a63; color: #fff; }
+  .tips { margin-left: auto; color: #8a949f; font-size: 12px; }
+
+  .stages { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 22px; align-items: flex-start; }
+  .stage { width: 560px; }
+  .stage-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px 4px; flex-wrap: wrap; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .4px;
+    color: #fff; background: #2f4a63; border-radius: 6px; padding: 2px 7px;
+  }
+  .stage-head h2 { font-size: 14.5px; margin: 0; font-weight: 650; }
+  .stage-head p { margin: 0; font-size: 12px; color: #7d8894; }
+
+  .wall {
+    position: relative; border-radius: 24px; padding: 26px;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      repeating-linear-gradient(118deg, rgba(255,255,255,.085) 0 1.4px, rgba(255,255,255,0) 1.4px 8px),
+      radial-gradient(72% 56% at 24% 22%, #9a9cf5 0%, rgba(120,130,240,0) 62%),
+      linear-gradient(155deg, #4162e6 0%, #5d7cf0 48%, #3b5fd8 100%);
+    box-shadow: 0 12px 34px rgba(24, 40, 80, .16);
+  }
+  .wall.dark {
+    background:
+      repeating-linear-gradient(118deg, rgba(255,255,255,.045) 0 1.4px, rgba(255,255,255,0) 1.4px 8px),
+      radial-gradient(72% 56% at 24% 22%, #2a3160 0%, rgba(20,26,50,0) 62%),
+      linear-gradient(155deg, #0d1220 0%, #151d33 50%, #0b1120 100%);
+  }
+
+  /* ---------- 组件骨架 ---------- */
+  .holder {
+    position: relative;
+    width: calc(var(--w) * var(--s));
+    height: calc(var(--h) * var(--s));
+  }
+  .widget {
+    position: relative; width: var(--w); height: var(--h); padding: 10px;
+    display: flex; flex-direction: column; border-radius: 20px;
+    color: var(--ink);
+    transform: scale(var(--s)); transform-origin: top left;
+  }
+  .w-head { display: flex; align-items: center; gap: 6px; height: 24px; }
+  .w-title {
+    flex: 1; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .w-gear { font-size: 12px; opacity: .72; line-height: 1; }
+  .w-updated { font-size: 9.5px; color: var(--ink-3); white-space: nowrap; }
+  .w-sum { margin-top: 4px; padding: 3px 6px 0; flex: 0 0 auto; }
+  .sum-main { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 600; }
+  .sum-note {
+    font-size: 10px; color: var(--ink-3); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .grid {
+    position: relative; flex: 1; min-height: 0; margin-top: 4px;
+    display: grid;
+    grid-template-columns: 8.5% repeat(7, 1fr);
+    grid-template-rows: 10% repeat(12, minmax(0, 1fr));
+  }
+  .wd {
+    grid-row: 1; font-style: normal; font-size: 10px; text-align: center;
+    align-self: center; color: var(--ink-2); z-index: 2;
+  }
+  .wd.today { color: var(--today-ink); font-weight: 700; }
+  .pn {
+    grid-column: 1; font-style: normal; font-size: 8.5px; text-align: center;
+    align-self: center; color: var(--ink-3); z-index: 2;
+  }
+  .today-col { grid-row: 2 / 14; background: var(--today-bg); z-index: 0; }
+  .line { position: absolute; pointer-events: none; z-index: 1; }
+  .line.h { left: 8.5%; right: 0; height: 1px; background: var(--grid-line); }
+  .line.v { top: 10%; bottom: 0; width: 1px; background: var(--grid-line); }
+
+  .blk {
+    z-index: 2; margin: 2px; padding: 4px 3px; border-radius: var(--r-blk);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; overflow: hidden; min-height: 0; min-width: 0;
+  }
+  .blk b { font-weight: 700; display: block; width: 100%; font-size: var(--ln, 12px); line-height: 1.06; }
+  .blk .ln { display: block; white-space: nowrap; }
+  .blk i { font-style: normal; opacity: .8; margin-top: 2px; line-height: 1.05; white-space: nowrap; max-width: 100%; }
+
+  /* ---------- A 全透明：课程块 = 液态玻璃（无描边） ---------- */
+  .widget[data-v="transparent"] .blk {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.52) 0%, rgba(255,255,255,0) 46%),
+      linear-gradient(160deg, rgba(255,255,255,.24), rgba(255,255,255,.08));
+    -webkit-backdrop-filter: blur(10px) saturate(122%);
+    backdrop-filter: blur(10px) saturate(122%);
+    box-shadow:
+      0 2px 7px rgba(8,18,32,.16),
+      inset 0 1px 0 rgba(255,255,255,.55);
+    color: #0d1721;
+  }
+  .widget[data-v="transparent"] .blk i { color: rgba(13,23,33,.70); }
+  .widget[data-v="transparent"] { --ink: #101a22; --ink-2: #1f2a33; --ink-3: #3f4b57; --grid-line: rgba(10, 22, 38, .16); }
+
+  /* ---------- B 不透明：白卡 + 毛玻璃灰块 ---------- */
+  .widget[data-v="opaque"] {
+    background: #fff;
+    box-shadow: 0 14px 34px rgba(12,24,40,.20);
+  }
+  /* ---------- B / C 共用：60% 不透明度毛玻璃冷色块（浅 / 中 / 深三档，无边框） ---------- */
+  .widget[data-v="opaque"] .blk,
+  .widget[data-v="glass"] .blk {
+    -webkit-backdrop-filter: blur(8px) saturate(112%);
+    backdrop-filter: blur(8px) saturate(112%);
+    box-shadow: 0 1px 2px rgba(16,26,38,.10);
+  }
+  .widget[data-v="opaque"] .blk i,
+  .widget[data-v="glass"] .blk i { color: inherit; opacity: .72; }
+
+  /* 浅冷 40%：白卡上落成 #D5E0EB */
+  .widget[data-v="opaque"] .blk[data-tier="0"],
+  .widget[data-v="glass"] .blk[data-tier="0"] { background: rgba(150,178,206,.40); color: #12202c; }
+  /* 中冷 40%：白卡上落成 #B9CADD */
+  .widget[data-v="opaque"] .blk[data-tier="1"],
+  .widget[data-v="glass"] .blk[data-tier="1"] { background: rgba(80,124,170,.40); color: #12202c; }
+  /* 深冷 40%：白卡上落成 #9DA9BD */
+  .widget[data-v="opaque"] .blk[data-tier="2"],
+  .widget[data-v="glass"] .blk[data-tier="2"] { background: rgba(10,40,90,.40); color: #12202c; }
+
+  /* ---------- C 液态玻璃卡片：卡片本体 ---------- */
+  .widget[data-v="glass"] {
+    background: linear-gradient(180deg, rgba(255,255,255,.54), rgba(255,255,255,.30));
+    -webkit-backdrop-filter: blur(18px) saturate(126%);
+    backdrop-filter: blur(18px) saturate(126%);
+    border: 1px solid rgba(255,255,255,.58);
+    box-shadow: 0 14px 34px rgba(12,24,40,.18);
+  }
+
+  /* ---------- 对照：现状 ---------- */
+  .widget[data-v="legacy"] .blk {
+    background: var(--blk); color: #fff; border-radius: 5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
+  }
+  .widget[data-v="legacy"] .blk i { color: rgba(255,255,255,.82); }
+
+  /* ---------- 深色主题 ---------- */
+  .wall.dark .widget { color: #eceff3; --ink: #eceff3; --ink-2: #c6ccd4; --ink-3: #98a2ad; --grid-line: rgba(255,255,255,.10); --today-ink: #8fc0ee; --today-bg: rgba(255,255,255,.07); }
+  .wall.dark .widget[data-v="opaque"] { background: #171b20; }
+  .wall.dark .widget[data-v="opaque"] .blk[data-tier="0"],
+  .wall.dark .widget[data-v="glass"] .blk[data-tier="0"] { background: rgba(170,195,220,.40); color: #eef3f8; }
+  .wall.dark .widget[data-v="opaque"] .blk[data-tier="1"],
+  .wall.dark .widget[data-v="glass"] .blk[data-tier="1"] { background: rgba(110,150,190,.40); color: #eef3f8; }
+  .wall.dark .widget[data-v="opaque"] .blk[data-tier="2"],
+  .wall.dark .widget[data-v="glass"] .blk[data-tier="2"] { background: rgba(64,104,146,.40); color: #eef3f8; }
+  .wall.dark .widget[data-v="glass"] {
+    background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
+    border-color: rgba(255,255,255,.20);
+  }
+  .wall.dark .widget[data-v="transparent"] .blk {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 46%),
+      linear-gradient(160deg, rgba(255,255,255,.13), rgba(255,255,255,.04));
+    box-shadow: 0 2px 7px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.20);
+    color: #f2f6fa;
+  }
+  .wall.dark .widget[data-v="transparent"] .blk i { color: rgba(242,246,250,.70); }
+
+  /* ---------- 说明 ---------- */
+  .notes { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 18px; }
+  .note {
+    flex: 1 1 320px; background: #fff; border: 1px solid #e6e9ee; border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .note h3 { margin: 0 0 8px; font-size: 13.5px; letter-spacing: .2px; }
+  .note ul { margin: 0; padding-left: 18px; color: #46525f; font-size: 12.5px; }
+  .note li { margin: 5px 0; }
+  code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: #f1f4f8; border-radius: 4px; padding: 1px 5px; }
+  .mat-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .mat { width: 92px; text-align: center; font-size: 11px; color: #6b7885; }
+  .mat span {
+    display: block; height: 44px; border-radius: 9px; margin-bottom: 5px;
+    position: relative; overflow: hidden;
+  }
+  .mat-1 span { background: #d5e0eb; border: 1px solid #fff; }
+  .mat-2 span { background: #b9cadd; border: 1px solid #fff; }
+  .mat-3 span { background: #9da9bd; border: 1px solid #fff; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #6b7885; margin-top: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>4×4 周课表 · 课程块材质</h1>
+  <p class="sub">只显示课表（无摘要行）；全透明＝液态玻璃，不透明 / 液态玻璃＝毛玻璃冷色（三档 40%，无边框）。每块同时显示课名与教室。尺寸按真机 985×1200px（约 340×414dp）同比例还原。</p>
+
+  <div class="controls">
+    <div class="ctl">
+      <span>壁纸</span>
+      <div class="seg" id="wall-tone">
+        <button data-wall="light" aria-pressed="true">浅色</button>
+        <button data-wall="dark" aria-pressed="false">深色</button>
+      </div>
+    </div>
+    <div class="tips">只显示课表：每块必带课名 + 教室；课程块为冷色三档（浅 / 中 / 深）× 40% 不透明度，无描边</div>
+  </div>
+
+  <div class="stages" id="stages"></div>
+
+  <div class="notes">
+    <div class="note">
+      <h3>A · 全透明：课程块 = 液态玻璃</h3>
+      <ul>
+        <li>左上 56% 白色高光斜扫 + 26%→9% 整体白 + <code>1px</code> 亮描边 + 柔和外投影，中性无色相。</li>
+        <li>九门课不再靠颜色区分，靠位置和课名 —— 这是“干净”的代价，也是液态玻璃的前提。</li>
+        <li><b>真机落差</b>：Android 位图没有背景模糊，只能用「半透明白 + 高光边 + 投影」近似，约八成；预览里的真实虚化到不了。</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>B / C · 不透明与液态玻璃：毛玻璃冷色（三档 × 40%，无边框）</h3>
+      <ul>
+        <li>统一 <code>opacity .40</code>：块面 = 40% 冷色 + 60% 卡片底。白卡上三档落成 <code>#D5E0EB</code> / <code>#B9CADD</code> / <code>#9DA9BD</code>。</li>
+        <li>色相只在 205–215°（蓝 → 石板蓝），只调明度分三档，不做绿/橙/红。</li>
+        <li><b>三档统一深墨字</b> <code>#12202C</code>（对比 5.7–13:1）：40% 不透明度下最深的块也只能到 <code>#9DA9BD</code>，白字在上面只有 2.3:1，所以不再需要白字。</li>
+        <li>无描边：只有 40% 填充 + 极轻投影，磨砂感靠半透明叠色与 8px 背景模糊。</li>
+        <li>位图 <code>ARGB_4444</code> 的 alpha 只有 16 档，<code>0.4 = 6/15</code> 正好对齐，不会偏色。</li>
+      </ul>
+      <div class="mat-row">
+        <div class="mat mat-1"><span></span>浅冷 40%</div>
+        <div class="mat mat-2"><span></span>中冷 40%</div>
+        <div class="mat mat-3"><span></span>深冷 40%</div>
+      </div>
+    </div>
+    <div class="note">
+      <h3>结构：只留课表</h3>
+      <ul>
+        <li>三行摘要（<code>未阅 33</code> / <code>最新：…</code> / <code>GPA 1.00 · 4 学分</code>）<b>全部删除</b>，右下角不再有统计信息；<code>更新于 21:48</code> 也一并去掉。</li>
+        <li><b>每块必须同时有课名和教室</b>：教室行固定预留，装不下就一起缩字号，不再像以前那样“放不下就把教室藏掉”。</li>
+        <li>省下来的高度全给网格：位图可用高度 316px → 约 374px（<code>CHROME_DP</code> 98 → 约 40），12 节每行多 4.8px，两节课的块终于塞得下教室行。</li>
+        <li>保留：今天列（<code>#14508F</code> 表头 + 圆点 + 淡底）、<code>本周课表 · 第 9 周</code>、三档冷色 40%。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const COURSES = [
+  { d: 1, s: 1, e: 4, n: "鸿蒙开发", r: "T2-A507", lines: ["鸿蒙", "开发"] },
+  { d: 1, s: 6, e: 9, n: "Spring Boot 应用开发", r: "T2-A412", lines: ["Spring", "Boot", "应用开发"] },
+  { d: 2, s: 3, e: 4, n: "毛泽东思想", r: "T1-D302", lines: ["毛泽东", "思想"] },
+  { d: 2, s: 6, e: 8, n: "Spring Boot 应用开发", r: "T2-A412", lines: ["Spring", "Boot", "应用开发"] },
+  { d: 3, s: 3, e: 4, n: "形势与政策", r: "T1-D302", lines: ["形势", "与政"] },
+  { d: 3, s: 6, e: 8, n: "机器学习", r: "T2-A412", lines: ["机器", "学习"] },
+  { d: 3, s: 10, e: 11, n: "改革开放", r: "", lines: ["改革", "开放"] },
+  { d: 4, s: 3, e: 4, n: "国家安全", r: "T1-D302", lines: ["国家", "安全"] },
+  { d: 4, s: 6, e: 9, n: "国产达梦", r: "T2-A308", lines: ["国产", "达梦"] },
+  { d: 7, s: 6, e: 7, n: "欧洲文明", r: "", lines: ["欧洲", "文明"] }
+];
+
+// 三档灰：按课程顺序轮换，保证同屏能同时看到浅 / 中 / 深（真机实现按课程名哈希固定）
+const TIER_OF = [0, 1, 2, 0, 1, 2, 0, 1, 2, 1];
+
+// 现状配色（绿/橙/红）：仅用于对照卡片
+const LEGACY = ["#2F855A", "#B7791F", "#C05621", "#B7791F", "#B7791F", "#C0392B", "#2F855A", "#1B5FAA", "#B7791F", "#B7791F"];
+
+const TODAY = 4;
+const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
+
+const state = { wall: "light" };
+const query = new URLSearchParams(location.search);
+if (query.get("wall")) state.wall = query.get("wall");
+
+function widgetHTML(variant) {
+  const parts = [];
+
+  parts.push(`<div class="w-head">
+      <span class="w-title">本周课表 · 第 9 周</span>
+      <span class="w-gear">⚙</span>
+    </div>`);
+
+  parts.push('<div class="grid">');
+  parts.push(`<div class="today-col" style="grid-column:${TODAY + 1} / ${TODAY + 2}"></div>`);
+  WEEKDAYS.forEach((w, i) => {
+    parts.push(`<i class="wd${i + 1 === TODAY ? " today" : ""}" style="grid-column:${i + 2} / ${i + 3}">${w}</i>`);
+  });
+  for (let r = 1; r <= 12; r++) {
+    parts.push(`<i class="pn" style="grid-row:${r + 1} / ${r + 2}">${r}</i>`);
+  }
+
+  COURSES.forEach((c, i) => {
+    const tiered = variant === "opaque" || variant === "glass";
+    parts.push(`<div class="blk" data-name="${c.n}" ${tiered ? `data-tier="${TIER_OF[i]}"` : ""}
+        style="grid-column:${c.d + 1} / ${c.d + 2}; grid-row:${c.s + 1} / ${c.e + 2};
+               ${variant === "legacy" ? `--blk:${LEGACY[i]};` : ""}">
+        <b>${(c.lines || [c.n]).map(t => `<span class="ln">${t}</span>`).join("")}</b>
+        ${c.r ? `<i>${c.r}</i>` : ""}
+      </div>`);
+  });
+
+  parts.push("</div>");
+
+  return `<div class="holder"><div class="widget" data-v="${variant}">${parts.join("")}</div></div>`;
+}
+
+const STAGES = [
+  { v: "transparent", tag: "A", title: "全透明 · 液态玻璃", desc: "无卡片底，课程块是玻璃块" },
+  { v: "opaque", tag: "B", title: "不透明 · 毛玻璃冷色（三档）", desc: "白色实底卡片 · 课程块 40% 不透明度 · 无边框" },
+  { v: "glass", tag: "C", title: "液态玻璃卡片 · 毛玻璃冷色（三档）", desc: "半透明卡片 · 课程块 40% 不透明度 · 无边框" },
+  { v: "legacy", tag: "×", title: "现状（对照）", desc: "饱和绿/橙/红，仅作比较" }
+];
+
+function render() {
+  const host = document.getElementById("stages");
+  host.innerHTML = STAGES.map(st => `
+    <section class="stage">
+      <div class="stage-head">
+        <span class="tag">${st.tag}</span>
+        <h2>${st.title}</h2>
+        <p>${st.desc}</p>
+      </div>
+      <div class="wall ${state.wall === "dark" ? "dark" : ""}">
+        ${widgetHTML(st.v)}
+      </div>
+    </section>`).join("");
+
+  host.querySelectorAll(".grid").forEach(grid => {
+    for (let r = 1; r <= 11; r++) {
+      const d = document.createElement("div");
+      d.className = "line h";
+      d.style.top = `calc(10% + ${r} * (90% / 12))`;
+      grid.appendChild(d);
+    }
+    for (let c = 1; c <= 6; c++) {
+      const d = document.createElement("div");
+      d.className = "line v";
+      d.style.left = `calc(8.5% + ${c} * (91.5% / 7))`;
+      grid.appendChild(d);
+    }
+  });
+
+  fitAll(host);
+  requestAnimationFrame(() => fitAll(host));
+}
+
+// 按课程块实际尺寸自动定字号：从大到小试，直到「课名 + 教室」装得下；
+// 装不下就丢掉教室行再试一次（和 WidgetBitmapRenderer.drawLabel 的策略一致）
+function fitAll(root) {
+  const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--s")) || 1;
+  const range = document.createRange();
+  const textWidth = el => {
+    range.selectNodeContents(el);
+    return range.getBoundingClientRect().width / scale;
+  };
+  root.querySelectorAll(".blk").forEach(blk => {
+    const b = blk.querySelector("b");
+    if (!b) return;
+    const room = blk.querySelector("i");
+    const lines = [...blk.querySelectorAll(".ln")];
+    const W = b.clientWidth;
+    const H = blk.clientHeight - 2;
+    if (W <= 4 || H <= 4) return;
+
+    const measure = size => {
+      b.style.setProperty("--ln", size + "px");
+      if (room) room.style.fontSize = Math.max(5.5, size * 0.58) + "px";
+      let maxW = 0;
+      lines.forEach(l => { maxW = Math.max(maxW, textWidth(l)); });
+      if (room) maxW = Math.max(maxW, textWidth(room));
+      const need = size * 1.06 * lines.length + (room ? room.offsetHeight + 2 : 0);
+      return { maxW, need };
+    };
+
+    // 课名 + 教室都必须显示：教室行固定预留，空间不够就一起缩字号，不再省略教室
+    let size = 18;
+    while (size > 5.5) {
+      const m = measure(size);
+      // 留 8% 余量：刚好等宽时字形会顶到边缘
+      if (m.maxW <= W * 0.92 && m.need <= H) break;
+      size -= 0.5;
+    }
+  });
+}
+
+document.getElementById("wall-tone").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-wall]");
+  if (!btn) return;
+  state.wall = btn.dataset.wall;
+  [...e.currentTarget.querySelectorAll("button")].forEach(b =>
+    b.setAttribute("aria-pressed", String(b === btn)));
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
