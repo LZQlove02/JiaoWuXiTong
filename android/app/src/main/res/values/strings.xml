@@ -8,6 +8,10 @@
     <!-- 桌面小组件 -->
     <string name="widget_title_next">下一节课</string>
     <string name="widget_title_today">今日课程</string>
+    <string name="widget_title_today_day">今日 · %1$s</string>
+    <string name="widget_state_pending">待上</string>
+    <string name="widget_state_now">进行中</string>
+    <string name="widget_state_done">已结束</string>
     <string name="widget_next_desc">下一节课与今天剩余节数</string>
     <string name="widget_today_desc">今日课程与下一节</string>
     <string name="widget_state_login">请登录</string>
