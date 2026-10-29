@@ -10,8 +10,8 @@ import android.widget.RemoteViews;
 import com.lzpu.jwxt.R;
 
 /**
- * 4x4「本周课表」：只有标题行 + 位图网格。
- * 结构硬约束见《小组件执行方案》§7.3——不显示未阅/通知/GPA，也不显示「更新于」；
+ * 4x4「本周课表」：标题行（周次 + 齿轮 + 更新于）+ 位图网格。
+ * 结构硬约束见《小组件执行方案》§7.3——不显示未阅/通知/GPA；
  * 每个课程块必须同时有课名与教室（由 WidgetBitmapRenderer 保证）。
  */
 final class WeekWidgetBinder {
@@ -27,6 +27,7 @@ final class WeekWidgetBinder {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_week);
         views.setInt(R.id.widget_root, "setBackgroundResource", theme.rootBackgroundRes());
         views.setTextColor(R.id.widget_week_title, theme.text);
+        views.setTextColor(R.id.widget_week_updated, theme.tertiary);
         views.setTextColor(R.id.widget_week_state, theme.tertiary);
         // 齿轮图标跟随主体文字色，不额外加深色底
         views.setInt(R.id.widget_style_chip, "setColorFilter", theme.secondary);
@@ -37,6 +38,8 @@ final class WeekWidgetBinder {
         views.setOnClickPendingIntent(R.id.widget_week_frame,
             WidgetDeepLink.open(context, "schedule", WidgetDeepLink.REQUEST_WEEK_SCHEDULE));
 
+        views.setTextViewText(R.id.widget_week_updated,
+            payload.updatedLabel.isEmpty() ? "" : context.getString(R.string.widget_updated_at, payload.updatedLabel));
         // 标题带上周次，让「本周」有具体指向；周次未知时保持 XML 里的原标题
         if (payload.termWeek > 0) {
             views.setTextViewText(R.id.widget_week_title,
