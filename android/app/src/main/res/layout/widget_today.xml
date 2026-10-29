@@ -34,6 +34,21 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/widget_style_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/widget_chip_bg"
+            android:paddingStart="6dp"
+            android:paddingTop="1dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="1dp"
+            android:text="@string/widget_style_glass"
+            android:textColor="#E6FFFFFF"
+            android:textSize="9sp" />
+
+        <TextView
             android:shadowColor="#66000000"
             android:shadowDx="0"
             android:shadowDy="1"

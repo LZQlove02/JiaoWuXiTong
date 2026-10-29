@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 组件角落的「样式」按钮底：半透明深色胶囊，浅色/深色壁纸上都能看清 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#4D000000" />
+    <corners android:radius="9dp" />
+    <stroke
+        android:width="1dp"
+        android:color="#4DFFFFFF" />
+</shape>

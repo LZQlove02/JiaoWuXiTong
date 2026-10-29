@@ -17,19 +17,41 @@
         android:paddingEnd="6dp"
         android:paddingBottom="4dp">
 
-        <TextView
-            android:shadowColor="#66000000"
-            android:shadowDx="0"
-            android:shadowDy="1"
-            android:shadowRadius="2"
-            android:id="@+id/widget_title"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/widget_title_next"
-            android:textColor="#5F6368"
-            android:textSize="11sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:shadowColor="#66000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="2"
+                android:id="@+id/widget_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/widget_title_next"
+                android:textColor="#5F6368"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/widget_style_chip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_chip_bg"
+                android:paddingStart="6dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="1dp"
+                android:text="@string/widget_style_glass"
+                android:textColor="#E6FFFFFF"
+                android:textSize="9sp" />
+        </LinearLayout>
 
         <TextView
             android:shadowColor="#66000000"

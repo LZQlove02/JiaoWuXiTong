@@ -50,13 +50,4 @@ public class WidgetBridgePlugin extends Plugin {
         WidgetUpdater.refreshAll(getContext());
         call.resolve();
     }
-
-    @PluginMethod
-    public void setStyle(PluginCall call) {
-        String style = call.getString("style");
-        WidgetStore.writeStyle(getContext(), style);
-        Log.i(TAG, "setStyle " + WidgetStore.readStyle(getContext()));
-        WidgetUpdater.refreshAll(getContext());
-        call.resolve();
-    }
 }

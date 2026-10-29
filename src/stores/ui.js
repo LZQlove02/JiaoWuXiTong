@@ -5,12 +5,9 @@ import { StatusBar, Style } from '@capacitor/status-bar'
 
 const AppTheme = registerPlugin('AppTheme')
 const STORAGE_KEY = 'lzpu.theme'
-const WIDGET_STYLE_KEY = 'lzpu.widgetStyle'
-export const WIDGET_STYLES = ['glass', 'transparent', 'opaque']
 
 export const useUiStore = defineStore('ui', () => {
   const theme = ref('system')
-  const widgetStyle = ref('glass')
   const overlayCloser = ref(null)
   const hasOverlay = computed(() => Boolean(overlayCloser.value))
 
@@ -81,28 +78,13 @@ export const useUiStore = defineStore('ui', () => {
     applyTheme()
   }
 
-  // 桌面小组件背景：玻璃 / 全透明 / 不透明
-  function initWidgetStyle() {
-    const saved = localStorage.getItem(WIDGET_STYLE_KEY)
-    if (WIDGET_STYLES.includes(saved)) widgetStyle.value = saved
-  }
-
-  function setWidgetStyle(value) {
-    if (!WIDGET_STYLES.includes(value)) return
-    widgetStyle.value = value
-    localStorage.setItem(WIDGET_STYLE_KEY, value)
-  }
-
   return {
     theme,
-    widgetStyle,
     hasOverlay,
     setOverlayCloser,
     clearOverlayCloser,
     closeOverlay,
     initTheme,
-    setTheme,
-    initWidgetStyle,
-    setWidgetStyle
+    setTheme
   }
 })

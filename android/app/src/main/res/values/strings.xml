@@ -28,4 +28,11 @@
     <string name="widget_latest_notice">最新：%1$s</string>
     <string name="widget_no_notice">暂无通知</string>
     <string name="widget_no_grades">本学期暂无成绩</string>
+
+    <!-- 桌面小组件：3 尺寸 × 3 样式 -->
+    <!-- 组件内「样式」按钮 -->
+    <string name="widget_style_glass">玻璃</string>
+    <string name="widget_style_transparent">透明</string>
+    <string name="widget_style_opaque">不透明</string>
+    <string name="widget_style_chip">%1$s</string>
 </resources>

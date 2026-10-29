@@ -3,7 +3,6 @@
 import { buildWidgetPayload } from './payload'
 import {
   clearWidget,
-  setWidgetStyle,
   setWidgetTheme,
   updateWidget,
   widgetAvailable
@@ -14,7 +13,6 @@ const DEBOUNCE_MS = 300
 let timer = null
 let lastPayload = ''
 let lastTheme = null
-let lastStyle = null
 
 function debounce(run) {
   if (timer) clearTimeout(timer)
@@ -46,12 +44,6 @@ export function syncWidgetTheme(theme) {
   setWidgetTheme(theme)
 }
 
-export function syncWidgetStyle(style) {
-  if (!widgetAvailable() || !style || style === lastStyle) return
-  lastStyle = style
-  setWidgetStyle(style)
-}
-
 // 退出登录：立刻清空组件内容，不等防抖
 export function clearWidgetNow() {
   if (timer) clearTimeout(timer)
@@ -67,5 +59,4 @@ export function resetWidgetSync() {
   timer = null
   lastPayload = ''
   lastTheme = null
-  lastStyle = null
 }

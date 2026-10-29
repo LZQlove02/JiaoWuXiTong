@@ -26,21 +26,6 @@
       </div>
     </section>
 
-    <h2 class="section-title">桌面小组件</h2>
-    <section class="card">
-      <div class="theme-row">
-        <button
-          v-for="option in widgetStyleOptions"
-          :key="option.value"
-          class="theme-btn"
-          :class="{ 'is-active': ui.widgetStyle === option.value }"
-          @click="ui.setWidgetStyle(option.value)"
-        >
-          {{ option.label }}
-        </button>
-      </div>
-    </section>
-
     <h2 class="section-title">通用</h2>
     <section class="card settings">
       <button class="setting-row" @click="clearCache">
@@ -83,12 +68,6 @@ const themeOptions = [
   { value: 'system', label: '跟随系统' },
   { value: 'light', label: '浅色' },
   { value: 'dark', label: '深色' }
-]
-
-const widgetStyleOptions = [
-  { value: 'glass', label: '液态玻璃' },
-  { value: 'transparent', label: '全透明' },
-  { value: 'opaque', label: '不透明' }
 ]
 
 const avatarText = computed(() => (auth.user?.name || '我').slice(-1))

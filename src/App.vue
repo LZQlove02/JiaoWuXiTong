@@ -18,7 +18,7 @@ import TabBar from './components/TabBar.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
 import { useUiStore } from './stores/ui'
-import { clearWidgetNow, syncWidget, syncWidgetStyle, syncWidgetTheme } from './widget/sync'
+import { clearWidgetNow, syncWidget, syncWidgetTheme } from './widget/sync'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,7 +55,6 @@ function openDeepLink(url) {
 // 组件数据全部来自已加载的 store，不新增网络请求
 function installWidgetSync() {
   syncWidgetTheme(ui.theme)
-  syncWidgetStyle(ui.widgetStyle)
   const context = () => ({
     user: auth.user,
     currentTerm: academic.currentTerm,
@@ -77,7 +76,6 @@ function installWidgetSync() {
     { immediate: true }
   )
   watch(() => ui.theme, (theme) => syncWidgetTheme(theme))
-  watch(() => ui.widgetStyle, (style) => syncWidgetStyle(style))
   // 4x4 的 GPA 摘要要用成绩；成绩页只在进入时才拉，这里登录后静默补一次
   watch(
     [() => auth.isLoggedIn, () => academic.currentTerm],
@@ -105,7 +103,6 @@ watch(
 
 onMounted(() => {
   ui.initTheme()
-  ui.initWidgetStyle()
   if (!Capacitor.isNativePlatform()) return
 
   installWidgetSync()

@@ -23,6 +23,10 @@ public final class WidgetDeepLink {
     public static final int REQUEST_WEEK_NOTICES = 5;
     public static final int REQUEST_WEEK_GRADES = 6;
 
+    // 组件内「样式」按钮：广播给自己换样式，不打开 App
+    public static final String ACTION_CYCLE_STYLE = "com.lzpu.jwxt.widget.CYCLE_STYLE";
+    public static final String EXTRA_APP_WIDGET_ID = "app_widget_id";
+
     private WidgetDeepLink() {
     }
 
@@ -37,5 +41,18 @@ public final class WidgetDeepLink {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return PendingIntent.getActivity(context, requestCode, intent, flags);
+    }
+
+    // 每个实例用 1000 + appWidgetId 作 requestCode，避免多个组件共用一个 PendingIntent
+    public static PendingIntent cycleStyle(Context context, int appWidgetId) {
+        Intent intent = new Intent(context, WidgetStyleReceiver.class);
+        intent.setAction(ACTION_CYCLE_STYLE);
+        intent.putExtra(EXTRA_APP_WIDGET_ID, appWidgetId);
+
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        return PendingIntent.getBroadcast(context, 1000 + appWidgetId, intent, flags);
     }
 }
