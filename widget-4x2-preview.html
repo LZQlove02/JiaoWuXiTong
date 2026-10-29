@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>4×2 今日课程 · 结构方案 B</title>
+<title>4×2 今日课程 · 方案 B（定稿版）</title>
 <style>
   :root {
-    --s: 1.5;              /* 预览放大倍数：布局按 320×130dp 计算 */
+    --s: 1.5;
     --w: 300px;
     --h: 140px;
     --ink: #101820;
@@ -34,11 +34,10 @@
   .seg button[aria-pressed="true"] { background: #2f4a63; color: #fff; }
   .tips { margin-left: auto; color: #8a949f; font-size: 12px; }
 
-  .state { margin-top: 26px; }
+  .state { margin-top: 24px; }
   .state h2 { font-size: 14px; margin: 0 0 4px; font-weight: 650; }
   .state p { margin: 0 0 12px; font-size: 12px; color: #7d8894; }
   .row3 { display: flex; gap: 22px; flex-wrap: wrap; }
-
   .cell { width: 478px; }
   .cell .cap { font-size: 11.5px; color: #78838f; margin: 0 0 6px 2px; }
 
@@ -65,41 +64,33 @@
     color: var(--ink);
   }
 
-  .head { display: flex; align-items: center; gap: 6px; height: 22px; }
+  .head { display: flex; align-items: center; gap: 6px; height: 22px; flex: 0 0 auto; }
   .title { flex: 1; font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .gear { font-size: 12px; opacity: .72; }
   .upd { font-size: 9.5px; color: var(--ink-3); white-space: nowrap; }
 
-  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; margin-top: 3px; }
+  /* 主体：行贴顶部，行数 1~3 都不影响底部「下一节」的位置 */
+  .body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; margin-top: 3px; }
 
-  .row { display: flex; align-items: center; gap: 6px; height: 20px; padding: 0 2px; border-radius: 6px; }
+  .row { display: flex; align-items: center; gap: 6px; height: 21px; }
   .row .t { flex: 0 0 42px; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
   .row .m { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .m b { font-size: 12px; font-weight: 600; }
   .row .m i { font-style: normal; font-size: 9.5px; color: var(--ink-3); margin-left: 4px; }
   .row .s { flex: 0 0 34px; text-align: right; font-size: 9px; color: var(--ink-3); white-space: nowrap; }
+  .row .s.on { color: var(--accent); }
 
-  .row.done { opacity: .44; }
-  .row.now { background: rgba(27, 95, 170, .10); box-shadow: inset 3px 0 0 var(--accent); }
-  .row.now .t { color: var(--accent); }
-  .row.now .m b { font-weight: 700; }
+  .empty { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-3); }
 
-  .empty { text-align: center; font-size: 11px; color: var(--ink-3); }
-  .more { display: flex; align-items: center; justify-content: center; height: 20px; font-size: 10.5px; color: var(--ink-2); }
-  .more span { color: var(--accent); font-weight: 600; }
-
-  .foot { font-size: 10px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .foot { flex: 0 0 auto; font-size: 10px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: auto; padding-top: 2px; }
 
   /* ---------- 三档样式 ---------- */
   .widget[data-v="transparent"] {
     background: transparent;
     --ink: #101a22; --ink-2: #1f2a33; --ink-3: #3f4b57;
   }
-  .widget[data-v="transparent"] .row.now { background: rgba(255,255,255,.34); box-shadow: inset 3px 0 0 var(--accent); }
-
   .widget[data-v="opaque"] { background: #fff; box-shadow: 0 10px 26px rgba(12,24,40,.18); }
   .widget[data-v="opaque"] .row + .row { box-shadow: inset 0 1px 0 var(--hair); }
-
   .widget[data-v="glass"] {
     background: linear-gradient(180deg, rgba(255,255,255,.54), rgba(255,255,255,.30));
     -webkit-backdrop-filter: blur(18px) saturate(126%);
@@ -108,17 +99,15 @@
     box-shadow: 0 10px 26px rgba(12,24,40,.16);
   }
 
-  /* 深色 */
   body.dark .widget { --ink: #eceff3; --ink-2: #c6ccd4; --ink-3: #98a2ad; --accent: #8fc0ee; --hair: rgba(255,255,255,.10); }
   body.dark .widget[data-v="opaque"] { background: #171b20; }
   body.dark .widget[data-v="glass"] {
     background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
     border-color: rgba(255,255,255,.20);
   }
-  body.dark .widget[data-v="transparent"] .row.now { background: rgba(255,255,255,.14); }
 
   /* ---------- 说明 ---------- */
-  .notes { margin-top: 34px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .notes { margin-top: 32px; display: flex; gap: 18px; flex-wrap: wrap; }
   .note { flex: 1 1 320px; background: #fff; border: 1px solid #e6e9ee; border-radius: 12px; padding: 16px 18px; }
   .note h3 { margin: 0 0 8px; font-size: 13.5px; }
   .note ul { margin: 0; padding-left: 18px; font-size: 12.5px; color: #46525f; }
@@ -128,8 +117,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>4×2 今日课程 · 结构方案 B</h1>
-  <p class="sub">时间 + 「课名 · 教室」两段式单行，右侧状态；空态居中、超额占位。按真机 300×140dp 还原，放大 1.5 倍展示。</p>
+  <h1>4×2 今日课程 · 方案 B（定稿版）</h1>
+  <p class="sub">最多 3 行、不做超额提示、进行中不做选中效果；行数 1–3 行时都贴顶部，「下一节」始终钉在卡片底部。</p>
 
   <div class="controls">
     <span style="font-size:13px;color:#3c4a57">壁纸</span>
@@ -137,37 +126,36 @@
       <button data-wall="light" aria-pressed="true">浅色</button>
       <button data-wall="dark" aria-pressed="false">深色</button>
     </div>
-    <div class="tips">同一套结构，三种卡片底；状态只有「进行中 / 待上 / 已结束」三种</div>
+    <div class="tips">同样的结构换三种卡片底；状态只有「待上 / 进行中 / 已结束」三种文字</div>
   </div>
 
   <div id="states"></div>
 
   <div class="notes">
     <div class="note">
-      <h3>结构要点</h3>
+      <h3>这一版的结构规则</h3>
       <ul>
-        <li>每条课一行：左侧时间固定 <code>42dp</code>，中间 <code>课名 · 教室</code> 单行省略，右侧 <code>34dp</code> 状态。</li>
-        <li><b>截断优先级</b>：先截教室 → 再截课名；不再像现在这样固定 108dp 给教室、先牺牲课名。</li>
-        <li>进行中：左侧 3px 强调竖条 + 浅底 + 时间转强调色；已结束整行 44% 透明；待上不着色。</li>
-        <li>空态：主体区垂直居中「今天没有课」，底部仍保留下一节，卡片不再「上半截有字、下半截空」。</li>
-        <li>超额：第三行换成「还有 2 门 · 打开查看」，点击整卡进课表。</li>
+        <li><b>最多 3 行</b>：一天超过 3 门也只显示前 3 门，不做「还有 N 门」占位。</li>
+        <li><b>行数跟随实际课数</b>：1 门 1 行、2 门 2 行、3 门 3 行，都贴着主体顶部。</li>
+        <li><b>「下一节」固定底部</b>：主体区撑满剩余高度，行少时下方留白，footer 位置不动。</li>
+        <li><b>不做选中效果</b>：进行中不加底色、不加竖条，只靠右侧状态文字（<code>进行中</code> 用强调色文字，其余灰色）。</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>行内结构</h3>
+      <ul>
+        <li>左：时间 <code>42dp</code>，10.5sp，等宽数字。</li>
+        <li>中：<code>课名 · 教室</code> 单行，12sp / 9.5sp；截断先截教室，课名最后才省。</li>
+        <li>右：状态 <code>34dp</code>，9sp，右对齐。</li>
+        <li>行高 21dp，三行 63dp；主体可用约 74dp，三行也放得下并留余量。</li>
       </ul>
     </div>
     <div class="note">
       <h3>真机约束</h3>
       <ul>
-        <li>4×2 高度实测约 <code>140dp</code>：头部 22 + 底部 18 + 内边距 20，主体只剩约 <code>62dp</code>，所以每行 20dp、只放得下 3 行单行文本。</li>
-        <li>RemoteViews 不能 <code>addView</code>：仍是 3 个固定槽位，状态点/竖条用固定 <code>View</code> + 背景色，不用动态布局。</li>
-        <li>「今日 · 周五」的星期由 <code>payload.today[]</code> 里任一条的 <code>dayLabel</code> 推；没有课就用 <code>next.dayLabel</code>；都没有则退回「今日课程」。</li>
-      </ul>
-    </div>
-    <div class="note">
-      <h3>相对现状的变化</h3>
-      <ul>
-        <li>去掉固定 108dp 的教室列（它现在挤得课名先被省略）。</li>
-        <li>新增状态列，解决「不知道哪节正在上」。</li>
-        <li>空态从「顶部一行 + 下方空白」改为居中，卡片不再显得坏掉。</li>
-        <li>标题补星期，跨天刷新后一眼知道是哪天。</li>
+        <li>卡片实测 <code>300×140dp</code>（900×420px @3x）：内边距 20 + 头部 22 + 底部 18，主体剩约 74dp。</li>
+        <li>RemoteViews 不能 <code>addView</code>：仍用 3 个固定槽位，行数不足就把后几行 <code>GONE</code>；footer 靠外层 <code>layout_weight</code> 撑到底部。</li>
+        <li>状态判定用 <code>ClassItem.startTime / endTime</code> 与当前时间比较，无需新增字段。</li>
       </ul>
     </div>
   </div>
@@ -180,79 +168,88 @@ const STYLES = [
   { v: "glass", name: "液态玻璃" }
 ];
 
-const DATA = {
-  empty: {
-    title: "今日 · 周五",
-    updated: "更新于 00:10",
-    rows: [],
-    empty: "今天没有课",
-    foot: "下一节 · 周日 14:30 欧洲文明"
+const STATES = [
+  {
+    key: "empty", title: "空态：今天没有课", desc: "主体居中提示，下一节照常钉在底部",
+    rows: [], empty: "今天没有课", foot: "下一节 · 周日 14:30 欧洲文明"
   },
-  now: {
-    title: "今日 · 周五",
-    updated: "更新于 10:20",
-    rows: [
-      { t: "08:00", name: "高等数学", room: "T2-A507", state: "done" },
-      { t: "10:05", name: "毛泽东思想", room: "T1-D302", state: "now" },
-      { t: "14:30", name: "欧洲文明", room: "T1-A203", state: "next" }
-    ],
+  {
+    key: "one", title: "一门课：进行中", desc: "只有一行，下一节仍在最底部",
+    rows: [{ t: "10:05", name: "毛泽东思想", room: "T1-D302", state: "now" }],
     foot: "下一节 · 14:30 欧洲文明"
   },
-  more: {
-    title: "今日 · 周五",
-    updated: "更新于 10:20",
+  {
+    key: "two", title: "两门课：已结束 + 进行中", desc: "两行贴顶，下方留白不动 footer",
     rows: [
       { t: "08:00", name: "高等数学", room: "T2-A507", state: "done" },
       { t: "10:05", name: "毛泽东思想", room: "T1-D302", state: "now" }
     ],
-    more: { count: 2 },
     foot: "下一节 · 14:30 欧洲文明"
+  },
+  {
+    key: "mixed", title: "三门课：已结束 + 进行中 + 待上", desc: "最常见的一天",
+    rows: [
+      { t: "08:00", name: "高等数学", room: "T2-A507", state: "done" },
+      { t: "10:05", name: "毛泽东思想", room: "T1-D302", state: "now" },
+      { t: "14:30", name: "欧洲文明", room: "T1-A203", state: "pending" }
+    ],
+    foot: "下一节 · 14:30 欧洲文明"
+  },
+  {
+    key: "pending3", title: "三门课：待上 × 3", desc: "早上刚打开时全是待上",
+    rows: [
+      { t: "08:00", name: "高等数学", room: "T2-A507", state: "pending" },
+      { t: "10:05", name: "毛泽东思想", room: "T1-D302", state: "pending" },
+      { t: "14:30", name: "欧洲文明", room: "T1-A203", state: "pending" }
+    ],
+    foot: "下一节 · 08:00 高等数学"
+  },
+  {
+    key: "done2", title: "三门课：已结束 × 2 + 进行中", desc: "一天快上完时",
+    rows: [
+      { t: "08:00", name: "高等数学", room: "T2-A507", state: "done" },
+      { t: "10:05", name: "毛泽东思想", room: "T1-D302", state: "done" },
+      { t: "14:30", name: "欧洲文明", room: "T1-A203", state: "now" }
+    ],
+    foot: "下一节 · 周日 14:30 欧洲文明"
   }
-};
-
-const STATE_ROWS = [
-  { key: "empty", title: "空态：今天没有课", desc: "主体居中提示，底部保留下一节" },
-  { key: "now", title: "进行中：第二节正在上", desc: "已结束置灰、进行中带竖条、待上不着色" },
-  { key: "more", title: "超额：今天还有 2 门", desc: "第三行换成入口，不再静默截断" }
 ];
 
+const LABEL = { pending: "待上", now: "进行中", done: "已结束" };
+
 function rowHTML(r) {
-  const cls = r.state === "now" ? " now" : r.state === "done" ? " done" : "";
-  const label = r.state === "now" ? "进行中" : r.state === "done" ? "已结束" : "待上";
-  return `<div class="row${cls}">
+  return `<div class="row">
       <span class="t">${r.t}</span>
       <span class="m"><b>${r.name}</b><i>· ${r.room}</i></span>
-      <span class="s">${label}</span>
+      <span class="s${r.state === "now" ? " on" : ""}">${LABEL[r.state]}</span>
     </div>`;
 }
 
-function widgetHTML(v, key) {
-  const d = DATA[key];
-  const body = d.empty
-    ? `<div class="empty">${d.empty}</div>`
-    : d.rows.map(rowHTML).join("") +
-      (d.more ? `<div class="more">还有 ${d.more.count} 门 · <span>打开查看</span></div>` : "");
+function widgetHTML(v, st) {
+  const body = st.empty
+    ? `<div class="empty">${st.empty}</div>`
+    : st.rows.map(rowHTML).join("");
   return `<div class="holder"><div class="widget" data-v="${v}">
       <div class="head">
-        <span class="title">${d.title}</span>
+        <span class="title">今日 · 周五</span>
         <span class="gear">⚙</span>
-        <span class="upd">${d.updated}</span>
+        <span class="upd">更新于 10:20</span>
       </div>
       <div class="body">${body}</div>
-      <div class="foot">${d.foot}</div>
+      <div class="foot">${st.foot}</div>
     </div></div>`;
 }
 
 function render() {
   const host = document.getElementById("states");
-  host.innerHTML = STATE_ROWS.map(st => `
+  host.innerHTML = STATES.map(st => `
     <section class="state">
       <h2>${st.title}</h2>
       <p>${st.desc}</p>
       <div class="row3">
         ${STYLES.map(v => `<div class="cell">
           <div class="cap">${v.name}</div>
-          <div class="wall">${widgetHTML(v.v, st.key)}</div>
+          <div class="wall">${widgetHTML(v.v, st)}</div>
         </div>`).join("")}
       </div>
     </section>`).join("");
