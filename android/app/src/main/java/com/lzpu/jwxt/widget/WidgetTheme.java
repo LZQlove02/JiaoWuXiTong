@@ -60,30 +60,18 @@ public final class WidgetTheme {
         return WidgetStore.STYLE_GLASS.equals(style);
     }
 
-    // 不透明样式：整块卡片铺底；玻璃/全透明样式不加底色
+    // 玻璃与不透明都铺整块卡片，只是玻璃半透明；全透明不铺底
     public int rootBackgroundRes() {
-        if (!isOpaque()) return 0;
-        return dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light;
+        if (isOpaque()) {
+            return dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light;
+        }
+        if (isGlass()) {
+            return dark ? R.drawable.widget_glass_dark : R.drawable.widget_glass_light;
+        }
+        return 0;
     }
 
-    // 玻璃样式：每段文字一张玻璃面板
-    public int panelBackgroundRes() {
-        if (!isGlass()) return 0;
-        return dark ? R.drawable.widget_glass_dark : R.drawable.widget_glass_light;
-    }
-
-    // 位图里的玻璃带配色（与 widget_glass_*.xml 保持一致）
-    public int glassStart() {
-        return dark ? 0xA6000000 : 0xBFFFFFFF;
-    }
-
-    public int glassEnd() {
-        return dark ? 0x66000000 : 0x7AFFFFFF;
-    }
-
-    public int glassEdge() {
-        return dark ? 0x33FFFFFF : 0xE6FFFFFF;
-    }
+    // 布局与不透明一致：文字块不再单独铺底，整块卡片由 root 承担
 
     private static WidgetTheme light(String style) {
         return new WidgetTheme(
@@ -99,13 +87,15 @@ public final class WidgetTheme {
     }
 
     private static WidgetTheme dark(String style) {
+        // 玻璃卡片会透出背后的壁纸，壁纸偏亮时次级文字容易糊，这两档提亮一些
+        boolean glass = WidgetStore.STYLE_GLASS.equals(style);
         return new WidgetTheme(
             true,
             style,
             Color.parseColor("#171B20"),
             Color.parseColor("#ECEDEE"),
-            Color.parseColor("#A0A6AD"),
-            Color.parseColor("#6E757D"),
+            Color.parseColor(glass ? "#C6CCD4" : "#A0A6AD"),
+            Color.parseColor(glass ? "#9AA4AE" : "#6E757D"),
             Color.parseColor("#262B31"),
             Color.parseColor("#4A9BE8")
         );

@@ -32,8 +32,6 @@ public class WeekWidgetProvider extends AppWidgetProvider {
                              int appWidgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_week);
         views.setInt(R.id.widget_root, "setBackgroundResource", theme.rootBackgroundRes());
-        views.setInt(R.id.widget_week_strip_head, "setBackgroundResource", theme.panelBackgroundRes());
-        views.setInt(R.id.widget_week_strip_summary, "setBackgroundResource", theme.panelBackgroundRes());
         views.setTextColor(R.id.widget_week_title, theme.text);
         views.setTextColor(R.id.widget_week_updated, theme.tertiary);
         views.setTextColor(R.id.widget_week_state, theme.tertiary);

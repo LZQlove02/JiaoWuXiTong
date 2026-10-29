@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 浅色「液态玻璃」面板：上亮下淡的白色渐变 + 1dp 高光描边 -->
+<!-- 浅色「液态玻璃」卡片：上浓下淡的白色渐变 + 1dp 高光描边，整体偏通透 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:endColor="#7AFFFFFF"
-                android:startColor="#BFFFFFFF"
+                android:endColor="#1AFFFFFF"
+                android:startColor="#4DFFFFFF"
                 android:type="linear" />
-            <corners android:radius="14dp" />
+            <corners android:radius="16dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <stroke
                 android:width="1dp"
-                android:color="#E6FFFFFF" />
-            <corners android:radius="14dp" />
+                android:color="#80FFFFFF" />
+            <corners android:radius="16dp" />
         </shape>
     </item>
 </layer-list>

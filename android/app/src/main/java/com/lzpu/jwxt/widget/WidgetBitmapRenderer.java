@@ -3,10 +3,8 @@ package com.lzpu.jwxt.widget;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.graphics.Typeface;
 
 /**
@@ -79,12 +77,9 @@ public final class WidgetBitmapRenderer {
         float cellW = (w - gutter) / COLS;
         float cellH = (h - header) / ROWS;
 
-        // 背景样式：不透明铺满卡片色，玻璃画两条渐变玻璃带，全透明什么都不画
+        // 背景样式：不透明铺满卡片色；玻璃卡片本身有渐变底，位图保持透明；全透明同样透明
         if (theme.isOpaque()) {
             canvas.drawColor(theme.background);
-        } else if (theme.isGlass()) {
-            drawGlassBand(canvas, new RectF(0, 0, w, header), true, theme, unit);
-            drawGlassBand(canvas, new RectF(0, header, gutter, h), false, theme, unit);
         }
 
         // 今天所在列淡淡高亮
@@ -151,30 +146,6 @@ public final class WidgetBitmapRenderer {
             fill.setColor(color);
             canvas.drawRoundRect(block, radius, radius, fill);
             drawLabel(canvas, item.name, block, color, unit, text);
-        }
-    }
-
-    private static void drawGlassBand(Canvas canvas, RectF rect, boolean rounded,
-                                      WidgetTheme theme, float unit) {
-        if (rect.width() <= 0 || rect.height() <= 0) return;
-        Paint glass = new Paint(Paint.ANTI_ALIAS_FLAG);
-        glass.setShader(new LinearGradient(rect.left, rect.top, rect.left, rect.bottom,
-            theme.glassStart(), theme.glassEnd(), Shader.TileMode.CLAMP));
-        float radius = Math.max(2f, unit * 1.8f);
-        if (rounded) {
-            canvas.drawRoundRect(rect, radius, radius, glass);
-        } else {
-            canvas.drawRect(rect, glass);
-        }
-
-        Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
-        edge.setStyle(Paint.Style.STROKE);
-        edge.setStrokeWidth(Math.max(1f, unit * 0.14f));
-        edge.setColor(theme.glassEdge());
-        if (rounded) {
-            canvas.drawRoundRect(rect, radius, radius, edge);
-        } else {
-            canvas.drawRect(rect, edge);
         }
     }
 
