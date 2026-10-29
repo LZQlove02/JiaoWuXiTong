@@ -31,3 +31,8 @@ export function clearWidget() {
 export function setWidgetTheme(theme) {
   return call('setTheme', { theme })
 }
+
+// 组件背景样式：glass / transparent / opaque
+export function setWidgetStyle(style) {
+  return call('setStyle', { style })
+}

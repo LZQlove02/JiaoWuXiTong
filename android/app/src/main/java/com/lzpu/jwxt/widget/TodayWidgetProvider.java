@@ -35,10 +35,10 @@ public class TodayWidgetProvider extends AppWidgetProvider {
 
     static RemoteViews build(Context context, WidgetPayload payload, WidgetTheme theme) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_today);
-        views.setInt(R.id.widget_root, "setBackgroundResource", 0);
-        views.setInt(R.id.widget_strip_head, "setBackgroundResource", theme.stripRes());
-        views.setInt(R.id.widget_strip_rows, "setBackgroundResource", theme.stripRes());
-        views.setInt(R.id.widget_strip_foot, "setBackgroundResource", theme.stripRes());
+        views.setInt(R.id.widget_root, "setBackgroundResource", theme.rootBackgroundRes());
+        views.setInt(R.id.widget_strip_head, "setBackgroundResource", theme.panelBackgroundRes());
+        views.setInt(R.id.widget_strip_rows, "setBackgroundResource", theme.panelBackgroundRes());
+        views.setInt(R.id.widget_strip_foot, "setBackgroundResource", theme.panelBackgroundRes());
         views.setOnClickPendingIntent(R.id.widget_root,
             WidgetDeepLink.open(context, "schedule", WidgetDeepLink.REQUEST_TODAY));
 

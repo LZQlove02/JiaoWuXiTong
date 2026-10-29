@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小组件背景样式 · 三方案对照</title>
+<style>
+  :root {
+    --ink: #16181d;
+    --ink-soft: #5b6169;
+    --ink-faint: #8b9099;
+    --rule: rgba(22, 24, 29, 0.14);
+    --paper: #f2f0ea;
+    --panel: #fbfaf7;
+    --accent: #1b5faa;
+    --radius-widget: 16px;
+    --glass-hi: rgba(255, 255, 255, 0.86);
+    --glass-lo: rgba(255, 255, 255, 0.46);
+    --glass-edge: rgba(255, 255, 255, 0.92);
+    --w-text: #1a1c1f;
+    --w-text-2: #5f6368;
+    --w-text-3: #8a8f98;
+    --w-card: #ffffff;
+    --w-line: rgba(0, 0, 0, 0.16);
+    --wallpaper: radial-gradient(120% 90% at 18% 8%, #8fb2f0 0%, #6d8fe0 34%, #5c74cf 62%, #6a5fc4 100%);
+  }
+
+  [data-theme="dark"] {
+    --ink: #eceff4;
+    --ink-soft: #a7aeb8;
+    --ink-faint: #767d87;
+    --rule: rgba(236, 239, 244, 0.16);
+    --paper: #111418;
+    --panel: #171b21;
+    --accent: #74a9e8;
+    --glass-hi: rgba(18, 20, 24, 0.72);
+    --glass-lo: rgba(18, 20, 24, 0.40);
+    --glass-edge: rgba(255, 255, 255, 0.22);
+    --w-text: #ecedee;
+    --w-text-2: #a0a6ad;
+    --w-text-3: #6e757d;
+    --w-card: #171b20;
+    --w-line: rgba(255, 255, 255, 0.20);
+  }
+
+  [data-wall="night"] {
+    --wallpaper: radial-gradient(120% 100% at 70% 12%, #24344f 0%, #131b28 48%, #080a0f 100%);
+  }
+
+  [data-wall="busy"] {
+    --wallpaper:
+      radial-gradient(45% 40% at 12% 18%, #ffb37a 0%, transparent 62%),
+      radial-gradient(52% 44% at 84% 22%, #ff6f9c 0%, transparent 60%),
+      radial-gradient(60% 55% at 62% 86%, #4fd1c5 0%, transparent 58%),
+      radial-gradient(48% 42% at 22% 80%, #8b7bf0 0%, transparent 60%),
+      linear-gradient(160deg, #2b3a55 0%, #1b2436 100%);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 56px 40px 80px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+
+  .shell { max-width: 1400px; margin: 0 auto; }
+
+  /* ---------- 页头 ---------- */
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .kicker {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+
+  h1 {
+    margin: 0;
+    font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+    font-size: clamp(30px, 3.4vw, 46px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+
+  .lede {
+    margin: 12px 0 0;
+    max-width: 54ch;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--ink-soft);
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-end;
+  }
+
+  .control-row { display: flex; align-items: center; gap: 10px; }
+
+  .control-label {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .seg {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--panel);
+  }
+
+  .seg button {
+    border: 0;
+    background: transparent;
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.22s ease, color 0.22s ease;
+  }
+
+  .seg button:hover { color: var(--ink); }
+
+  .seg button[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  /* ---------- 三栏 ---------- */
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px;
+    margin-top: 44px;
+  }
+
+  .column { opacity: 0; transform: translateY(14px); animation: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  .column:nth-child(1) { animation-delay: 0.05s; }
+  .column:nth-child(2) { animation-delay: 0.16s; }
+  .column:nth-child(3) { animation-delay: 0.27s; }
+
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  .column-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .column-index {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink-faint);
+  }
+
+  .column h2 {
+    margin: 0;
+    font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+    font-size: 21px;
+    font-weight: 600;
+  }
+
+  .column-note {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    min-height: 44px;
+  }
+
+  /* ---------- 手机画布 ---------- */
+  .canvas {
+    position: relative;
+    margin-top: 18px;
+    padding: 26px 22px 34px;
+    border-radius: 28px;
+    background-image: var(--wallpaper);
+    background-size: cover;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.4) inset,
+      0 22px 40px -24px rgba(10, 18, 40, 0.55);
+    overflow: hidden;
+    transition: background-image 0.5s ease;
+  }
+
+  .canvas::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 30%);
+    pointer-events: none;
+  }
+
+  .widget-stack {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .widget {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    padding: 12px;
+    color: var(--w-text);
+    font-size: 12px;
+    line-height: 1.45;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .widget:hover { transform: translateY(-2px); }
+
+  .widget--2x2 { width: 196px; height: 196px; max-width: 196px; aspect-ratio: 1 / 1; padding: 10px; overflow: hidden; }
+  .widget--4x2 { aspect-ratio: 400 / 176; }
+  .widget--4x4 { aspect-ratio: 1 / 1; }
+
+  /* 尺寸标注 */
+  .dim {
+    position: absolute;
+    right: -6px;
+    bottom: -18px;
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.82);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  body[data-dims="on"] .dim { opacity: 1; }
+
+  /* ---------- 三种样式 ---------- */
+  /* 1. 液态玻璃 */
+  [data-style="glass"] .widget {
+    border-radius: var(--radius-widget);
+  }
+
+  [data-style="glass"] .panel {
+    border-radius: 12px;
+    padding: 7px 9px;
+    background: linear-gradient(180deg, var(--glass-hi), var(--glass-lo));
+    border: 1px solid var(--glass-edge);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  }
+
+  [data-style="glass"] .gap { height: 6px; }
+
+  /* 2. 全透明 */
+  [data-style="transparent"] .panel {
+    padding: 7px 0;
+    background: transparent;
+    border: 0;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+
+  [data-style="transparent"] .gap { height: 8px; }
+
+  /* 3. 不透明 */
+  [data-style="opaque"] .widget {
+    border-radius: var(--radius-widget);
+    background: var(--w-card);
+    border: 1px solid color-mix(in srgb, var(--w-text-3) 26%, transparent);
+    box-shadow: 0 10px 24px -18px rgba(6, 12, 26, 0.6);
+  }
+
+  [data-style="opaque"] .panel {
+    padding: 7px 2px;
+    background: transparent;
+    border: 0;
+  }
+
+  [data-style="opaque"] .gap { height: 6px; }
+
+  /* ---------- 组件内部排版 ---------- */
+  .row { display: flex; align-items: baseline; gap: 8px; }
+  .row-head { justify-content: space-between; }
+
+  .title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--w-text);
+  }
+
+  .sub {
+    font-size: 10px;
+    color: var(--w-text-3);
+  }
+
+  .course {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .meta { font-size: 11px; color: var(--w-text-2); }
+  .meta-sm { font-size: 10px; color: var(--w-text-3); }
+
+  .foot {
+    margin-top: auto;
+    font-size: 10.5px;
+    color: var(--w-text-2);
+  }
+
+  .widget--2x2 { display: flex; flex-direction: column; }
+  .widget--2x2 .panel { padding: 5px 7px; }
+  .widget--2x2 .course { font-size: 13px; }
+  .widget--2x2 .gap { height: 4px; }
+  .widget--2x2 .foot, .widget--2x2 .meta-sm { font-size: 9.5px; }
+
+  .today-row {
+    display: grid;
+    grid-template-columns: 42px 1fr 96px;
+    gap: 8px;
+    align-items: baseline;
+    font-size: 12px;
+  }
+
+  .today-row .t { font-size: 11px; color: var(--w-text-3); }
+  .today-row .n { color: var(--w-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .today-row .r { font-size: 9.5px; color: var(--w-text-3); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- 周课表 ---------- */
+  .week-head {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+
+  .week {
+    display: grid;
+    grid-template-columns: 20px repeat(7, 1fr);
+    grid-template-rows: 18px repeat(12, 1fr);
+    gap: 1px;
+    height: 236px;
+  }
+
+  .week .day {
+    font-size: 9px;
+    color: var(--w-text-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .week .day.is-today { color: var(--accent); font-weight: 700; }
+
+  .week .sec {
+    grid-column: 1;
+    font-size: 8.5px;
+    color: var(--w-text-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.85;
+  }
+
+  .week .grid-line {
+    grid-column: 2 / -1;
+    border-top: 1px solid var(--w-line);
+    opacity: 0.5;
+  }
+
+  .block {
+    border-radius: 5px;
+    padding: 3px 4px;
+    font-size: 9px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.15;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  [data-style="transparent"] .block { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.35); }
+
+  .summary { margin-top: 8px; }
+
+  /* ---------- 页脚 ---------- */
+  footer {
+    margin-top: 60px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.8;
+  }
+
+  footer code {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 1080px) {
+    body { padding: 32px 20px 60px; }
+    .columns { grid-template-columns: 1fr; gap: 44px; }
+    header { grid-template-columns: 1fr; }
+    .controls { align-items: flex-start; }
+    .widget { max-width: 100%; }
+  }
+</style>
+</head>
+<body data-theme="light" data-wall="aurora" data-dims="on">
+<div class="shell">
+  <header>
+    <div>
+      <p class="kicker">LZPU · Widget Skinning</p>
+      <h1>三种背景，三种气质</h1>
+      <p class="lede">
+        同一块「国家安全教育 10:05-12:15 · 敏行楼T1-D302」数据，在三种背景下的观感差异。
+        点右侧开关切换深浅色与壁纸，重点看文字在花壁纸上的存活率。
+      </p>
+    </div>
+    <div class="controls">
+      <div class="control-row">
+        <span class="control-label">主题</span>
+        <div class="seg" id="themeSeg">
+          <button data-theme-value="light" aria-pressed="true">浅色</button>
+          <button data-theme-value="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span class="control-label">壁纸</span>
+        <div class="seg" id="wallSeg">
+          <button data-wall-value="aurora" aria-pressed="true">极光蓝</button>
+          <button data-wall-value="night" aria-pressed="false">深夜</button>
+          <button data-wall-value="busy" aria-pressed="false">繁花</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span class="control-label">标注</span>
+        <div class="seg" id="dimSeg">
+          <button data-dim-value="on" aria-pressed="true">显示尺寸</button>
+          <button data-dim-value="off" aria-pressed="false">隐藏</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="columns" id="columns"></main>
+
+  <footer>
+    <div>
+      注：浏览器里的 <code>backdrop-filter</code> 模糊效果在 Android 桌面组件上无法实现（RemoteViews 没有背后模糊）。
+      真机上的「液态玻璃」是<b>上亮下淡的半透明渐变 + 1dp 高光描边 + 圆角</b>，观感接近但不会真的把壁纸糊掉。
+    </div>
+    <div style="text-align:right">
+      数据为 2026-10-29 真实课表<br>
+      2x2 · 4x2 · 4x4
+    </div>
+  </footer>
+</div>
+
+<script>
+  const STYLES = [
+    {
+      key: 'glass',
+      name: '液态玻璃',
+      note: '上亮下淡渐变 + 1dp 高光边，壁纸透出约 20–40%，最像 iOS 26。文字永远有底。',
+      meta: '玻璃面板 · 14dp 圆角'
+    },
+    {
+      key: 'transparent',
+      name: '全透明',
+      note: '不铺任何底色，文字靠阴影浮在壁纸上。通透感最强，但花壁纸下会吃力。',
+      meta: '无底 · 仅文字阴影'
+    },
+    {
+      key: 'opaque',
+      name: '不透明',
+      note: '白底卡片，可读性最稳、最像系统组件，代价是完全挡住壁纸。',
+      meta: '实色卡片 · 16dp 圆角'
+    }
+  ];
+
+  const WEEK = [
+    { day: 1, start: 1, end: 2, name: '鸿蒙开发', color: '#2F855A' },
+    { day: 1, start: 6, end: 7, name: 'Spring', color: '#B7791F' },
+    { day: 2, start: 3, end: 6, name: '毛泽东思', color: '#C05621' },
+    { day: 2, start: 6, end: 7, name: 'Spring', color: '#B7791F' },
+    { day: 3, start: 3, end: 5, name: '形势与政', color: '#B7791F' },
+    { day: 3, start: 6, end: 7, name: '机器学习', color: '#C0392B' },
+    { day: 4, start: 3, end: 5, name: '国家安全', color: '#1B5FAA' },
+    { day: 4, start: 6, end: 8, name: '国产达梦', color: '#B7791F' },
+    { day: 7, start: 6, end: 7, name: '欧洲文明', color: '#C05621' }
+  ];
+
+  const DAYS = ['一', '二', '三', '四', '五', '六', '日'];
+
+  function weekGrid() {
+    let cells = '';
+    DAYS.forEach((label, index) => {
+      const today = index + 1 === 4 ? ' is-today' : '';
+      cells += `<div class="day${today}" style="grid-row:1;grid-column:${index + 2}">${label}</div>`;
+    });
+    for (let row = 1; row <= 12; row += 1) {
+      cells += `<div class="sec" style="grid-row:${row + 1};grid-column:1">${row}</div>`;
+      cells += `<div class="grid-line" style="grid-row:${row + 1};grid-column:2/-1"></div>`;
+    }
+    WEEK.forEach((item) => {
+      cells += `<div class="block" style="grid-row:${item.start + 1} / ${item.end + 2};grid-column:${item.day + 1};background:${item.color}">${item.name}</div>`;
+    });
+    return `<div class="week">${cells}</div>`;
+  }
+
+  function widget2x2(style) {
+    if (style === 'opaque') {
+      return `
+        <div class="widget widget--2x2" style="display:flex;flex-direction:column">
+          <div class="row-head row"><span class="title">下一节课</span></div>
+          <div class="course" style="margin-top:2px">国家安全教育</div>
+          <div class="meta" style="margin-top:2px">10:05-12:15</div>
+          <div class="meta-sm">敏行楼T1-D302</div>
+          <div class="foot">剩 2 节 · 更新于 11:20</div>
+          <div class="dim">2 × 2</div>
+        </div>`;
+    }
+    return `
+      <div class="widget widget--2x2" style="display:flex;flex-direction:column">
+        <div class="panel">
+          <div class="title">下一节课</div>
+          <div class="course" style="margin-top:2px">国家安全教育</div>
+        </div>
+        <div class="gap"></div>
+        <div class="panel">
+          <div class="meta">10:05-12:15</div>
+          <div class="meta-sm">敏行楼T1-D302</div>
+        </div>
+        <div style="flex:1"></div>
+        <div class="panel">
+          <div class="foot" style="margin:0">剩 2 节</div>
+          <div class="meta-sm">更新于 11:20</div>
+        </div>
+        <div class="dim">2 × 2</div>
+      </div>`;
+  }
+
+  function todayRows() {
+    return `
+      <div class="today-row" style="margin-top:6px"><span class="t">10:05</span><span class="n">国家安全教育</span><span class="r">敏行楼T1-D302</span></div>
+      <div class="today-row"><span class="t">14:30</span><span class="n">国产达梦数据库应用技术</span><span class="r">笃行楼T2-A308</span></div>
+      <div class="meta" style="margin-top:6px">下一节 · 10:05 国家安全教育</div>`;
+  }
+
+  function todayHead() {
+    return `<div class="row-head row"><span class="title">今日课程</span><span class="sub">更新于 11:20</span></div>`;
+  }
+
+  function widget4x2(style) {
+    if (style === 'opaque') {
+      return `
+        <div class="widget widget--4x2">
+          <div class="panel">${todayHead()}${todayRows()}</div>
+          <div class="dim">4 × 2</div>
+        </div>`;
+    }
+    if (style === 'transparent') {
+      return `
+        <div class="widget widget--4x2">
+          <div class="panel">${todayHead()}</div>
+          <div class="panel">${todayRows()}</div>
+          <div class="dim">4 × 2</div>
+        </div>`;
+    }
+    return `
+      <div class="widget widget--4x2">
+        <div class="panel">${todayHead()}</div>
+        <div class="gap"></div>
+        <div class="panel">${todayRows()}</div>
+        <div class="dim">4 × 2</div>
+      </div>`;
+  }
+
+  function summaryBlock() {
+    return `
+      <div class="meta">未阅 33</div>
+      <div class="meta-sm">最新：关于做好2026-2027学…</div>
+      <div class="meta">GPA 1 · 4 学分</div>`;
+  }
+
+  function weekHead() {
+    return `<div class="week-head"><span class="title">本周课表</span><span class="sub" style="margin-left:auto">更新于 11:20</span></div>`;
+  }
+
+  function widget4x4(style) {
+    if (style === 'opaque') {
+      return `
+        <div class="widget widget--4x4">
+          <div class="panel">${weekHead()}${weekGrid()}<div class="summary">${summaryBlock()}</div></div>
+          <div class="dim">4 × 4</div>
+        </div>`;
+    }
+    if (style === 'transparent') {
+      return `
+        <div class="widget widget--4x4">
+          <div class="panel">${weekHead()}</div>
+          ${weekGrid()}
+          <div class="panel summary">${summaryBlock()}</div>
+          <div class="dim">4 × 4</div>
+        </div>`;
+    }
+    return `
+      <div class="widget widget--4x4">
+        <div class="panel">${weekHead()}</div>
+        ${weekGrid()}
+        <div class="gap"></div>
+        <div class="panel summary">${summaryBlock()}</div>
+        <div class="dim">4 × 4</div>
+      </div>`;
+  }
+
+  function render() {
+    document.getElementById('columns').innerHTML = STYLES.map((style, index) => `
+      <section class="column" data-style="${style.key}">
+        <div class="column-head">
+          <div>
+            <div class="column-index">0${index + 1} / ${style.meta}</div>
+            <h2>${style.name}</h2>
+          </div>
+        </div>
+        <p class="column-note">${style.note}</p>
+        <div class="canvas">
+          <div class="widget-stack">
+            ${widget2x2(style.key)}
+            ${widget4x2(style.key)}
+            ${widget4x4(style.key)}
+          </div>
+        </div>
+      </section>
+    `).join('');
+  }
+
+  function bindSeg(id, onPick) {
+    const seg = document.getElementById(id);
+    seg.addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      [...seg.querySelectorAll('button')].forEach((item) => {
+        item.setAttribute('aria-pressed', String(item === button));
+      });
+      onPick(button.dataset);
+    });
+  }
+
+  bindSeg('themeSeg', (data) => {
+    document.body.dataset.theme = data.themeValue;
+  });
+
+  bindSeg('wallSeg', (data) => {
+    document.body.dataset.wall = data.wallValue;
+  });
+
+  bindSeg('dimSeg', (data) => {
+    document.body.dataset.dims = data.dimValue;
+  });
+
+  render();
+</script>
+</body>
+</html>

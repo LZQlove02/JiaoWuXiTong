@@ -23,10 +23,13 @@ public final class WidgetTheme {
     public final int tertiary;
     public final int border;
     public final int accent;
+    // 背景样式：glass / transparent / opaque
+    public final String style;
 
-    private WidgetTheme(boolean dark, int background, int text, int secondary,
+    private WidgetTheme(boolean dark, String style, int background, int text, int secondary,
                         int tertiary, int border, int accent) {
         this.dark = dark;
+        this.style = style;
         this.background = background;
         this.text = text;
         this.secondary = secondary;
@@ -35,23 +38,57 @@ public final class WidgetTheme {
         this.accent = accent;
     }
 
-    public static WidgetTheme resolve(Context context, String stored) {
+    public static WidgetTheme resolve(Context context, String storedTheme, String style) {
         boolean isDark;
-        if (LIGHT.equals(stored)) {
+        if (LIGHT.equals(storedTheme)) {
             isDark = false;
-        } else if (DARK.equals(stored)) {
+        } else if (DARK.equals(storedTheme)) {
             isDark = true;
         } else {
             int mode = context.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK;
             isDark = mode == Configuration.UI_MODE_NIGHT_YES;
         }
-        return isDark ? dark() : light();
+        return isDark ? dark(style) : light(style);
     }
 
-    private static WidgetTheme light() {
+    public boolean isOpaque() {
+        return WidgetStore.STYLE_OPAQUE.equals(style);
+    }
+
+    public boolean isGlass() {
+        return WidgetStore.STYLE_GLASS.equals(style);
+    }
+
+    // 不透明样式：整块卡片铺底；玻璃/全透明样式不加底色
+    public int rootBackgroundRes() {
+        if (!isOpaque()) return 0;
+        return dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light;
+    }
+
+    // 玻璃样式：每段文字一张玻璃面板
+    public int panelBackgroundRes() {
+        if (!isGlass()) return 0;
+        return dark ? R.drawable.widget_glass_dark : R.drawable.widget_glass_light;
+    }
+
+    // 位图里的玻璃带配色（与 widget_glass_*.xml 保持一致）
+    public int glassStart() {
+        return dark ? 0xA6000000 : 0xBFFFFFFF;
+    }
+
+    public int glassEnd() {
+        return dark ? 0x66000000 : 0x7AFFFFFF;
+    }
+
+    public int glassEdge() {
+        return dark ? 0x33FFFFFF : 0xE6FFFFFF;
+    }
+
+    private static WidgetTheme light(String style) {
         return new WidgetTheme(
             false,
+            style,
             Color.parseColor("#FFFFFF"),
             Color.parseColor("#1A1C1F"),
             Color.parseColor("#5F6368"),
@@ -61,9 +98,10 @@ public final class WidgetTheme {
         );
     }
 
-    private static WidgetTheme dark() {
+    private static WidgetTheme dark(String style) {
         return new WidgetTheme(
             true,
+            style,
             Color.parseColor("#171B20"),
             Color.parseColor("#ECEDEE"),
             Color.parseColor("#A0A6AD"),
@@ -73,18 +111,13 @@ public final class WidgetTheme {
         );
     }
 
-    // 卡片本身透明，文字行用 60% 不透明度的衬底保证可读性
-    public int stripRes() {
-        return dark ? R.drawable.widget_strip_dark : R.drawable.widget_strip_light;
-    }
-
-    // 位图里的表头/节次栏衬底：与文字衬底同色（60%），保证观感统一
-    public int gridScrim() {
-        return dark ? 0x99000000 : 0x99FFFFFF;
+    // 全透明卡片：不再需要底色与衬底，只保留深色判断
+    public boolean isDark() {
+        return dark;
     }
 
     public int gridLine() {
-        return dark ? 0x40FFFFFF : 0x33000000;
+        return dark ? 0x59FFFFFF : 0x4D000000;
     }
 
     public int todayTint() {

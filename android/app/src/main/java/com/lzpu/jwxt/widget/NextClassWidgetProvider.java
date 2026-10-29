@@ -25,10 +25,10 @@ public class NextClassWidgetProvider extends AppWidgetProvider {
 
     static RemoteViews build(Context context, WidgetPayload payload, WidgetTheme theme) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_next);
-        views.setInt(R.id.widget_root, "setBackgroundResource", 0);
-        views.setInt(R.id.widget_strip_top, "setBackgroundResource", theme.stripRes());
-        views.setInt(R.id.widget_strip_mid, "setBackgroundResource", theme.stripRes());
-        views.setInt(R.id.widget_strip_foot, "setBackgroundResource", theme.stripRes());
+        views.setInt(R.id.widget_root, "setBackgroundResource", theme.rootBackgroundRes());
+        views.setInt(R.id.widget_strip_top, "setBackgroundResource", theme.panelBackgroundRes());
+        views.setInt(R.id.widget_strip_mid, "setBackgroundResource", theme.panelBackgroundRes());
+        views.setInt(R.id.widget_strip_foot, "setBackgroundResource", theme.panelBackgroundRes());
         views.setOnClickPendingIntent(R.id.widget_root,
             WidgetDeepLink.open(context, "schedule", WidgetDeepLink.REQUEST_NEXT));
 

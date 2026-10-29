@@ -21,7 +21,9 @@ public final class WidgetUpdater {
         if (manager == null) return;
 
         WidgetPayload payload = WidgetPayload.parse(WidgetStore.readPayload(app));
-        WidgetTheme theme = WidgetTheme.resolve(app, WidgetStore.readTheme(app));
+        WidgetTheme theme = WidgetTheme.resolve(app,
+            WidgetStore.readTheme(app), WidgetStore.readStyle(app));
+        Log.i("LzpuWidget", "style=" + theme.style + " dark=" + theme.dark);
         Log.i("LzpuWidget", "payload loggedIn=" + payload.loggedIn
             + " loaded=" + payload.scheduleLoaded
             + " week=" + payload.week.size()

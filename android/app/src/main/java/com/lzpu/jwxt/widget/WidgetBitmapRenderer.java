@@ -3,13 +3,15 @@ package com.lzpu.jwxt.widget;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 
 /**
  * 4x4 周课表位图：7 天 × 12 节迷你网格。
- * 位图走 RemoteViews Binder，总像素必须受控（RGB_565 上限 400,000 px ≈ 780KB）。
+ * 位图走 RemoteViews Binder，总像素必须受控（ARGB_4444 上限 400,000 px ≈ 780KB，且必须保留 alpha）。
  */
 public final class WidgetBitmapRenderer {
 
@@ -69,7 +71,6 @@ public final class WidgetBitmapRenderer {
         Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
         text.setTypeface(Typeface.DEFAULT);
 
-        // 卡片透明：整张位图不铺底色，只在表头与节次刻度两处垫半透明衬底
         float unit = Math.min(w, h) / 100f;
         float gutter = w * 0.085f;
         float header = h * 0.10f;
@@ -78,10 +79,13 @@ public final class WidgetBitmapRenderer {
         float cellW = (w - gutter) / COLS;
         float cellH = (h - header) / ROWS;
 
-        fill.setColor(theme.gridScrim());
-        float stripRadius = Math.max(2f, unit * 1.6f);
-        canvas.drawRoundRect(new RectF(0, 0, w, header), stripRadius, stripRadius, fill);
-        canvas.drawRect(0, header, gutter, h, fill);
+        // 背景样式：不透明铺满卡片色，玻璃画两条渐变玻璃带，全透明什么都不画
+        if (theme.isOpaque()) {
+            canvas.drawColor(theme.background);
+        } else if (theme.isGlass()) {
+            drawGlassBand(canvas, new RectF(0, 0, w, header), true, theme, unit);
+            drawGlassBand(canvas, new RectF(0, header, gutter, h), false, theme, unit);
+        }
 
         // 今天所在列淡淡高亮
         if (todayWeekday >= 1 && todayWeekday <= COLS) {
@@ -105,10 +109,11 @@ public final class WidgetBitmapRenderer {
             canvas.drawLine(x, gridTop, x, gridTop + ROWS * cellH, line);
         }
 
-        // 星期表头
+        // 星期表头（透明底上靠阴影拉开对比：浅色主题描白光、深色主题描黑影）
         float headSize = Math.min(header * 0.52f, unit * 3.2f);
         text.setTextSize(headSize);
         text.setTextAlign(Paint.Align.CENTER);
+        text.setShadowLayer(unit * 0.9f, 0f, unit * 0.25f, theme.dark ? 0x99000000 : 0xCCFFFFFF);
         for (int col = 0; col < COLS; col += 1) {
             text.setColor(col + 1 == todayWeekday ? theme.accent : theme.secondary);
             text.setTypeface(col + 1 == todayWeekday ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
@@ -149,6 +154,30 @@ public final class WidgetBitmapRenderer {
         }
     }
 
+    private static void drawGlassBand(Canvas canvas, RectF rect, boolean rounded,
+                                      WidgetTheme theme, float unit) {
+        if (rect.width() <= 0 || rect.height() <= 0) return;
+        Paint glass = new Paint(Paint.ANTI_ALIAS_FLAG);
+        glass.setShader(new LinearGradient(rect.left, rect.top, rect.left, rect.bottom,
+            theme.glassStart(), theme.glassEnd(), Shader.TileMode.CLAMP));
+        float radius = Math.max(2f, unit * 1.8f);
+        if (rounded) {
+            canvas.drawRoundRect(rect, radius, radius, glass);
+        } else {
+            canvas.drawRect(rect, glass);
+        }
+
+        Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
+        edge.setStyle(Paint.Style.STROKE);
+        edge.setStrokeWidth(Math.max(1f, unit * 0.14f));
+        edge.setColor(theme.glassEdge());
+        if (rounded) {
+            canvas.drawRoundRect(rect, radius, radius, edge);
+        } else {
+            canvas.drawRect(rect, edge);
+        }
+    }
+
     // 先按字符数粗限（汉字 4 个、英文 8 个），再按块宽精确截断，保证不压到相邻列
     private static void drawLabel(Canvas canvas, String name, RectF block, int background,
                                   float unit, Paint text) {
@@ -163,6 +192,8 @@ public final class WidgetBitmapRenderer {
         text.setTypeface(Typeface.DEFAULT_BOLD);
         text.setTextAlign(Paint.Align.CENTER);
         text.setColor(isLight(background) ? 0xFF1A1C1F : Color.WHITE);
+        // 课程块内的字贴在实色块上，用一层弱黑影就够
+        text.setShadowLayer(unit * 0.45f, 0f, unit * 0.15f, 0x66000000);
 
         float available = block.width() - unit * 0.8f;
         while (label.length() > 1 && text.measureText(label) > available) {

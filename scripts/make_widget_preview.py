@@ -2,12 +2,11 @@
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 700, 560
-SCRIM = (255, 255, 255, 153)      # 表头/节次栏衬底：60% 白，与文字衬底一致
-LINE = (0, 0, 0, 51)              # 网格线：20% 黑
+LINE = (0, 0, 0, 64)              # 网格线：25% 黑
 TODAY_TINT = (27, 95, 170, 26)    # 今天列：10% 品牌蓝
 FONT_PATH = "C:/Windows/Fonts/msyh.ttc"
 
-# 卡片透明，整张图只有文字衬底、网格线与课程块
+# 卡片全透明，整张图只有网格线、星期/节次文字与课程块
 img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 draw = ImageDraw.Draw(img)
 
@@ -20,10 +19,6 @@ cell_h = (H - header) / 12
 def font(size):
     return ImageFont.truetype(FONT_PATH, max(9, int(size)))
 
-
-# 表头横条 + 左侧节次竖条衬底
-draw.rounded_rectangle([0, 0, W, header], radius=6, fill=SCRIM)
-draw.rectangle([0, header, gutter, H], fill=SCRIM)
 
 # 今天（周四 = 第 4 列）淡高亮
 draw.rectangle([gutter + 3 * cell_w, header, gutter + 4 * cell_w, H], fill=TODAY_TINT)

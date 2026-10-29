@@ -12,6 +12,12 @@ public final class WidgetStore {
     private static final String PREFS_NAME = "lzpu_widget";
     private static final String KEY_PAYLOAD = "payload";
     private static final String KEY_THEME = "theme";
+    private static final String KEY_STYLE = "style";
+
+    // 组件背景样式
+    public static final String STYLE_GLASS = "glass";
+    public static final String STYLE_TRANSPARENT = "transparent";
+    public static final String STYLE_OPAQUE = "opaque";
 
     private WidgetStore() {
     }
@@ -44,5 +50,18 @@ public final class WidgetStore {
     private static String normalizeTheme(String value) {
         if (WidgetTheme.LIGHT.equals(value) || WidgetTheme.DARK.equals(value)) return value;
         return WidgetTheme.SYSTEM;
+    }
+
+    public static void writeStyle(Context context, String style) {
+        prefs(context).edit().putString(KEY_STYLE, normalizeStyle(style)).apply();
+    }
+
+    public static String readStyle(Context context) {
+        return normalizeStyle(prefs(context).getString(KEY_STYLE, STYLE_GLASS));
+    }
+
+    private static String normalizeStyle(String value) {
+        if (STYLE_TRANSPARENT.equals(value) || STYLE_OPAQUE.equals(value)) return value;
+        return STYLE_GLASS;
     }
 }
