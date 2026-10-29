@@ -121,8 +121,16 @@ public final class WidgetTheme {
         return dark ? 0x59FFFFFF : 0x4D000000;
     }
 
+    // 今天列的底色：原 10% 落在壁纸上几乎看不出，提到 14%
     public int todayTint() {
-        return dark ? 0x1AFFFFFF : 0x1A1B5FAA;
+        return dark ? 0x24FFFFFF : 0x241B5FAA;
+    }
+
+    // 今天的表头与圆点：透明 / 玻璃档的底是壁纸，主题蓝直接压上去实测 3.6:1，
+    // 这两档单独压深一档到 #14508F；不透明档有实色卡片兜底，沿用主题蓝。
+    public int todayAccent() {
+        if (dark) return 0xFF4A9BE8;
+        return isOpaque() ? 0xFF1B5FAA : 0xFF14508F;
     }
 
     // 课程块内描边：玻璃档给每块加 1px 内描边，相邻课之间才分得开

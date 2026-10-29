@@ -7,6 +7,9 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 4x4 周课表位图：7 天 × 12 节迷你网格。
  * 位图走 RemoteViews Binder，总像素必须受控（ARGB_4444 上限 400,000 px ≈ 780KB，且必须保留 alpha）。
@@ -24,7 +27,7 @@ public final class WidgetBitmapRenderer {
     }
 
     public static Bitmap render(WidgetPayload payload, WidgetTheme theme,
-                                int widthPx, int heightPx, int todayWeekday) {
+                                int widthPx, int heightPx, int todayWeekday, String emptyText) {
         int[] size = fit(widthPx, heightPx);
         Bitmap bitmap;
         try {
@@ -33,7 +36,7 @@ public final class WidgetBitmapRenderer {
             return null;
         }
         try {
-            draw(bitmap, payload, theme, todayWeekday);
+            draw(bitmap, payload, theme, todayWeekday, emptyText);
             // 必须保留 alpha：卡片是透明的，转 RGB_565 会把空白区压成黑色
             // 用 ARGB_4444（2 字节/像素、带 alpha）把 Binder 开销压在 800KB 以内
             Bitmap compact = bitmap.copy(Bitmap.Config.ARGB_4444, false);
@@ -60,7 +63,8 @@ public final class WidgetBitmapRenderer {
         return new int[]{Math.max(120, w), Math.max(120, h)};
     }
 
-    private static void draw(Bitmap bitmap, WidgetPayload payload, WidgetTheme theme, int todayWeekday) {
+    private static void draw(Bitmap bitmap, WidgetPayload payload, WidgetTheme theme,
+                             int todayWeekday, String emptyText) {
         int w = bitmap.getWidth();
         int h = bitmap.getHeight();
         Canvas canvas = new Canvas(bitmap);
@@ -113,16 +117,16 @@ public final class WidgetBitmapRenderer {
         text.clearShadowLayer();
         for (int col = 0; col < COLS; col += 1) {
             boolean today = col + 1 == todayWeekday;
-            text.setColor(today ? theme.accent : theme.secondary);
+            text.setColor(today ? theme.todayAccent() : theme.secondary);
             text.setTypeface(today ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
             float centerX = gridLeft + (col + 0.5f) * cellW;
-            canvas.drawText(WEEKDAYS[col], centerX, header * 0.74f, text);
+            canvas.drawText(WEEKDAYS[col], centerX, header * 0.72f, text);
 
-            // 玻璃档的「今天」标记：表头文字下面一颗小圆点
-            if (glass && today) {
-                fill.setColor(theme.accent);
+            // 「今天」标记：表头下面一颗圆点，三档样式统一给（原来只有玻璃档有）
+            if (today) {
+                fill.setColor(theme.todayAccent());
                 fill.setStyle(Paint.Style.FILL);
-                canvas.drawCircle(centerX, header * 0.93f, Math.max(1.5f, unit * 0.62f), fill);
+                canvas.drawCircle(centerX, header * 0.92f, Math.max(1.5f, unit * 0.55f), fill);
             }
         }
 
@@ -139,10 +143,11 @@ public final class WidgetBitmapRenderer {
         }
 
         // 课程块
-        float inset = Math.max(1f, unit * 0.32f);
+        // 相邻两门课之间要留出看得见的缝：0.32% 在 480px 宽下只有 1.15px，几乎贴在一起
+        float inset = Math.max(1.5f, unit * 0.5f);
         // 玻璃档用更大的圆角（约 6dp）并加一圈内描边，相邻两门课才分得开
         float radius = glass ? Math.max(inset * 2f, unit * 2.2f) : inset * 1.8f;
-        for (WidgetPayload.WeekItem item : payload.week) {
+        for (WidgetPayload.WeekItem item : mergeBlocks(payload.week)) {
             int col = item.weekday - 1;
             if (col < 0 || col >= COLS) continue;
             int rowStart = Math.max(0, item.start - 1);
@@ -170,6 +175,50 @@ public final class WidgetBitmapRenderer {
 
             drawLabel(canvas, item.name, item.room, block, color, unit, text);
         }
+
+        // 本周没有课：网格照画（表头与节次留着，版面不塌），中央补一句占位
+        if (payload.week.isEmpty() && emptyText != null && !emptyText.isEmpty()) {
+            text.setTypeface(Typeface.DEFAULT);
+            text.setTextSize(Math.max(unit * 3.2f, 11f));
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setColor(theme.tertiary);
+            text.clearShadowLayer();
+            float centerX = (gridLeft + w) / 2f;
+            float centerY = gridTop + ROWS * cellH / 2f;
+            canvas.drawText(emptyText, centerX, centerY - (text.ascent() + text.descent()) / 2f, text);
+        }
+    }
+
+    // 同一天里首尾相接、名字相同的课合并成一整块：连堂（2 节 + 2 节）不再被切成两段，
+    // 视觉上和课表里的「一次课」对得上，也少画一次课名
+    private static List<WidgetPayload.WeekItem> mergeBlocks(List<WidgetPayload.WeekItem> items) {
+        List<WidgetPayload.WeekItem> merged = new ArrayList<>();
+        for (WidgetPayload.WeekItem item : items) {
+            if (item == null) continue;
+            WidgetPayload.WeekItem hit = null;
+            for (WidgetPayload.WeekItem candidate : merged) {
+                if (candidate.weekday == item.weekday
+                    && candidate.name.equals(item.name)
+                    && item.start <= candidate.end + 1
+                    && item.start >= candidate.start) {
+                    hit = candidate;
+                    break;
+                }
+            }
+            if (hit == null) {
+                WidgetPayload.WeekItem copy = new WidgetPayload.WeekItem();
+                copy.weekday = item.weekday;
+                copy.start = item.start;
+                copy.end = item.end;
+                copy.name = item.name;
+                copy.room = item.room;
+                copy.color = item.color;
+                merged.add(copy);
+            } else {
+                hit.end = Math.max(hit.end, item.end);
+            }
+        }
+        return merged;
     }
 
     // 课程名排版：两节以上折两行（每行 2 字），单节块一行 4 字。

@@ -155,7 +155,8 @@ public final class WidgetPayload {
         double credits = grades.optDouble("totalCredits", 0);
         StringBuilder builder = new StringBuilder();
         if (!Double.isNaN(gpa)) {
-            builder.append("GPA ").append(trimNumber(gpa));
+            // GPA 固定两位小数：trimNumber 会把 1.0 收成 "1"，读起来像整数
+            builder.append("GPA ").append(String.format(java.util.Locale.US, "%.2f", gpa));
         }
         if (credits > 0) {
             if (builder.length() > 0) builder.append(" · ");

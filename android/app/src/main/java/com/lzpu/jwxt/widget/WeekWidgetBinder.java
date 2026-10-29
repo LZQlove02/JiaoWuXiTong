@@ -15,8 +15,9 @@ import com.lzpu.jwxt.R;
  */
 final class WeekWidgetBinder {
 
-    // 与 widget_week.xml 对应：上下内边距 + 标题行 + 摘要三行 + 间距的固定开销（dp）
-    private static final int CHROME_DP = 116;
+    // 与 widget_week.xml 对应：上下内边距 + 标题行 + 摘要两行 + 间距的固定开销（dp）。
+    // 摘要从三行压到两行后少了 18dp；改布局必须同步这里，否则位图比例会和格子对不上。
+    private static final int CHROME_DP = 98;
     // 根布局左右各 10dp，位图宽度要扣掉
     private static final int H_PADDING_DP = 20;
 
@@ -48,6 +49,11 @@ final class WeekWidgetBinder {
 
         views.setTextViewText(R.id.widget_week_updated,
             payload.updatedLabel.isEmpty() ? "" : context.getString(R.string.widget_updated_at, payload.updatedLabel));
+        // 标题带上周次，让「本周」有具体指向；周次未知时保持 XML 里的原标题
+        if (payload.termWeek > 0) {
+            views.setTextViewText(R.id.widget_week_title,
+                context.getString(R.string.widget_title_week_no, payload.termWeek));
+        }
 
         if (!payload.loggedIn) {
             showState(views, context.getString(R.string.widget_state_login));
@@ -60,7 +66,8 @@ final class WeekWidgetBinder {
 
         int[] size = gridSize(context, appWidgetId);
         android.graphics.Bitmap bitmap = WidgetBitmapRenderer.render(
-            payload, theme, size[0], size[1], todayWeekday());
+            payload, theme, size[0], size[1], todayWeekday(),
+            context.getString(R.string.widget_empty_week));
         if (bitmap == null) {
             // 位图渲染失败时按 §8.5 降级为纯文本摘要：隐藏网格，但摘要三行不能丢
             showBitmapFallback(views, context, payload);
@@ -168,9 +175,9 @@ final class WeekWidgetBinder {
         if (payload.latestNotice.isEmpty()) {
             return context.getString(R.string.widget_no_notice);
         }
-        String title = payload.latestNotice;
-        if (title.length() > 14) title = title.substring(0, 14) + "…";
-        return context.getString(R.string.widget_latest_notice, title);
+        // 不再先 substring(14) 再让 TextView ellipsize（双层截断会多切一次），
+        // 只补省略号，宽度交给单行 ellipsize 按真实可用宽度决定
+        return context.getString(R.string.widget_latest_notice, payload.latestNotice);
     }
 
     private static String gradeText(Context context, WidgetPayload payload) {
