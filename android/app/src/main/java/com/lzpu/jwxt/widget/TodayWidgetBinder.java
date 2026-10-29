@@ -34,8 +34,6 @@ final class TodayWidgetBinder {
         views.setTextColor(R.id.widget_updated, theme.tertiary);
         views.setTextColor(R.id.widget_empty, theme.tertiary);
         views.setTextColor(R.id.widget_footer, theme.secondary);
-        views.setTextViewText(R.id.widget_style_chip,
-            context.getString(R.string.widget_style_chip, WidgetStore.styleLabel(context, theme.style)));
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
         for (int i = 0; i < MAX_ROWS; i += 1) {

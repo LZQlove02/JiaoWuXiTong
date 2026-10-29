@@ -80,15 +80,6 @@ public final class WidgetStore {
         return STYLE_GLASS;
     }
 
-    public static String styleLabel(Context context, String style) {
-        if (STYLE_TRANSPARENT.equals(style)) {
-            return context.getString(com.lzpu.jwxt.R.string.widget_style_transparent);
-        }
-        if (STYLE_OPAQUE.equals(style)) {
-            return context.getString(com.lzpu.jwxt.R.string.widget_style_opaque);
-        }
-        return context.getString(com.lzpu.jwxt.R.string.widget_style_glass);
-    }
 
     private static String normalizeStyle(String value) {
         if (STYLE_TRANSPARENT.equals(value) || STYLE_OPAQUE.equals(value)) return value;

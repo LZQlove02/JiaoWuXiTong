@@ -29,8 +29,6 @@ final class WeekWidgetBinder {
         views.setTextColor(R.id.widget_week_messages, theme.secondary);
         views.setTextColor(R.id.widget_week_notices, theme.tertiary);
         views.setTextColor(R.id.widget_week_grades, theme.secondary);
-        views.setTextViewText(R.id.widget_style_chip,
-            context.getString(R.string.widget_style_chip, WidgetStore.styleLabel(context, theme.style)));
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
 

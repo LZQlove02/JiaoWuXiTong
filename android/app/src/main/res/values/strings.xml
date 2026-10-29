@@ -31,8 +31,5 @@
 
     <!-- 桌面小组件：3 尺寸 × 3 样式 -->
     <!-- 组件内「样式」按钮 -->
-    <string name="widget_style_glass">玻璃</string>
-    <string name="widget_style_transparent">透明</string>
-    <string name="widget_style_opaque">不透明</string>
-    <string name="widget_style_chip">%1$s</string>
+    <string name="widget_style_action">切换小组件样式</string>
 </resources>

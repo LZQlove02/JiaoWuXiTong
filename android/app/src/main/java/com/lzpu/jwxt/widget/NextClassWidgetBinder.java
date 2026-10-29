@@ -63,8 +63,6 @@ final class NextClassWidgetBinder {
 
     // 2x2 宽度只够放一行，剩余节数与更新时间分成两行显示
     static void bindStyleChip(Context context, RemoteViews views, WidgetTheme theme, int appWidgetId) {
-        views.setTextViewText(R.id.widget_style_chip,
-            context.getString(R.string.widget_style_chip, WidgetStore.styleLabel(context, theme.style)));
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
     }
