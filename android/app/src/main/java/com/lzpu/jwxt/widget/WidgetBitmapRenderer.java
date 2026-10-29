@@ -168,18 +168,18 @@ public final class WidgetBitmapRenderer {
                 canvas.drawRoundRect(rim, radius, radius, edge);
             }
 
-            drawLabel(canvas, item.name, block, color, unit, text);
+            drawLabel(canvas, item.name, item.room, block, color, unit, text);
         }
     }
 
-    // 课程名自适应：两节以上的块折成两行（每行两个汉字），单节块一行四个字。
-    // 字号先按「每行字数」和「行高」取最大值，再压到字号上限，比原来固定 0.36×块宽大 40%~90%。
-    private static void drawLabel(Canvas canvas, String name, RectF block, int background,
-                                  float unit, Paint text) {
+    // 课程名排版：两节以上折两行（每行 2 字），单节块一行 4 字。
+    // 高块（三节以上）把校名贴顶、教室紧跟在下面，不再是「标题浮在块中间、下面一大片空」。
+    private static void drawLabel(Canvas canvas, String name, String room, RectF block,
+                                  int background, float unit, Paint text) {
         if (name == null || name.isEmpty()) return;
 
-        float maxW = block.width() - unit * 0.7f;
-        float maxH = block.height() - unit * 0.5f;
+        float maxW = block.width() - unit * 1.0f;
+        float maxH = block.height() - unit * 1.2f;
         if (maxW <= 0 || maxH <= 0) return;
 
         boolean cjk = isCjk(name.charAt(0));
@@ -187,12 +187,34 @@ public final class WidgetBitmapRenderer {
         int lines = cjk ? (tall ? 2 : 1) : 1;
         int perLine = cjk ? (tall ? 2 : 4) : 6;
 
-        float size = Math.min(maxW / (perLine + 0.3f), maxH / (lines * 1.2f));
-        size = Math.min(size, unit * (tall ? 5.8f : 5.2f));
+        float size = Math.min(maxW / (perLine + 0.3f), maxH / (lines * 1.12f));
+        size = Math.min(size, unit * (lines == 2 ? 5.6f : 5.2f));
         if (size < unit * 1.6f) return;
 
         int capacity = perLine * lines;
         String label = name.length() > capacity ? name.substring(0, capacity) : name;
+
+        int lineCount = Math.min(lines, (int) Math.ceil(label.length() / (double) perLine));
+        float lineH = size * 1.12f;
+        float nameH = lineH * lineCount;
+
+        // 教室：有空间才画，字号约为课名的 0.6；只保留教室号（去掉「敏行楼」这类中文楼名），
+        // 一行放得下才不挤
+        String roomLabel = compactRoom(room);
+        float roomSize = Math.min(unit * 3.0f, Math.max(unit * 1.8f, size * 0.62f));
+        float roomGap = roomSize * 0.5f;
+        boolean showRoom = !roomLabel.isEmpty()
+            && block.height() - nameH >= roomSize * 1.9f
+            && roomSize >= unit * 1.5f;
+
+        float textTop;
+        if (showRoom) {
+            float need = nameH + roomGap + roomSize;
+            textTop = Math.min(block.top + unit * 1.2f, block.bottom - unit * 0.8f - need);
+            textTop = Math.max(textTop, block.top + unit * 0.6f);
+        } else {
+            textTop = block.centerY() - nameH / 2f;
+        }
 
         text.setTextSize(size);
         text.setTypeface(Typeface.DEFAULT_BOLD);
@@ -201,11 +223,7 @@ public final class WidgetBitmapRenderer {
         // 课程块内的字贴在实色块上，用一层弱黑影就够；别太重，否则小字号会糊
         text.setShadowLayer(Math.max(1f, unit * 0.45f), 0f, unit * 0.14f, 0x59000000);
 
-        int lineCount = Math.min(lines, (int) Math.ceil(label.length() / (double) perLine));
-        float lineH = size * 1.18f;
-        float top = block.centerY() - lineH * lineCount / 2f;
         float baselineOffset = (text.ascent() + text.descent()) / 2f;
-
         for (int i = 0; i < lineCount; i += 1) {
             int from = i * perLine;
             int to = Math.min(label.length(), from + perLine);
@@ -214,7 +232,20 @@ public final class WidgetBitmapRenderer {
                 part = part.substring(0, part.length() - 1);
             }
             if (part.isEmpty()) continue;
-            float baseline = top + lineH * (i + 0.5f) - baselineOffset;
+            float baseline = textTop + lineH * (i + 0.5f) - baselineOffset;
+            canvas.drawText(part, block.centerX(), baseline, text);
+        }
+
+        if (showRoom) {
+            text.setTextSize(roomSize);
+            text.setTypeface(Typeface.DEFAULT);
+            text.setColor(isLight(background) ? 0xD91A1C1F : 0xD9FFFFFF);
+            String part = roomLabel;
+            while (part.length() > 1 && text.measureText(part) > maxW) {
+                part = part.substring(0, part.length() - 1);
+            }
+            float centerY = textTop + nameH + roomGap + roomSize * 0.5f;
+            float baseline = centerY - (text.ascent() + text.descent()) / 2f;
             canvas.drawText(part, block.centerX(), baseline, text);
         }
     }
@@ -222,6 +253,17 @@ public final class WidgetBitmapRenderer {
     private static boolean isCjk(char c) {
         // 常用汉字区间；不用 Character.UnicodeScript（API 24+）
         return c >= 0x4E00 && c <= 0x9FFF;
+    }
+
+    // 「敏行楼T1-D302」→「T1-D302」：楼名在 4x4 的小方块里放不下，
+    // 教室号本身已经带了楼栋代号（T1/T2），去掉中文前缀更清楚。
+    private static String compactRoom(String room) {
+        if (room == null) return "";
+        String text = room.trim();
+        int cut = 0;
+        while (cut < text.length() && isCjk(text.charAt(cut))) cut += 1;
+        if (cut > 0 && cut < text.length()) return text.substring(cut).trim();
+        return text;
     }
 
     private static boolean isLight(int color) {
