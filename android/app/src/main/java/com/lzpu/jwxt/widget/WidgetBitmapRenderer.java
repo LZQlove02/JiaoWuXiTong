@@ -320,6 +320,12 @@ public final class WidgetBitmapRenderer {
             if (size < unit * 1.2f) break;
         }
 
+        // 教室字号再跟课名收一档：单节块里课名被压小后，教室不能反而比课名还大
+        if (hasRoom) {
+            roomSize = Math.min(roomSize, Math.max(unit * 1.1f, size * 0.62f));
+            roomGap = roomSize * 0.45f;
+        }
+
         float lineH = size * 1.12f;
         float nameH = lineH * lineCount;
         float roomH = hasRoom ? roomGap + roomSize : 0f;
