@@ -133,6 +133,40 @@ public final class WidgetTheme {
         return isOpaque() ? 0xFF1B5FAA : 0xFF14508F;
     }
 
+    public boolean isTransparent() {
+        return WidgetStore.STYLE_TRANSPARENT.equals(style);
+    }
+
+    // 课程块的冷色三档（浅 / 中 / 深）：只换明度，色相锁在蓝—石板蓝
+    private static final int[][] COOL_LIGHT = {
+        {150, 178, 206}, {80, 124, 170}, {10, 40, 90}
+    };
+    private static final int[][] COOL_DARK = {
+        {200, 220, 240}, {150, 185, 220}, {90, 130, 175}
+    };
+
+    // 课程块填充：不透明档 20% 不透明度，液态玻璃档 40%（全透明档走液态玻璃，不用课程色）。
+    // 0x33 / 0x66 正好对应 ARGB_4444 的 3/15、6/15，不会在 4bit 量化里跑偏。
+    public int courseFill(int tier) {
+        int[] c = (dark ? COOL_DARK : COOL_LIGHT)[Math.floorMod(tier, 3)];
+        int alpha = isOpaque() ? 0x33 : 0x66;
+        return Color.argb(alpha, c[0], c[1], c[2]);
+    }
+
+    // 课程块里的字：三档填充都浅（深色主题下都深），统一用同一种字色
+    public int courseInk() {
+        return dark ? 0xFFEAF1F8 : 0xFF12202C;
+    }
+
+    // 全透明档的液态玻璃块：半透明白 + 顶边高光（位图没有背景模糊，只能近似）
+    public int glassFill() {
+        return dark ? 0x28FFFFFF : 0x42FFFFFF;
+    }
+
+    public int glassHighlight() {
+        return dark ? 0x3DFFFFFF : 0x8CFFFFFF;
+    }
+
     // 课程块内描边：玻璃档给每块加 1px 内描边，相邻课之间才分得开
     public int blockEdge() {
         return dark ? 0x33FFFFFF : 0x38FFFFFF;

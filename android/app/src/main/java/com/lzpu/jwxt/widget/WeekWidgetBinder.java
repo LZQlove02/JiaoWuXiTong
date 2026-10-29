@@ -10,45 +10,33 @@ import android.widget.RemoteViews;
 import com.lzpu.jwxt.R;
 
 /**
- * 4x4「本周课表 + 摘要」：位图网格 + 未阅消息 / 最新通知 / 成绩。
- * 三个热区各自独立 PendingIntent，避免点击串页。
+ * 4x4「本周课表」：只有标题行 + 位图网格。
+ * 结构硬约束见《小组件执行方案》§7.3——不显示未阅/通知/GPA，也不显示「更新于」；
+ * 每个课程块必须同时有课名与教室（由 WidgetBitmapRenderer 保证）。
  */
 final class WeekWidgetBinder {
 
-    // 与 widget_week.xml 对应：上下内边距 + 标题行 + 摘要两行 + 间距的固定开销（dp）。
-    // 摘要从三行压到两行后少了 18dp；改布局必须同步这里，否则位图比例会和格子对不上。
-    private static final int CHROME_DP = 98;
+    // 与 widget_week.xml 对应：根布局上下内边距 + 标题行 + 网格上方间距（dp）。
+    // 摘要移除后从 98dp 降到 46dp，省下的高度全给网格；改布局必须同步这里。
+    private static final int CHROME_DP = 46;
     // 根布局左右各 10dp，位图宽度要扣掉
     private static final int H_PADDING_DP = 20;
-
-
 
     static RemoteViews build(Context context, WidgetPayload payload, WidgetTheme theme,
                              int appWidgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_week);
         views.setInt(R.id.widget_root, "setBackgroundResource", theme.rootBackgroundRes());
         views.setTextColor(R.id.widget_week_title, theme.text);
-        views.setTextColor(R.id.widget_week_updated, theme.tertiary);
         views.setTextColor(R.id.widget_week_state, theme.tertiary);
-        views.setTextColor(R.id.widget_week_messages, theme.secondary);
-        views.setTextColor(R.id.widget_week_notices, theme.tertiary);
-        views.setTextColor(R.id.widget_week_grades, theme.secondary);
         // 齿轮图标跟随主体文字色，不额外加深色底
         views.setInt(R.id.widget_style_chip, "setColorFilter", theme.secondary);
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
 
+        // 只剩一个热区：整块网格 → 课表
         views.setOnClickPendingIntent(R.id.widget_week_frame,
             WidgetDeepLink.open(context, "schedule", WidgetDeepLink.REQUEST_WEEK_SCHEDULE));
-        views.setOnClickPendingIntent(R.id.widget_week_messages,
-            WidgetDeepLink.open(context, "messages", WidgetDeepLink.REQUEST_WEEK_MESSAGES));
-        views.setOnClickPendingIntent(R.id.widget_week_notices,
-            WidgetDeepLink.open(context, "notices", WidgetDeepLink.REQUEST_WEEK_NOTICES));
-        views.setOnClickPendingIntent(R.id.widget_week_grades,
-            WidgetDeepLink.open(context, "grades", WidgetDeepLink.REQUEST_WEEK_GRADES));
 
-        views.setTextViewText(R.id.widget_week_updated,
-            payload.updatedLabel.isEmpty() ? "" : context.getString(R.string.widget_updated_at, payload.updatedLabel));
         // 标题带上周次，让「本周」有具体指向；周次未知时保持 XML 里的原标题
         if (payload.termWeek > 0) {
             views.setTextViewText(R.id.widget_week_title,
@@ -69,17 +57,14 @@ final class WeekWidgetBinder {
             payload, theme, size[0], size[1], todayWeekday(),
             context.getString(R.string.widget_empty_week));
         if (bitmap == null) {
-            // 位图渲染失败时按 §8.5 降级为纯文本摘要：隐藏网格，但摘要三行不能丢
-            showBitmapFallback(views, context, payload);
+            // 位图渲染失败（超限 / OOM / 绘制异常）：只留状态文案，不空白
+            showState(views, context.getString(R.string.widget_need_sync));
             return views;
         }
 
         views.setViewVisibility(R.id.widget_week_state, View.GONE);
         views.setViewVisibility(R.id.widget_week_grid, View.VISIBLE);
         views.setImageViewBitmap(R.id.widget_week_grid, bitmap);
-        views.setTextViewText(R.id.widget_week_messages, messageText(context, payload));
-        views.setTextViewText(R.id.widget_week_notices, noticeText(context, payload));
-        views.setTextViewText(R.id.widget_week_grades, gradeText(context, payload));
         return views;
     }
 
@@ -87,19 +72,6 @@ final class WeekWidgetBinder {
         views.setViewVisibility(R.id.widget_week_grid, View.GONE);
         views.setViewVisibility(R.id.widget_week_state, View.VISIBLE);
         views.setTextViewText(R.id.widget_week_state, state);
-        views.setTextViewText(R.id.widget_week_messages, "");
-        views.setTextViewText(R.id.widget_week_notices, "");
-        views.setTextViewText(R.id.widget_week_grades, "");
-    }
-
-    // 位图失败（超限 / OOM / 绘制异常）时：网格让位给状态文案，摘要照常显示
-    private static void showBitmapFallback(RemoteViews views, Context context, WidgetPayload payload) {
-        views.setViewVisibility(R.id.widget_week_grid, View.GONE);
-        views.setViewVisibility(R.id.widget_week_state, View.VISIBLE);
-        views.setTextViewText(R.id.widget_week_state, context.getString(R.string.widget_need_sync));
-        views.setTextViewText(R.id.widget_week_messages, messageText(context, payload));
-        views.setTextViewText(R.id.widget_week_notices, noticeText(context, payload));
-        views.setTextViewText(R.id.widget_week_grades, gradeText(context, payload));
     }
 
     // 位图只画网格本身，尺寸要和 ImageView 实际占的格子一致。
@@ -162,27 +134,5 @@ final class WeekWidgetBinder {
         java.util.Calendar calendar = java.util.Calendar.getInstance();
         int day = calendar.get(java.util.Calendar.DAY_OF_WEEK);
         return day == java.util.Calendar.SUNDAY ? 7 : day - 1;
-    }
-
-    private static String messageText(Context context, WidgetPayload payload) {
-        if (payload.unread > 0) {
-            return context.getString(R.string.widget_unread, payload.unread);
-        }
-        return context.getString(R.string.widget_no_unread);
-    }
-
-    private static String noticeText(Context context, WidgetPayload payload) {
-        if (payload.latestNotice.isEmpty()) {
-            return context.getString(R.string.widget_no_notice);
-        }
-        // 不再先 substring(14) 再让 TextView ellipsize（双层截断会多切一次），
-        // 只补省略号，宽度交给单行 ellipsize 按真实可用宽度决定
-        return context.getString(R.string.widget_latest_notice, payload.latestNotice);
-    }
-
-    private static String gradeText(Context context, WidgetPayload payload) {
-        return payload.gradeLabel.isEmpty()
-            ? context.getString(R.string.widget_no_grades)
-            : payload.gradeLabel;
     }
 }

@@ -154,14 +154,14 @@
   .widget[data-v="opaque"] .blk i,
   .widget[data-v="glass"] .blk i { color: inherit; opacity: .72; }
 
-  /* 浅冷 40%：白卡上落成 #D5E0EB */
-  .widget[data-v="opaque"] .blk[data-tier="0"],
+  /* ---- 不透明档：20% 不透明度（白卡上落成 #EAEFF5 / #DCE4EE / #CED4DE） ---- */
+  .widget[data-v="opaque"] .blk[data-tier="0"] { background: rgba(150,178,206,.20); color: #12202c; }
+  .widget[data-v="opaque"] .blk[data-tier="1"] { background: rgba(80,124,170,.20); color: #12202c; }
+  .widget[data-v="opaque"] .blk[data-tier="2"] { background: rgba(10,40,90,.20); color: #12202c; }
+
+  /* ---- 液态玻璃档：40% 不透明度（白卡上落成 #D5E0EB / #B9CADD / #9DA9BD） ---- */
   .widget[data-v="glass"] .blk[data-tier="0"] { background: rgba(150,178,206,.40); color: #12202c; }
-  /* 中冷 40%：白卡上落成 #B9CADD */
-  .widget[data-v="opaque"] .blk[data-tier="1"],
   .widget[data-v="glass"] .blk[data-tier="1"] { background: rgba(80,124,170,.40); color: #12202c; }
-  /* 深冷 40%：白卡上落成 #9DA9BD */
-  .widget[data-v="opaque"] .blk[data-tier="2"],
   .widget[data-v="glass"] .blk[data-tier="2"] { background: rgba(10,40,90,.40); color: #12202c; }
 
   /* ---------- C 液态玻璃卡片：卡片本体 ---------- */
@@ -183,11 +183,11 @@
   /* ---------- 深色主题 ---------- */
   .wall.dark .widget { color: #eceff3; --ink: #eceff3; --ink-2: #c6ccd4; --ink-3: #98a2ad; --grid-line: rgba(255,255,255,.10); --today-ink: #8fc0ee; --today-bg: rgba(255,255,255,.07); }
   .wall.dark .widget[data-v="opaque"] { background: #171b20; }
-  .wall.dark .widget[data-v="opaque"] .blk[data-tier="0"],
+  .wall.dark .widget[data-v="opaque"] .blk[data-tier="0"] { background: rgba(200,220,240,.20); color: #eef3f8; }
+  .wall.dark .widget[data-v="opaque"] .blk[data-tier="1"] { background: rgba(150,185,220,.20); color: #eef3f8; }
+  .wall.dark .widget[data-v="opaque"] .blk[data-tier="2"] { background: rgba(90,130,175,.20); color: #eef3f8; }
   .wall.dark .widget[data-v="glass"] .blk[data-tier="0"] { background: rgba(170,195,220,.40); color: #eef3f8; }
-  .wall.dark .widget[data-v="opaque"] .blk[data-tier="1"],
   .wall.dark .widget[data-v="glass"] .blk[data-tier="1"] { background: rgba(110,150,190,.40); color: #eef3f8; }
-  .wall.dark .widget[data-v="opaque"] .blk[data-tier="2"],
   .wall.dark .widget[data-v="glass"] .blk[data-tier="2"] { background: rgba(64,104,146,.40); color: #eef3f8; }
   .wall.dark .widget[data-v="glass"] {
     background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
@@ -218,16 +218,19 @@
     display: block; height: 44px; border-radius: 9px; margin-bottom: 5px;
     position: relative; overflow: hidden;
   }
-  .mat-1 span { background: #d5e0eb; border: 1px solid #fff; }
-  .mat-2 span { background: #b9cadd; border: 1px solid #fff; }
-  .mat-3 span { background: #9da9bd; border: 1px solid #fff; }
+  .mat-1 span { background: #eaeff5; border: 1px solid #fff; }
+  .mat-2 span { background: #dce4ee; border: 1px solid #fff; }
+  .mat-3 span { background: #ced4de; border: 1px solid #fff; }
+  .mat-4 span { background: #d5e0eb; border: 1px solid #fff; }
+  .mat-5 span { background: #b9cadd; border: 1px solid #fff; }
+  .mat-6 span { background: #9da9bd; border: 1px solid #fff; }
   .legend { display: flex; gap: 14px; font-size: 12px; color: #6b7885; margin-top: 10px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>4×4 周课表 · 课程块材质</h1>
-  <p class="sub">只显示课表（无摘要行）；全透明＝液态玻璃，不透明 / 液态玻璃＝毛玻璃冷色（三档 40%，无边框）。每块同时显示课名与教室。尺寸按真机 985×1200px（约 340×414dp）同比例还原。</p>
+  <p class="sub">只显示课表（无摘要行）；每块同时显示课名与教室。全透明＝液态玻璃，不透明＝毛玻璃冷色 20%，液态玻璃＝毛玻璃冷色 40%，均为三档（浅 / 中 / 深）、无边框。尺寸按真机 985×1200px（约 340×414dp）同比例还原。</p>
 
   <div class="controls">
     <div class="ctl">
@@ -237,7 +240,7 @@
         <button data-wall="dark" aria-pressed="false">深色</button>
       </div>
     </div>
-    <div class="tips">只显示课表：每块必带课名 + 教室；课程块为冷色三档（浅 / 中 / 深）× 40% 不透明度，无描边</div>
+    <div class="tips">只显示课表：每块必带课名 + 教室；B 不透明档 20% 不透明度，C 液态玻璃档 40%</div>
   </div>
 
   <div class="stages" id="stages"></div>
@@ -252,18 +255,23 @@
       </ul>
     </div>
     <div class="note">
-      <h3>B / C · 不透明与液态玻璃：毛玻璃冷色（三档 × 40%，无边框）</h3>
+      <h3>B / C · 毛玻璃冷色（三档）</h3>
       <ul>
-        <li>统一 <code>opacity .40</code>：块面 = 40% 冷色 + 60% 卡片底。白卡上三档落成 <code>#D5E0EB</code> / <code>#B9CADD</code> / <code>#9DA9BD</code>。</li>
-        <li>色相只在 205–215°（蓝 → 石板蓝），只调明度分三档，不做绿/橙/红。</li>
-        <li><b>三档统一深墨字</b> <code>#12202C</code>（对比 5.7–13:1）：40% 不透明度下最深的块也只能到 <code>#9DA9BD</code>，白字在上面只有 2.3:1，所以不再需要白字。</li>
-        <li>无描边：只有 40% 填充 + 极轻投影，磨砂感靠半透明叠色与 8px 背景模糊。</li>
-        <li>位图 <code>ARGB_4444</code> 的 alpha 只有 16 档，<code>0.4 = 6/15</code> 正好对齐，不会偏色。</li>
+        <li><b>B 不透明档 = 20% 不透明度</b>：白卡上三档落成 <code>#EAEFF5</code> / <code>#DCE4EE</code> / <code>#CED4DE</code>，块面很淡，主要靠明度差分区。</li>
+        <li><b>C 液态玻璃档 = 40% 不透明度</b>：等效白卡上 <code>#D5E0EB</code> / <code>#B9CADD</code> / <code>#9DA9BD</code>，比 B 明显实一点。</li>
+        <li>色相锁在 205–215°（蓝 → 石板蓝），只调明度分三档，不做绿/橙/红。</li>
+        <li>三档统一深墨字 <code>#12202C</code>（对比 12:1 以上），没有白字。</li>
+        <li>无描边，只有填充 + 极轻投影；<code>ARGB_4444</code> 的 16 档 alpha 里 <code>0.2 = 3/15</code>、<code>0.4 = 6/15</code>，都正好对齐。</li>
       </ul>
       <div class="mat-row">
-        <div class="mat mat-1"><span></span>浅冷 40%</div>
-        <div class="mat mat-2"><span></span>中冷 40%</div>
-        <div class="mat mat-3"><span></span>深冷 40%</div>
+        <div class="mat mat-1"><span></span>B 浅 20%</div>
+        <div class="mat mat-2"><span></span>B 中 20%</div>
+        <div class="mat mat-3"><span></span>B 深 20%</div>
+      </div>
+      <div class="mat-row">
+        <div class="mat mat-4"><span></span>C 浅 40%</div>
+        <div class="mat mat-5"><span></span>C 中 40%</div>
+        <div class="mat mat-6"><span></span>C 深 40%</div>
       </div>
     </div>
     <div class="note">
@@ -339,7 +347,7 @@ function widgetHTML(variant) {
 
 const STAGES = [
   { v: "transparent", tag: "A", title: "全透明 · 液态玻璃", desc: "无卡片底，课程块是玻璃块" },
-  { v: "opaque", tag: "B", title: "不透明 · 毛玻璃冷色（三档）", desc: "白色实底卡片 · 课程块 40% 不透明度 · 无边框" },
+  { v: "opaque", tag: "B", title: "不透明 · 毛玻璃冷色（三档）", desc: "白色实底卡片 · 课程块 20% 不透明度 · 无边框" },
   { v: "glass", tag: "C", title: "液态玻璃卡片 · 毛玻璃冷色（三档）", desc: "半透明卡片 · 课程块 40% 不透明度 · 无边框" },
   { v: "legacy", tag: "×", title: "现状（对照）", desc: "饱和绿/橙/红，仅作比较" }
 ];

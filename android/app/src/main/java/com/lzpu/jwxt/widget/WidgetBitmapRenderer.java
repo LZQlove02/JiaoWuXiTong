@@ -37,9 +37,13 @@ public final class WidgetBitmapRenderer {
         }
         try {
             draw(bitmap, payload, theme, todayWeekday, emptyText);
-            // 必须保留 alpha：卡片是透明的，转 RGB_565 会把空白区压成黑色
-            // 用 ARGB_4444（2 字节/像素、带 alpha）把 Binder 开销压在 800KB 以内
-            Bitmap compact = bitmap.copy(Bitmap.Config.ARGB_4444, false);
+            // 透明 / 液态玻璃档必须保留 alpha（空网格要透出壁纸），只能用 ARGB_4444；
+            // 不透明档的画布已经铺满卡片色（没有透明像素），改用 RGB_565：
+            // ARGB_4444 每通道只有 16 级，20% 的浅色叠在白卡上会被量化成中性灰（真机已踩）。
+            Bitmap.Config config = theme.isOpaque()
+                ? Bitmap.Config.RGB_565
+                : Bitmap.Config.ARGB_4444;
+            Bitmap compact = bitmap.copy(config, false);
             if (compact != null && compact != bitmap) {
                 bitmap.recycle();
                 return compact;
@@ -145,8 +149,8 @@ public final class WidgetBitmapRenderer {
         // 课程块
         // 相邻两门课之间要留出看得见的缝：0.32% 在 480px 宽下只有 1.15px，几乎贴在一起
         float inset = Math.max(1.5f, unit * 0.5f);
-        // 玻璃档用更大的圆角（约 6dp）并加一圈内描边，相邻两门课才分得开
-        float radius = glass ? Math.max(inset * 2f, unit * 2.2f) : inset * 1.8f;
+        float radius = Math.max(inset * 1.8f, unit * 1.1f);
+        boolean liquidGlass = theme.isTransparent();
         for (WidgetPayload.WeekItem item : mergeBlocks(payload.week)) {
             int col = item.weekday - 1;
             if (col < 0 || col >= COLS) continue;
@@ -159,21 +163,23 @@ public final class WidgetBitmapRenderer {
                 gridTop + (rowEnd + 1) * cellH - inset);
             if (block.width() <= 0 || block.height() <= 0) continue;
 
-            int color = parseColor(item.color, theme.accent);
-            fill.setColor(color);
-            canvas.drawRoundRect(block, radius, radius, fill);
-
-            if (glass) {
+            if (liquidGlass) {
+                // 全透明档：液态玻璃块（中性白，模拟壁纸透过磨砂玻璃）
+                fill.setColor(theme.glassFill());
+                canvas.drawRoundRect(block, radius, radius, fill);
+                // 顶边高光：一条亮线，两端让开圆角
                 edge.setStyle(Paint.Style.STROKE);
-                edge.setStrokeWidth(Math.max(1f, unit * 0.16f));
-                edge.setColor(theme.blockEdge());
-                RectF rim = new RectF(block);
-                float half = edge.getStrokeWidth() / 2f;
-                rim.inset(half, half);
-                canvas.drawRoundRect(rim, radius, radius, edge);
+                edge.setStrokeWidth(Math.max(1f, unit * 0.18f));
+                edge.setColor(theme.glassHighlight());
+                float lineY = block.top + edge.getStrokeWidth() / 2f;
+                canvas.drawLine(block.left + radius, lineY, block.right - radius, lineY, edge);
+            } else {
+                // 不透明 / 液态玻璃档：冷色三档，无描边，仅 20% / 40% 填充
+                fill.setColor(theme.courseFill(tierOf(item.name)));
+                canvas.drawRoundRect(block, radius, radius, fill);
             }
 
-            drawLabel(canvas, item.name, item.room, block, color, unit, text);
+            drawLabel(canvas, item.name, item.room, block, theme.courseInk(), unit, text);
         }
 
         // 本周没有课：网格照画（表头与节次留着，版面不塌），中央补一句占位
@@ -224,7 +230,7 @@ public final class WidgetBitmapRenderer {
     // 课程名排版：两节以上折两行（每行 2 字），单节块一行 4 字。
     // 高块（三节以上）把校名贴顶、教室紧跟在下面，不再是「标题浮在块中间、下面一大片空」。
     private static void drawLabel(Canvas canvas, String name, String room, RectF block,
-                                  int background, float unit, Paint text) {
+                                  int ink, float unit, Paint text) {
         if (name == null || name.isEmpty()) return;
 
         float maxW = block.width() - unit * 1.0f;
@@ -290,34 +296,42 @@ public final class WidgetBitmapRenderer {
             if (size < unit * 1.4f) return;
         }
 
+        // 课名 + 教室必须同时显示（《小组件执行方案》§7.3 硬约束）：
+        // 只剩很窄的块时逐档缩字号，直到两行都装得下，绝不省略教室
+        String roomLabel = compactRoom(room);
+        boolean hasRoom = !roomLabel.isEmpty();
+        // 教室字号只由「块宽」决定，不跟课名字号走：否则大块里教室会被放大到宽度放不下
+        float roomSize = unit * 2.6f;
+        text.setTypeface(Typeface.DEFAULT);
+        text.setTextSize(roomSize);
+        int guard = 0;
+        while (hasRoom && roomSize > unit * 1.1f && text.measureText(roomLabel) > maxW * 0.98f && guard < 40) {
+            roomSize *= 0.9f;
+            text.setTextSize(roomSize);
+            guard += 1;
+        }
+        float roomGap = roomSize * 0.45f;
         int lineCount = parts.length;
+
+        for (int attempt = 0; attempt < 12 && hasRoom; attempt += 1) {
+            float needH = size * 1.12f * lineCount + roomGap + roomSize;
+            if (needH <= maxH) break;
+            size *= 0.9f;
+            if (size < unit * 1.2f) break;
+        }
+
         float lineH = size * 1.12f;
         float nameH = lineH * lineCount;
-
-        // 教室：有空间才画，字号约为课名的 0.6；只保留教室号（去掉「敏行楼」这类中文楼名），
-        // 一行放得下才不挤
-        String roomLabel = compactRoom(room);
-        float roomSize = Math.min(unit * 3.0f, Math.max(unit * 1.8f, size * 0.62f));
-        float roomGap = roomSize * 0.5f;
-        boolean showRoom = !roomLabel.isEmpty()
-            && block.height() - nameH >= roomSize * 1.9f
-            && roomSize >= unit * 1.5f;
-
-        float textTop;
-        if (showRoom) {
-            float need = nameH + roomGap + roomSize;
-            textTop = Math.min(block.top + unit * 1.2f, block.bottom - unit * 0.8f - need);
-            textTop = Math.max(textTop, block.top + unit * 0.6f);
-        } else {
-            textTop = block.centerY() - nameH / 2f;
-        }
+        float roomH = hasRoom ? roomGap + roomSize : 0f;
+        float totalH = nameH + roomH;
+        float textTop = block.top + Math.max(0f, (block.height() - totalH) / 2f);
 
         text.setTextSize(size);
         text.setTypeface(Typeface.DEFAULT_BOLD);
         text.setTextAlign(Paint.Align.CENTER);
-        text.setColor(isLight(background) ? 0xFF1A1C1F : Color.WHITE);
-        // 课程块内的字贴在实色块上，用一层弱黑影就够；别太重，否则小字号会糊
-        text.setShadowLayer(Math.max(1f, unit * 0.45f), 0f, unit * 0.14f, 0x59000000);
+        text.setColor(ink);
+        // 块是半透明的，字压在浅色块上，弱阴影足够；别太重，小字号会糊
+        text.setShadowLayer(Math.max(1f, unit * 0.45f), 0f, unit * 0.14f, 0x40000000);
 
         float baselineOffset = (text.ascent() + text.descent()) / 2f;
         for (int i = 0; i < parts.length; i += 1) {
@@ -330,10 +344,10 @@ public final class WidgetBitmapRenderer {
             canvas.drawText(part, block.centerX(), baseline, text);
         }
 
-        if (showRoom) {
+        if (hasRoom) {
             text.setTextSize(roomSize);
             text.setTypeface(Typeface.DEFAULT);
-            text.setColor(isLight(background) ? 0xD91A1C1F : 0xD9FFFFFF);
+            text.setColor((ink & 0x00FFFFFF) | 0xB3000000);   // 教室行：同一字色的 70%
             String part = roomLabel;
             while (part.length() > 1 && text.measureText(part) > maxW) {
                 part = part.substring(0, part.length() - 1);
@@ -342,6 +356,12 @@ public final class WidgetBitmapRenderer {
             float baseline = centerY - (text.ascent() + text.descent()) / 2f;
             canvas.drawText(part, block.centerX(), baseline, text);
         }
+    }
+
+    // 冷色三档按课程名哈希固定分配：同一门课每次刷新、每个尺寸都落在同一档
+    private static int tierOf(String name) {
+        if (name == null || name.isEmpty()) return 0;
+        return Math.floorMod(name.hashCode(), 3);
     }
 
     private static boolean isCjk(char c) {
@@ -358,11 +378,6 @@ public final class WidgetBitmapRenderer {
         while (cut < text.length() && isCjk(text.charAt(cut))) cut += 1;
         if (cut > 0 && cut < text.length()) return text.substring(cut).trim();
         return text;
-    }
-
-    private static boolean isLight(int color) {
-        double luminance = 0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color);
-        return luminance > 150;
     }
 
     // 按词把名字均分成 lines 行，保持词序；尽量让每行宽度接近
@@ -406,13 +421,5 @@ public final class WidgetBitmapRenderer {
             if (line != null && !line.isEmpty()) result[at++] = line;
         }
         return result;
-    }
-
-    private static int parseColor(String value, int fallback) {
-        try {
-            return Color.parseColor(value);
-        } catch (RuntimeException error) {
-            return fallback;
-        }
     }
 }
