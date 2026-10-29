@@ -18,6 +18,10 @@ public final class WidgetDeepLink {
 
     public static final int REQUEST_NEXT = 1;
     public static final int REQUEST_TODAY = 2;
+    public static final int REQUEST_WEEK_SCHEDULE = 3;
+    public static final int REQUEST_WEEK_MESSAGES = 4;
+    public static final int REQUEST_WEEK_NOTICES = 5;
+    public static final int REQUEST_WEEK_GRADES = 6;
 
     private WidgetDeepLink() {
     }

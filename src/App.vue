@@ -76,6 +76,14 @@ function installWidgetSync() {
     { immediate: true }
   )
   watch(() => ui.theme, (theme) => syncWidgetTheme(theme))
+  // 4x4 的 GPA 摘要要用成绩；成绩页只在进入时才拉，这里登录后静默补一次
+  watch(
+    [() => auth.isLoggedIn, () => academic.currentTerm],
+    ([loggedIn, term]) => {
+      if (loggedIn && term && !academic.grades) academic.loadGrades(term)
+    },
+    { immediate: true }
+  )
   // 退出登录立即清空，避免桌面残留旧课表
   watch(
     () => auth.isLoggedIn,

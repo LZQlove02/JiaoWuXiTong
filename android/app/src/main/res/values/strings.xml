@@ -19,4 +19,13 @@
     <string name="widget_need_sync">打开 App 同步</string>
     <string name="widget_open_app_sync">打开 App 同步课表</string>
     <string name="widget_next_prefix">下一节 · </string>
+
+    <!-- 桌面小组件：4x4 周课表 -->
+    <string name="widget_title_week">本周课表</string>
+    <string name="widget_week_desc">本周课表与消息、通知、成绩摘要</string>
+    <string name="widget_unread">未阅 %1$d</string>
+    <string name="widget_no_unread">消息已读</string>
+    <string name="widget_latest_notice">最新：%1$s</string>
+    <string name="widget_no_notice">暂无通知</string>
+    <string name="widget_no_grades">本学期暂无成绩</string>
 </resources>
