@@ -73,7 +73,21 @@ public final class WidgetTheme {
         );
     }
 
-    public int backgroundRes() {
-        return dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light;
+    // 卡片本身透明，文字行用 60% 不透明度的衬底保证可读性
+    public int stripRes() {
+        return dark ? R.drawable.widget_strip_dark : R.drawable.widget_strip_light;
+    }
+
+    // 位图里的表头/节次栏衬底：与文字衬底同色（60%），保证观感统一
+    public int gridScrim() {
+        return dark ? 0x99000000 : 0x99FFFFFF;
+    }
+
+    public int gridLine() {
+        return dark ? 0x40FFFFFF : 0x33000000;
+    }
+
+    public int todayTint() {
+        return dark ? 0x1AFFFFFF : 0x1A1B5FAA;
     }
 }

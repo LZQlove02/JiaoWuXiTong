@@ -34,7 +34,9 @@ public final class WidgetBitmapRenderer {
         }
         try {
             draw(bitmap, payload, theme, todayWeekday);
-            Bitmap compact = bitmap.copy(Bitmap.Config.RGB_565, false);
+            // 必须保留 alpha：卡片是透明的，转 RGB_565 会把空白区压成黑色
+            // 用 ARGB_4444（2 字节/像素、带 alpha）把 Binder 开销压在 800KB 以内
+            Bitmap compact = bitmap.copy(Bitmap.Config.ARGB_4444, false);
             if (compact != null && compact != bitmap) {
                 bitmap.recycle();
                 return compact;
@@ -67,8 +69,7 @@ public final class WidgetBitmapRenderer {
         Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
         text.setTypeface(Typeface.DEFAULT);
 
-        canvas.drawColor(theme.background);
-
+        // 卡片透明：整张位图不铺底色，只在表头与节次刻度两处垫半透明衬底
         float unit = Math.min(w, h) / 100f;
         float gutter = w * 0.085f;
         float header = h * 0.10f;
@@ -77,9 +78,14 @@ public final class WidgetBitmapRenderer {
         float cellW = (w - gutter) / COLS;
         float cellH = (h - header) / ROWS;
 
+        fill.setColor(theme.gridScrim());
+        float stripRadius = Math.max(2f, unit * 1.6f);
+        canvas.drawRoundRect(new RectF(0, 0, w, header), stripRadius, stripRadius, fill);
+        canvas.drawRect(0, header, gutter, h, fill);
+
         // 今天所在列淡淡高亮
         if (todayWeekday >= 1 && todayWeekday <= COLS) {
-            fill.setColor(theme.dark ? 0x14FFFFFF : 0x0D1B5FAA);
+            fill.setColor(theme.todayTint());
             canvas.drawRect(
                 gridLeft + (todayWeekday - 1) * cellW, gridTop,
                 gridLeft + todayWeekday * cellW, gridTop + ROWS * cellH,
@@ -89,7 +95,7 @@ public final class WidgetBitmapRenderer {
         // 网格线：横向每节一条但压到很淡，避免 12 条线糊成一片
         line.setStyle(Paint.Style.STROKE);
         line.setStrokeWidth(Math.max(1f, unit * 0.1f));
-        line.setColor((theme.border & 0x00FFFFFF) | 0x33000000);
+        line.setColor(theme.gridLine());
         for (int row = 1; row < ROWS; row += 1) {
             float y = gridTop + row * cellH;
             canvas.drawLine(gridLeft, y, w, y, line);

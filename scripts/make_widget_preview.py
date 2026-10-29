@@ -1,13 +1,14 @@
-"""生成 4x4 小组件添加面板预览图（与 WidgetBitmapRenderer 的比例保持一致）"""
+"""生成 4x4 小组件添加面板预览图（与 WidgetBitmapRenderer 保持同一套比例与透明度）"""
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 700, 560
-BG = "#FFFFFF"
-LINE = "#E9EBEE"
-TODAY_TINT = "#F4F7FB"
+SCRIM = (255, 255, 255, 153)      # 表头/节次栏衬底：60% 白，与文字衬底一致
+LINE = (0, 0, 0, 51)              # 网格线：20% 黑
+TODAY_TINT = (27, 95, 170, 26)    # 今天列：10% 品牌蓝
 FONT_PATH = "C:/Windows/Fonts/msyh.ttc"
 
-img = Image.new("RGB", (W, H), BG)
+# 卡片透明，整张图只有文字衬底、网格线与课程块
+img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 draw = ImageDraw.Draw(img)
 
 gutter = W * 0.085
@@ -19,6 +20,10 @@ cell_h = (H - header) / 12
 def font(size):
     return ImageFont.truetype(FONT_PATH, max(9, int(size)))
 
+
+# 表头横条 + 左侧节次竖条衬底
+draw.rounded_rectangle([0, 0, W, header], radius=6, fill=SCRIM)
+draw.rectangle([0, header, gutter, H], fill=SCRIM)
 
 # 今天（周四 = 第 4 列）淡高亮
 draw.rectangle([gutter + 3 * cell_w, header, gutter + 4 * cell_w, H], fill=TODAY_TINT)
