@@ -1,8 +1,7 @@
 package com.lzpu.jwxt.widget;
 
 /**
- * 兼容旧入口：v1.1.0 之前添加的「下一节课」实例仍走这里，统一按液态玻璃样式渲染。
- * 新增组件请用 NextGlassWidgetProvider / Transparent / Opaque。
+ * 2x2「下一节课」。背景样式由实例自己的 style_&lt;appWidgetId&gt; 决定，不再按类区分玻璃/透明/不透明。
  */
 public class NextClassWidgetProvider extends BaseWidgetProvider {
 }

@@ -48,7 +48,7 @@
         android:layout_marginTop="4dp"
         android:layout_weight="1"
         android:contentDescription="@string/widget_title_week"
-        android:scaleType="fitXY"
+        android:scaleType="fitCenter"
         android:src="@drawable/widget_week_preview" />
 
     <LinearLayout

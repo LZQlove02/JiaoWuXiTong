@@ -22,11 +22,10 @@ public final class WidgetUpdater {
 
         WidgetPayload payload = WidgetPayload.parse(WidgetStore.readPayload(app));
         String themeName = WidgetStore.readTheme(app);
+        // 只记状态，不记成绩、未读数等个人数据（日志脱敏）
         Log.i("LzpuWidget", "payload loggedIn=" + payload.loggedIn
             + " loaded=" + payload.scheduleLoaded
-            + " week=" + payload.week.size()
-            + " unread=" + payload.unread
-            + " grade=" + (payload.gradeLabel.isEmpty() ? "-" : payload.gradeLabel));
+            + " week=" + payload.week.size());
 
         pushNext(app, manager, payload, themeName);
         pushToday(app, manager, payload, themeName);

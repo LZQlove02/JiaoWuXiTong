@@ -5,7 +5,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 
 /**
- * 9 个桌面组件共用：样式与尺寸由 WidgetUpdater 按类映射，这里只负责触发刷新。
+ * 三个尺寸（2x2 / 4x2 / 4x4）的组件共用：样式与主题由 WidgetUpdater 按实例解析，这里只负责触发刷新。
  */
 public abstract class BaseWidgetProvider extends AppWidgetProvider {
 

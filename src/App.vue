@@ -44,10 +44,14 @@ function deepLinkPath(url) {
   return DEEP_LINK_PATHS[match[1].toLowerCase()] || ''
 }
 
-function openDeepLink(url) {
+async function openDeepLink(url) {
   const path = deepLinkPath(url)
+  if (!path) return
+  // 冷启动时 bootstrap 还没完，此时 isLoggedIn 必为 false，直接返回会把跳转丢掉
+  if (auth.restoring) await auth.bootstrap()
+  await router.isReady()
   // 未登录时由路由守卫落到登录页，这里不重复跳转，避免守卫循环
-  if (!path || !auth.isLoggedIn) return
+  if (!auth.isLoggedIn) return
   if (router.currentRoute.value.path === path) return
   router.push(path)
 }
@@ -72,9 +76,14 @@ function installWidgetSync() {
       () => academic.messages,
       () => academic.portalNotices
     ],
-    () => syncWidget(context),
+    // 会话恢复期间先不写盘，否则冷启动会把「请登录」闪一下再改回来
+    () => {
+      if (!auth.restoring) syncWidget(context)
+    },
     { immediate: true }
   )
+  // 恢复结束后无论登录与否都写一次，保证组件状态和 App 一致
+  auth.bootstrap().finally(() => syncWidget(context))
   watch(() => ui.theme, (theme) => syncWidgetTheme(theme))
   // 4x4 的 GPA 摘要要用成绩；成绩页只在进入时才拉，这里登录后静默补一次
   watch(
@@ -106,8 +115,12 @@ onMounted(() => {
   if (!Capacitor.isNativePlatform()) return
 
   installWidgetSync()
-  CapApp.getLaunchUrl().then((result) => openDeepLink(result?.url))
-  CapApp.addListener('appUrlOpen', (event) => openDeepLink(event?.url))
+  CapApp.getLaunchUrl()
+    .then((result) => openDeepLink(result?.url))
+    .catch(() => {})
+  CapApp.addListener('appUrlOpen', (event) => {
+    openDeepLink(event?.url).catch(() => {})
+  })
 
   CapApp.addListener('backButton', () => {
     const current = router.currentRoute.value

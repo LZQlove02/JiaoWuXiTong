@@ -62,7 +62,8 @@ final class WeekWidgetBinder {
         android.graphics.Bitmap bitmap = WidgetBitmapRenderer.render(
             payload, theme, size[0], size[1], todayWeekday());
         if (bitmap == null) {
-            showState(views, context.getString(R.string.widget_need_sync));
+            // 位图渲染失败时按 §8.5 降级为纯文本摘要：隐藏网格，但摘要三行不能丢
+            showBitmapFallback(views, context, payload);
             return views;
         }
 
@@ -82,6 +83,16 @@ final class WeekWidgetBinder {
         views.setTextViewText(R.id.widget_week_messages, "");
         views.setTextViewText(R.id.widget_week_notices, "");
         views.setTextViewText(R.id.widget_week_grades, "");
+    }
+
+    // 位图失败（超限 / OOM / 绘制异常）时：网格让位给状态文案，摘要照常显示
+    private static void showBitmapFallback(RemoteViews views, Context context, WidgetPayload payload) {
+        views.setViewVisibility(R.id.widget_week_grid, View.GONE);
+        views.setViewVisibility(R.id.widget_week_state, View.VISIBLE);
+        views.setTextViewText(R.id.widget_week_state, context.getString(R.string.widget_need_sync));
+        views.setTextViewText(R.id.widget_week_messages, messageText(context, payload));
+        views.setTextViewText(R.id.widget_week_notices, noticeText(context, payload));
+        views.setTextViewText(R.id.widget_week_grades, gradeText(context, payload));
     }
 
     // 位图只画网格本身，尺寸要和 ImageView 实际占的格子一致。
@@ -114,7 +125,9 @@ final class WeekWidgetBinder {
     // 返回组件占的格子尺寸（dp）；取与当前屏幕方向一致的那一份
     private static int[] widgetCellSize(Bundle options, boolean portrait) {
         java.util.ArrayList<android.os.Parcelable> sizes =
-            options.getParcelableArrayList("appWidgetSizes");
+            android.os.Build.VERSION.SDK_INT >= 33
+                ? options.getParcelableArrayList("appWidgetSizes", android.os.Parcelable.class)
+                : options.getParcelableArrayList("appWidgetSizes");
         if (sizes != null) {
             for (android.os.Parcelable item : sizes) {
                 if (!(item instanceof android.util.SizeF)) continue;
