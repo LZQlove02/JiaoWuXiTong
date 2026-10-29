@@ -63,12 +63,13 @@
         android:layout_marginTop="4dp"
         android:layout_weight="1">
 
+        <!-- fitCenter：位图比例和格子对不上时只做等比缩放（留边），绝不拉伸文字 -->
         <ImageView
             android:id="@+id/widget_week_grid"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:contentDescription="@string/widget_title_week"
-            android:scaleType="fitXY" />
+            android:scaleType="fitCenter" />
 
         <TextView
             android:shadowColor="#66000000"

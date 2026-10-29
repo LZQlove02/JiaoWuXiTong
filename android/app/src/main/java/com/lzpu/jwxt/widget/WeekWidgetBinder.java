@@ -2,6 +2,7 @@ package com.lzpu.jwxt.widget;
 
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -14,8 +15,10 @@ import com.lzpu.jwxt.R;
  */
 final class WeekWidgetBinder {
 
-    // 与 widget_week.xml 对应：标题 + 摘要三行 + 更新时间的固定开销
-    private static final int CHROME_DP = 96;
+    // 与 widget_week.xml 对应：上下内边距 + 标题行 + 摘要三行 + 间距的固定开销（dp）
+    private static final int CHROME_DP = 116;
+    // 根布局左右各 10dp，位图宽度要扣掉
+    private static final int H_PADDING_DP = 20;
 
 
 
@@ -81,7 +84,9 @@ final class WeekWidgetBinder {
         views.setTextViewText(R.id.widget_week_grades, "");
     }
 
-    // 位图只画网格本身，尺寸要扣掉标题、摘要与内边距，避免被 fitXY 拉伸变形
+    // 位图只画网格本身，尺寸要和 ImageView 实际占的格子一致。
+    // 关键：不能用 MAX_WIDTH/MAX_HEIGHT —— 它们是「横屏上限」，直接用会把位图拉宽一倍多，
+    // 再被 fitXY 压扁，字就变形了。优先读 appWidgetSizes（竖屏/横屏各一个），按当前方向挑。
     private static int[] gridSize(Context context, int appWidgetId) {
         int[] fallback = {480, 360};
         Bundle options;
@@ -92,19 +97,44 @@ final class WeekWidgetBinder {
         }
         if (options == null) return fallback;
 
-        int widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0);
-        int heightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
-        if (widthDp <= 0 || heightDp <= 0) {
-            widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
-            heightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
-        }
-        if (widthDp <= 0 || heightDp <= 0) return fallback;
+        boolean portrait = context.getResources().getConfiguration().orientation
+            == Configuration.ORIENTATION_PORTRAIT;
+        int[] cell = widgetCellSize(options, portrait);
+        if (cell == null) return fallback;
 
         float density = context.getResources().getDisplayMetrics().density;
-        int widthPx = Math.round(widthDp * density);
-        int heightPx = Math.round((heightDp - CHROME_DP) * density);
+        int widthPx = Math.round((cell[0] - H_PADDING_DP) * density);
+        int heightPx = Math.round((cell[1] - CHROME_DP) * density);
         if (widthPx <= 0 || heightPx <= 0) return fallback;
+        android.util.Log.d("LzpuWidget", "gridSize cell=" + cell[0] + "x" + cell[1]
+            + " portrait=" + portrait + " -> " + widthPx + "x" + heightPx);
         return new int[]{widthPx, heightPx};
+    }
+
+    // 返回组件占的格子尺寸（dp）；取与当前屏幕方向一致的那一份
+    private static int[] widgetCellSize(Bundle options, boolean portrait) {
+        java.util.ArrayList<android.os.Parcelable> sizes =
+            options.getParcelableArrayList("appWidgetSizes");
+        if (sizes != null) {
+            for (android.os.Parcelable item : sizes) {
+                if (!(item instanceof android.util.SizeF)) continue;
+                android.util.SizeF size = (android.util.SizeF) item;
+                boolean sizePortrait = size.getWidth() <= size.getHeight();
+                if (sizePortrait == portrait) {
+                    return new int[]{Math.round(size.getWidth()), Math.round(size.getHeight())};
+                }
+            }
+        }
+
+        // 旧版本没有 SIZES：MIN 是竖屏尺寸、MAX 是横屏尺寸
+        int minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+        int minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
+        int maxW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0);
+        int maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        int width = portrait ? minW : maxW;
+        int height = portrait ? maxH : minH;
+        if (width <= 0 || height <= 0) return null;
+        return new int[]{width, height};
     }
 
     // 周一=1 ... 周日=7，与 JS 侧 getWeekday 保持一致
