@@ -71,7 +71,9 @@ public class TodayWidgetProvider extends AppWidgetProvider {
 
         if (today.isEmpty()) {
             views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
-            views.setTextViewText(R.id.widget_empty, context.getString(R.string.widget_no_class));
+            views.setTextViewText(R.id.widget_empty, payload.scheduleLoaded
+                ? context.getString(R.string.widget_no_class)
+                : context.getString(R.string.widget_need_sync));
         } else {
             views.setViewVisibility(R.id.widget_empty, View.GONE);
         }
@@ -91,6 +93,8 @@ public class TodayWidgetProvider extends AppWidgetProvider {
     private static String footerText(Context context, WidgetPayload payload) {
         WidgetPayload.ClassItem next = payload.next;
         if (next == null) {
+            // 课表未加载时上方占位已提示同步，这里不再重复
+            if (!payload.scheduleLoaded) return "";
             return payload.today.isEmpty()
                 ? context.getString(R.string.widget_no_class)
                 : context.getString(R.string.widget_class_finished);

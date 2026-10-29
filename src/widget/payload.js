@@ -63,6 +63,14 @@ function courseIndex(courses) {
   return map
 }
 
+// 组件宽度有限，去掉「官塘校区」这类校区前缀，保留楼栋+教室号
+export function shortRoom(room) {
+  const text = String(room || '').trim()
+  if (!text) return ''
+  const shortened = text.replace(/^[^\d\s]{1,8}校区/, '').trim()
+  return shortened || text
+}
+
 // sessions 里没有课程名与颜色，必须按 courseId join 课程表
 function classItem(session, courses) {
   const course = courses.get(session.courseId) || {}
@@ -76,7 +84,7 @@ function classItem(session, courses) {
     startTime: first ? first.start : '',
     endTime: last ? last.end : '',
     name: course.name || '',
-    room: session.room || '',
+    room: shortRoom(session.room),
     color: course.color || FALLBACK_COLOR
   }
 }
@@ -194,6 +202,8 @@ export function buildWidgetPayload(input = {}) {
     updatedAtLabel,
     account: { name: input.user.name || '' },
     term: { label: term?.label || '', week },
+    // 区分「课表还没加载」与「本周确实没课」
+    scheduleLoaded: Boolean(schedule && Array.isArray(schedule.sessions)),
     today,
     next: pickNextClass(weekSessions, courses, weekday, nowMinutes),
     remainingToday,

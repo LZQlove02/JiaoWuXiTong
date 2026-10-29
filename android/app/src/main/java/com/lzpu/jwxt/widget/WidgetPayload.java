@@ -15,6 +15,7 @@ public final class WidgetPayload {
     public static final String FALLBACK_COLOR = "#1B5FAA";
 
     public boolean loggedIn;
+    public boolean scheduleLoaded;
     public String updatedLabel = "";
     public String accountName = "";
     public String termLabel = "";
@@ -69,6 +70,7 @@ public final class WidgetPayload {
             JSONObject root = new JSONObject(json);
             WidgetPayload payload = new WidgetPayload();
             payload.loggedIn = root.optBoolean("loggedIn", false);
+            payload.scheduleLoaded = root.optBoolean("scheduleLoaded", false);
             payload.updatedLabel = root.optString("updatedAtLabel", "");
 
             JSONObject account = root.optJSONObject("account");

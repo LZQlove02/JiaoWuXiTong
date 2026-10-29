@@ -34,23 +34,27 @@ public class NextClassWidgetProvider extends AppWidgetProvider {
         views.setTextColor(R.id.widget_time, theme.secondary);
         views.setTextColor(R.id.widget_room, theme.tertiary);
         views.setTextColor(R.id.widget_footer, theme.tertiary);
+        views.setTextColor(R.id.widget_updated, theme.tertiary);
 
         if (!payload.loggedIn) {
             views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title_next));
             views.setTextViewText(R.id.widget_course, context.getString(R.string.widget_state_login));
             views.setTextViewText(R.id.widget_time, "");
             views.setTextViewText(R.id.widget_room, "");
+            views.setTextViewText(R.id.widget_updated, "");
             views.setTextViewText(R.id.widget_footer, context.getString(R.string.widget_open_app_sync));
             return views;
         }
 
+        String updated = updatedText(context, payload);
         WidgetPayload.ClassItem next = payload.next;
         if (next == null) {
             views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title_next));
             views.setTextViewText(R.id.widget_course, context.getString(R.string.widget_no_next));
             views.setTextViewText(R.id.widget_time, "");
             views.setTextViewText(R.id.widget_room, "");
-            views.setTextViewText(R.id.widget_footer, footer(context, payload));
+            views.setTextViewText(R.id.widget_updated, updated);
+            views.setTextViewText(R.id.widget_footer, remainingText(context, payload));
             return views;
         }
 
@@ -63,22 +67,27 @@ public class NextClassWidgetProvider extends AppWidgetProvider {
             next.name.isEmpty() ? context.getString(R.string.widget_no_next) : next.name);
         views.setTextViewText(R.id.widget_time, next.timeRange());
         views.setTextViewText(R.id.widget_room, next.room);
-        views.setTextViewText(R.id.widget_footer, footer(context, payload));
+        views.setTextViewText(R.id.widget_updated, updated);
+        views.setTextViewText(R.id.widget_footer, remainingText(context, payload));
         return views;
     }
 
-    static String footer(Context context, WidgetPayload payload) {
-        StringBuilder builder = new StringBuilder();
+    // 2x2 宽度只够放一行，剩余节数与更新时间分成两行显示
+    static String updatedText(Context context, WidgetPayload payload) {
+        return payload.updatedLabel.isEmpty()
+            ? ""
+            : context.getString(R.string.widget_updated_at, payload.updatedLabel);
+    }
+
+    static String remainingText(Context context, WidgetPayload payload) {
         if (payload.remainingToday > 0) {
-            builder.append(context.getString(R.string.widget_remaining, payload.remainingToday));
+            return context.getString(R.string.widget_remaining, payload.remainingToday);
         }
-        if (!payload.updatedLabel.isEmpty()) {
-            if (builder.length() > 0) builder.append(" · ");
-            builder.append(context.getString(R.string.widget_updated_at, payload.updatedLabel));
+        if (!payload.scheduleLoaded) {
+            return context.getString(R.string.widget_need_sync);
         }
-        if (builder.length() == 0) {
-            builder.append(context.getString(R.string.widget_need_sync));
-        }
-        return builder.toString();
+        return payload.today.isEmpty()
+            ? context.getString(R.string.widget_no_class)
+            : context.getString(R.string.widget_class_finished);
     }
 }

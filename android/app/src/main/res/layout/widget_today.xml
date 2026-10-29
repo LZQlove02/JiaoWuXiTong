@@ -60,13 +60,13 @@
 
         <TextView
             android:id="@+id/widget_room1"
-            android:layout_width="82dp"
+            android:layout_width="108dp"
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:gravity="end"
             android:maxLines="1"
             android:textColor="#8A8F98"
-            android:textSize="10sp" />
+            android:textSize="9sp" />
     </LinearLayout>
 
     <LinearLayout
@@ -95,13 +95,13 @@
 
         <TextView
             android:id="@+id/widget_room2"
-            android:layout_width="82dp"
+            android:layout_width="108dp"
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:gravity="end"
             android:maxLines="1"
             android:textColor="#8A8F98"
-            android:textSize="10sp" />
+            android:textSize="9sp" />
     </LinearLayout>
 
     <LinearLayout
@@ -130,13 +130,13 @@
 
         <TextView
             android:id="@+id/widget_room3"
-            android:layout_width="82dp"
+            android:layout_width="108dp"
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:gravity="end"
             android:maxLines="1"
             android:textColor="#8A8F98"
-            android:textSize="10sp" />
+            android:textSize="9sp" />
     </LinearLayout>
 
     <TextView
@@ -150,15 +150,10 @@
         android:visibility="gone" />
 
     <TextView
-        android:id="@+id/widget_spacer"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <TextView
         android:id="@+id/widget_footer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="#5F6368"

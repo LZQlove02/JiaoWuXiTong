@@ -3,7 +3,8 @@ import {
   buildWidgetPayload,
   currentWeekOf,
   gradeView,
-  sessionsInWeek
+  sessionsInWeek,
+  shortRoom
 } from '../src/widget/payload'
 
 const term = {
@@ -118,10 +119,24 @@ describe('小组件 payload：课表', () => {
 
   it('课表未加载时不报错，字段为空', () => {
     const payload = build({ schedule: null })
+    expect(payload.scheduleLoaded).toBe(false)
     expect(payload.today).toEqual([])
     expect(payload.week).toEqual([])
     expect(payload.next).toBeNull()
     expect(payload.remainingToday).toBe(0)
+  })
+
+  it('地点去掉校区前缀，保留楼栋与教室号', () => {
+    expect(shortRoom('官塘校区敏行楼T1-D302')).toBe('敏行楼T1-D302')
+    expect(shortRoom('官塘校区笃行楼T2-A412')).toBe('笃行楼T2-A412')
+    expect(shortRoom('T2-A412')).toBe('T2-A412')
+    expect(shortRoom('')).toBe('')
+    // 只有校区没有楼栋时不要被清空
+    expect(shortRoom('官塘校区')).toBe('官塘校区')
+  })
+
+  it('课表加载后 scheduleLoaded 为 true', () => {
+    expect(build().scheduleLoaded).toBe(true)
   })
 
   it('今天没有课且本周无课时 next 为 null', () => {
@@ -234,6 +249,7 @@ describe('小组件 payload：整体契约', () => {
       'next',
       'notices',
       'remainingToday',
+      'scheduleLoaded',
       'schema',
       'term',
       'today',

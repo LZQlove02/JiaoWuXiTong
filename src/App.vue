@@ -37,14 +37,11 @@ const DEEP_LINK_PATHS = {
 
 function deepLinkPath(url) {
   if (!url) return ''
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol !== 'lzpu:') return ''
-    const key = String(parsed.hostname || parsed.host || '').toLowerCase()
-    return DEEP_LINK_PATHS[key] || ''
-  } catch (error) {
-    return ''
-  }
+  // 不用 new URL()：自定义 scheme 在 WebView 里解析不可靠，正则更稳
+  const text = String(url).trim()
+  const match = /^lzpu:\/\/([^/?#]+)/i.exec(text) || /^lzpu:([^/?#]+)/i.exec(text)
+  if (!match) return ''
+  return DEEP_LINK_PATHS[match[1].toLowerCase()] || ''
 }
 
 function openDeepLink(url) {
