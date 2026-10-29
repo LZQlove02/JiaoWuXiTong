@@ -19,6 +19,7 @@ import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
 import { useUiStore } from './stores/ui'
 import { clearWidgetNow, syncWidget, syncWidgetTheme } from './widget/sync'
+import { deepLinkPath } from './utils/deepLink'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,23 +28,7 @@ const auth = useAuthStore()
 const academic = useAcademicStore()
 const showTabBar = computed(() => route.meta.tab === true)
 
-// 桌面小组件深链：lzpu://schedule 等，与 WidgetDeepLink.java 中的路径一一对应
-const DEEP_LINK_PATHS = {
-  schedule: '/schedule',
-  messages: '/messages',
-  grades: '/grades',
-  notices: '/notices'
-}
-
-function deepLinkPath(url) {
-  if (!url) return ''
-  // 不用 new URL()：自定义 scheme 在 WebView 里解析不可靠，正则更稳
-  const text = String(url).trim()
-  const match = /^lzpu:\/\/([^/?#]+)/i.exec(text) || /^lzpu:([^/?#]+)/i.exec(text)
-  if (!match) return ''
-  return DEEP_LINK_PATHS[match[1].toLowerCase()] || ''
-}
-
+// 深链解析在 src/utils/deepLink.js，这里只负责跳转
 async function openDeepLink(url) {
   const path = deepLinkPath(url)
   if (!path) return
