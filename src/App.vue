@@ -16,13 +16,77 @@ import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import TabBar from './components/TabBar.vue'
 import { useAuthStore } from './stores/auth'
+import { useAcademicStore } from './stores/academic'
 import { useUiStore } from './stores/ui'
+import { clearWidgetNow, syncWidget, syncWidgetTheme } from './widget/sync'
 
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
 const auth = useAuthStore()
+const academic = useAcademicStore()
 const showTabBar = computed(() => route.meta.tab === true)
+
+// 桌面小组件深链：lzpu://schedule 等，与 WidgetDeepLink.java 中的路径一一对应
+const DEEP_LINK_PATHS = {
+  schedule: '/schedule',
+  messages: '/messages',
+  grades: '/grades',
+  notices: '/notices'
+}
+
+function deepLinkPath(url) {
+  if (!url) return ''
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'lzpu:') return ''
+    const key = String(parsed.hostname || parsed.host || '').toLowerCase()
+    return DEEP_LINK_PATHS[key] || ''
+  } catch (error) {
+    return ''
+  }
+}
+
+function openDeepLink(url) {
+  const path = deepLinkPath(url)
+  // 未登录时由路由守卫落到登录页，这里不重复跳转，避免守卫循环
+  if (!path || !auth.isLoggedIn) return
+  if (router.currentRoute.value.path === path) return
+  router.push(path)
+}
+
+// 组件数据全部来自已加载的 store，不新增网络请求
+function installWidgetSync() {
+  syncWidgetTheme(ui.theme)
+  const context = () => ({
+    user: auth.user,
+    currentTerm: academic.currentTerm,
+    schedule: academic.schedule,
+    grades: academic.grades,
+    messages: academic.messages,
+    portalNotices: academic.portalNotices
+  })
+  watch(
+    [
+      () => auth.user,
+      () => academic.currentTerm,
+      () => academic.schedule,
+      () => academic.grades,
+      () => academic.messages,
+      () => academic.portalNotices
+    ],
+    () => syncWidget(context),
+    { immediate: true }
+  )
+  watch(() => ui.theme, (theme) => syncWidgetTheme(theme))
+  // 退出登录立即清空，避免桌面残留旧课表
+  watch(
+    () => auth.isLoggedIn,
+    (loggedIn) => {
+      if (!loggedIn) clearWidgetNow()
+    }
+  )
+}
 
 // 后台校验发现会话失效时会清空登录态，这里统一退回登录页
 watch(
@@ -35,6 +99,10 @@ watch(
 onMounted(() => {
   ui.initTheme()
   if (!Capacitor.isNativePlatform()) return
+
+  installWidgetSync()
+  CapApp.getLaunchUrl().then((result) => openDeepLink(result?.url))
+  CapApp.addListener('appUrlOpen', (event) => openDeepLink(event?.url))
 
   CapApp.addListener('backButton', () => {
     const current = router.currentRoute.value

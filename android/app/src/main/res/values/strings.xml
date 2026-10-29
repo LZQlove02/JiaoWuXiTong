@@ -4,4 +4,19 @@
     <string name="title_activity_main">柳职教务</string>
     <string name="package_name">com.lzpu.jwxt</string>
     <string name="custom_url_scheme">com.lzpu.jwxt</string>
+
+    <!-- 桌面小组件 -->
+    <string name="widget_title_next">下一节课</string>
+    <string name="widget_title_today">今日课程</string>
+    <string name="widget_next_desc">下一节课与今天剩余节数</string>
+    <string name="widget_today_desc">今日课程与下一节</string>
+    <string name="widget_state_login">请登录</string>
+    <string name="widget_no_next">暂无后续课程</string>
+    <string name="widget_no_class">今天没有课</string>
+    <string name="widget_class_finished">今天课程已结束</string>
+    <string name="widget_remaining">剩 %1$d 节</string>
+    <string name="widget_updated_at">更新于 %1$s</string>
+    <string name="widget_need_sync">打开 App 同步</string>
+    <string name="widget_open_app_sync">打开 App 同步课表</string>
+    <string name="widget_next_prefix">下一节 · </string>
 </resources>

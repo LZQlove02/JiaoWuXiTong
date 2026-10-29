@@ -254,7 +254,8 @@ export function parseTermsFromHtml(html, currentTerm = null, options = {}) {
   return sortTerms([...terms.values()].filter((item) => !isAfterCurrent(item, currentTerm)))
 }
 
-function summarizeGrades(grades) {
+// 小组件与成绩页共用同一套绩点/学分口径，避免两处算法漂移
+export function summarizeGrades(grades) {
   let totalCredits = 0
   let weighted = 0
   let weight = 0

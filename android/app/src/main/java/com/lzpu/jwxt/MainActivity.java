@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(JwxtHttpPlugin.class);
         registerPlugin(SsoLoginPlugin.class);
         registerPlugin(AppThemePlugin.class);
+        registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
