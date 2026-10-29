@@ -63,6 +63,8 @@ final class NextClassWidgetBinder {
 
     // 2x2 宽度只够放一行，剩余节数与更新时间分成两行显示
     static void bindStyleChip(Context context, RemoteViews views, WidgetTheme theme, int appWidgetId) {
+        // 齿轮图标跟随主体文字色，不额外加深色底
+        views.setInt(R.id.widget_style_chip, "setColorFilter", theme.secondary);
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
     }

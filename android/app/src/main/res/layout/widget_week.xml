@@ -35,13 +35,12 @@
 
         <ImageView
                 android:id="@+id/widget_style_chip"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="6dp"
-                android:background="@drawable/widget_chip_bg"
                 android:contentDescription="@string/widget_style_action"
-                android:padding="4dp"
+                android:padding="1dp"
                 android:src="@drawable/ic_widget_style" />
 
         <TextView

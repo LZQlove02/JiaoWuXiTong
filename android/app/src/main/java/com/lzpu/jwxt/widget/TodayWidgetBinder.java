@@ -34,6 +34,8 @@ final class TodayWidgetBinder {
         views.setTextColor(R.id.widget_updated, theme.tertiary);
         views.setTextColor(R.id.widget_empty, theme.tertiary);
         views.setTextColor(R.id.widget_footer, theme.secondary);
+        // 齿轮图标跟随主体文字色，不额外加深色底
+        views.setInt(R.id.widget_style_chip, "setColorFilter", theme.secondary);
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
         for (int i = 0; i < MAX_ROWS; i += 1) {

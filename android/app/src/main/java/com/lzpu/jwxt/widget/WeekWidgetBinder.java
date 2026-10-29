@@ -29,6 +29,8 @@ final class WeekWidgetBinder {
         views.setTextColor(R.id.widget_week_messages, theme.secondary);
         views.setTextColor(R.id.widget_week_notices, theme.tertiary);
         views.setTextColor(R.id.widget_week_grades, theme.secondary);
+        // 齿轮图标跟随主体文字色，不额外加深色底
+        views.setInt(R.id.widget_style_chip, "setColorFilter", theme.secondary);
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
 
