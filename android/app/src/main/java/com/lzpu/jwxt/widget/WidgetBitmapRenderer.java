@@ -67,6 +67,7 @@ public final class WidgetBitmapRenderer {
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
         Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
         text.setTypeface(Typeface.DEFAULT);
 
         float unit = Math.min(w, h) / 100f;
@@ -82,8 +83,9 @@ public final class WidgetBitmapRenderer {
             canvas.drawColor(theme.background);
         }
 
-        // 今天所在列淡淡高亮
-        if (todayWeekday >= 1 && todayWeekday <= COLS) {
+        // 今天所在列：玻璃档不铺整列色块（会和课程块叠成一片），改成星期下方的圆点
+        boolean glass = theme.isGlass();
+        if (!glass && todayWeekday >= 1 && todayWeekday <= COLS) {
             fill.setColor(theme.todayTint());
             canvas.drawRect(
                 gridLeft + (todayWeekday - 1) * cellW, gridTop,
@@ -104,15 +106,24 @@ public final class WidgetBitmapRenderer {
             canvas.drawLine(x, gridTop, x, gridTop + ROWS * cellH, line);
         }
 
-        // 星期表头（透明底上靠阴影拉开对比：浅色主题描白光、深色主题描黑影）
-        float headSize = Math.min(header * 0.52f, unit * 3.2f);
+        // 星期表头：文字直接用主题深色，不再描白/黑光晕（光晕会把 8px 的细字洗成灰色）
+        float headSize = Math.min(header * 0.58f, unit * 4f);
         text.setTextSize(headSize);
         text.setTextAlign(Paint.Align.CENTER);
-        text.setShadowLayer(unit * 0.9f, 0f, unit * 0.25f, theme.dark ? 0x99000000 : 0xCCFFFFFF);
+        text.clearShadowLayer();
         for (int col = 0; col < COLS; col += 1) {
-            text.setColor(col + 1 == todayWeekday ? theme.accent : theme.secondary);
-            text.setTypeface(col + 1 == todayWeekday ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-            canvas.drawText(WEEKDAYS[col], gridLeft + (col + 0.5f) * cellW, header * 0.74f, text);
+            boolean today = col + 1 == todayWeekday;
+            text.setColor(today ? theme.accent : theme.secondary);
+            text.setTypeface(today ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            float centerX = gridLeft + (col + 0.5f) * cellW;
+            canvas.drawText(WEEKDAYS[col], centerX, header * 0.74f, text);
+
+            // 玻璃档的「今天」标记：表头文字下面一颗小圆点
+            if (glass && today) {
+                fill.setColor(theme.accent);
+                fill.setStyle(Paint.Style.FILL);
+                canvas.drawCircle(centerX, header * 0.93f, Math.max(1.5f, unit * 0.62f), fill);
+            }
         }
 
         // 左侧节次刻度：行高够就每节标，太挤就隔一节标
@@ -129,7 +140,8 @@ public final class WidgetBitmapRenderer {
 
         // 课程块
         float inset = Math.max(1f, unit * 0.32f);
-        float radius = inset * 1.8f;
+        // 玻璃档用更大的圆角（约 6dp）并加一圈内描边，相邻两门课才分得开
+        float radius = glass ? Math.max(inset * 2f, unit * 2.2f) : inset * 1.8f;
         for (WidgetPayload.WeekItem item : payload.week) {
             int col = item.weekday - 1;
             if (col < 0 || col >= COLS) continue;
@@ -145,35 +157,66 @@ public final class WidgetBitmapRenderer {
             int color = parseColor(item.color, theme.accent);
             fill.setColor(color);
             canvas.drawRoundRect(block, radius, radius, fill);
+
+            if (glass) {
+                edge.setStyle(Paint.Style.STROKE);
+                edge.setStrokeWidth(Math.max(1f, unit * 0.16f));
+                edge.setColor(theme.blockEdge());
+                RectF rim = new RectF(block);
+                float half = edge.getStrokeWidth() / 2f;
+                rim.inset(half, half);
+                canvas.drawRoundRect(rim, radius, radius, edge);
+            }
+
             drawLabel(canvas, item.name, block, color, unit, text);
         }
     }
 
-    // 先按字符数粗限（汉字 4 个、英文 8 个），再按块宽精确截断，保证不压到相邻列
+    // 课程名自适应：两节以上的块折成两行（每行两个汉字），单节块一行四个字。
+    // 字号先按「每行字数」和「行高」取最大值，再压到字号上限，比原来固定 0.36×块宽大 40%~90%。
     private static void drawLabel(Canvas canvas, String name, RectF block, int background,
                                   float unit, Paint text) {
         if (name == null || name.isEmpty()) return;
-        float textSize = Math.min(block.height() * 0.40f, block.width() * 0.36f);
-        textSize = Math.min(textSize, unit * 3.4f);
-        if (textSize < unit * 1.35f) return;
 
-        int cap = name.length() > 4 && !isCjk(name.charAt(0)) ? 8 : 4;
-        String label = name.length() > cap ? name.substring(0, cap) : name;
-        text.setTextSize(textSize);
+        float maxW = block.width() - unit * 0.7f;
+        float maxH = block.height() - unit * 0.5f;
+        if (maxW <= 0 || maxH <= 0) return;
+
+        boolean cjk = isCjk(name.charAt(0));
+        boolean tall = block.height() >= unit * 7.2f && name.length() > 2;
+        int lines = cjk ? (tall ? 2 : 1) : 1;
+        int perLine = cjk ? (tall ? 2 : 4) : 6;
+
+        float size = Math.min(maxW / (perLine + 0.3f), maxH / (lines * 1.2f));
+        size = Math.min(size, unit * (tall ? 5.8f : 5.2f));
+        if (size < unit * 1.6f) return;
+
+        int capacity = perLine * lines;
+        String label = name.length() > capacity ? name.substring(0, capacity) : name;
+
+        text.setTextSize(size);
         text.setTypeface(Typeface.DEFAULT_BOLD);
         text.setTextAlign(Paint.Align.CENTER);
         text.setColor(isLight(background) ? 0xFF1A1C1F : Color.WHITE);
-        // 课程块内的字贴在实色块上，用一层弱黑影就够
-        text.setShadowLayer(unit * 0.45f, 0f, unit * 0.15f, 0x66000000);
+        // 课程块内的字贴在实色块上，用一层弱黑影就够；别太重，否则小字号会糊
+        text.setShadowLayer(Math.max(1f, unit * 0.45f), 0f, unit * 0.14f, 0x59000000);
 
-        float available = block.width() - unit * 0.8f;
-        while (label.length() > 1 && text.measureText(label) > available) {
-            label = label.substring(0, label.length() - 1);
+        int lineCount = Math.min(lines, (int) Math.ceil(label.length() / (double) perLine));
+        float lineH = size * 1.18f;
+        float top = block.centerY() - lineH * lineCount / 2f;
+        float baselineOffset = (text.ascent() + text.descent()) / 2f;
+
+        for (int i = 0; i < lineCount; i += 1) {
+            int from = i * perLine;
+            int to = Math.min(label.length(), from + perLine);
+            String part = label.substring(from, to);
+            while (part.length() > 1 && text.measureText(part) > maxW) {
+                part = part.substring(0, part.length() - 1);
+            }
+            if (part.isEmpty()) continue;
+            float baseline = top + lineH * (i + 0.5f) - baselineOffset;
+            canvas.drawText(part, block.centerX(), baseline, text);
         }
-        if (label.isEmpty()) return;
-
-        float baseline = block.centerY() - (text.descent() + text.ascent()) / 2f;
-        canvas.drawText(label, block.centerX(), baseline, text);
     }
 
     private static boolean isCjk(char c) {

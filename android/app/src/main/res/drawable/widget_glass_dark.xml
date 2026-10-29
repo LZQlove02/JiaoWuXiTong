@@ -1,22 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 深色「液态玻璃」卡片：上浓下淡的黑色渐变 + 1dp 白色高光描边，整体偏通透 -->
+<!--
+  深色「液态玻璃」卡片（A2 + B）：
+  20dp 圆角 + 顶部一层白光擦亮 + 内描边 + 外描边。
+  黑色渐变本身做不了「顶边高光」，所以单独叠一层只在上沿可见的白光。
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:endColor="#0F000000"
-                android:startColor="#33000000"
+                android:endColor="#14000000"
+                android:startColor="#3D000000"
                 android:type="linear" />
-            <corners android:radius="16dp" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:centerColor="#00FFFFFF"
+                android:centerY="0.18"
+                android:endColor="#00FFFFFF"
+                android:startColor="#2AFFFFFF"
+                android:type="linear" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <item
+        android:bottom="1dp"
+        android:left="1dp"
+        android:right="1dp"
+        android:top="1dp">
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="1dp"
+                android:color="#1FFFFFFF" />
+            <corners android:radius="19dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <stroke
                 android:width="1dp"
-                android:color="#26FFFFFF" />
-            <corners android:radius="16dp" />
+                android:color="#2EFFFFFF" />
+            <corners android:radius="20dp" />
         </shape>
     </item>
 </layer-list>

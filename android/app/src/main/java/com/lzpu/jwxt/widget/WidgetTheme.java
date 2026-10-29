@@ -73,29 +73,36 @@ public final class WidgetTheme {
 
     // 布局与不透明一致：文字块不再单独铺底，整块卡片由 root 承担
 
+    // 玻璃与全透明两档的底不可控（壁纸透出多少不知道），
+    // 这两档的文字必须压到主文字级别，否则中灰落在壁纸上是 1.2:1（真机实测）。
+    // 不透明档有实色卡片兜底，保留原来的中灰层级。
+    private static boolean needsDeepText(String style) {
+        return !WidgetStore.STYLE_OPAQUE.equals(style);
+    }
+
     private static WidgetTheme light(String style) {
+        boolean deep = needsDeepText(style);
         return new WidgetTheme(
             false,
             style,
             Color.parseColor("#FFFFFF"),
             Color.parseColor("#1A1C1F"),
-            Color.parseColor("#5F6368"),
-            Color.parseColor("#8A8F98"),
+            Color.parseColor(deep ? "#1A1C1F" : "#5F6368"),
+            Color.parseColor(deep ? "#23272D" : "#8A8F98"),
             Color.parseColor("#E6E8EB"),
             Color.parseColor("#1B5FAA")
         );
     }
 
     private static WidgetTheme dark(String style) {
-        // 玻璃卡片会透出背后的壁纸，壁纸偏亮时次级文字容易糊，这两档提亮一些
-        boolean glass = WidgetStore.STYLE_GLASS.equals(style);
+        boolean deep = needsDeepText(style);
         return new WidgetTheme(
             true,
             style,
             Color.parseColor("#171B20"),
             Color.parseColor("#ECEDEE"),
-            Color.parseColor(glass ? "#C6CCD4" : "#A0A6AD"),
-            Color.parseColor(glass ? "#9AA4AE" : "#6E757D"),
+            Color.parseColor(deep ? "#ECEDEE" : "#A0A6AD"),
+            Color.parseColor(deep ? "#C6CCD4" : "#6E757D"),
             Color.parseColor("#262B31"),
             Color.parseColor("#4A9BE8")
         );
@@ -107,10 +114,19 @@ public final class WidgetTheme {
     }
 
     public int gridLine() {
+        // 玻璃档的网格退到 20%，否则和卡片渐变叠在一起显碎
+        if (isGlass()) {
+            return dark ? 0x33FFFFFF : 0x2E000000;
+        }
         return dark ? 0x59FFFFFF : 0x4D000000;
     }
 
     public int todayTint() {
         return dark ? 0x1AFFFFFF : 0x1A1B5FAA;
+    }
+
+    // 课程块内描边：玻璃档给每块加 1px 内描边，相邻课之间才分得开
+    public int blockEdge() {
+        return dark ? 0x33FFFFFF : 0x38FFFFFF;
     }
 }
