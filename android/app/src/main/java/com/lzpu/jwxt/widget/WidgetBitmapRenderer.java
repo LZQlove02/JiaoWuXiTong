@@ -183,18 +183,65 @@ public final class WidgetBitmapRenderer {
         if (maxW <= 0 || maxH <= 0) return;
 
         boolean cjk = isCjk(name.charAt(0));
-        boolean tall = block.height() >= unit * 7.2f && name.length() > 2;
-        int lines = cjk ? (tall ? 2 : 1) : 1;
-        int perLine = cjk ? (tall ? 2 : 4) : 6;
+        float size;
+        String[] parts;
+        if (cjk) {
+            boolean tall = block.height() >= unit * 7.2f && name.length() > 2;
+            int maxLines = tall ? 2 : 1;
+            int perLine = tall ? 2 : 4;
+            size = Math.min(maxW / (perLine + 0.3f), maxH / (maxLines * 1.12f));
+            size = Math.min(size, unit * (maxLines == 2 ? 5.6f : 5.2f));
+            if (size < unit * 1.6f) return;
+            int capacity = perLine * maxLines;
+            String label = name.length() > capacity ? name.substring(0, capacity) : name;
+            int count = Math.min(maxLines, (int) Math.ceil(label.length() / (double) perLine));
+            parts = new String[count];
+            for (int i = 0; i < count; i += 1) {
+                int from = i * perLine;
+                parts[i] = label.substring(from, Math.min(label.length(), from + perLine));
+            }
+        } else {
+            // 英文（或中英混排）按真实字宽算字号：拉丁字符约 0.55em，
+            // 套汉字「每行几个字」的算法会把字压到一半。
+            // 1~3 行里选字号最大的折法：长名字多折一行，字号就能拉回来。
+            String trimmed = name.trim();
+            String[] words = trimmed.split("\\s+");
+            float ref = 100f;
+            text.setTypeface(Typeface.DEFAULT_BOLD);
+            text.setTextSize(ref);
+            String[] best = new String[]{trimmed};
+            float bestSize = 0f;
+            int maxLines = Math.min(3, Math.max(1, words.length));
+            for (int lineCount = 1; lineCount <= maxLines; lineCount += 1) {
+                if (lineCount * unit * 1.9f > maxH) break;
+                String[] candidate = partitionWords(words, lineCount, text);
+                float widest = 0f;
+                for (String line : candidate) widest = Math.max(widest, text.measureText(line));
+                if (widest <= 0f) continue;
+                float candidateSize = Math.min(
+                    maxW * 0.96f * ref / widest,
+                    Math.min(maxH / (lineCount * 1.12f), unit * 5.2f));
+                if (candidateSize > bestSize) {
+                    bestSize = candidateSize;
+                    best = candidate;
+                }
+            }
+            if (bestSize <= 0f) return;
+            size = bestSize;
+            parts = best;
+            text.setTextSize(size);
+            float target = maxW * 0.96f;
+            for (int i = 0; i < parts.length; i += 1) {
+                String part = parts[i];
+                while (part.length() > 1 && text.measureText(part) > target) {
+                    part = part.substring(0, part.length() - 1);
+                }
+                parts[i] = part;
+            }
+            if (size < unit * 1.4f) return;
+        }
 
-        float size = Math.min(maxW / (perLine + 0.3f), maxH / (lines * 1.12f));
-        size = Math.min(size, unit * (lines == 2 ? 5.6f : 5.2f));
-        if (size < unit * 1.6f) return;
-
-        int capacity = perLine * lines;
-        String label = name.length() > capacity ? name.substring(0, capacity) : name;
-
-        int lineCount = Math.min(lines, (int) Math.ceil(label.length() / (double) perLine));
+        int lineCount = parts.length;
         float lineH = size * 1.12f;
         float nameH = lineH * lineCount;
 
@@ -224,14 +271,12 @@ public final class WidgetBitmapRenderer {
         text.setShadowLayer(Math.max(1f, unit * 0.45f), 0f, unit * 0.14f, 0x59000000);
 
         float baselineOffset = (text.ascent() + text.descent()) / 2f;
-        for (int i = 0; i < lineCount; i += 1) {
-            int from = i * perLine;
-            int to = Math.min(label.length(), from + perLine);
-            String part = label.substring(from, to);
+        for (int i = 0; i < parts.length; i += 1) {
+            String part = parts[i];
+            if (part == null || part.isEmpty()) continue;
             while (part.length() > 1 && text.measureText(part) > maxW) {
                 part = part.substring(0, part.length() - 1);
             }
-            if (part.isEmpty()) continue;
             float baseline = textTop + lineH * (i + 0.5f) - baselineOffset;
             canvas.drawText(part, block.centerX(), baseline, text);
         }
@@ -269,6 +314,49 @@ public final class WidgetBitmapRenderer {
     private static boolean isLight(int color) {
         double luminance = 0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color);
         return luminance > 150;
+    }
+
+    // 按词把名字均分成 lines 行，保持词序；尽量让每行宽度接近
+    private static String[] partitionWords(String[] words, int lines, Paint paint) {
+        if (lines <= 1) {
+            StringBuilder all = new StringBuilder();
+            for (String word : words) {
+                if (all.length() > 0) all.append(' ');
+                all.append(word);
+            }
+            return new String[]{all.toString()};
+        }
+        float total = 0f;
+        for (String word : words) {
+            total += paint.measureText(word) + paint.measureText(" ");
+        }
+        float target = total / lines;
+        String[] out = new String[lines];
+        int index = 0;
+        StringBuilder current = new StringBuilder();
+        for (String word : words) {
+            String next = current.length() == 0 ? word : current + " " + word;
+            if (index < lines - 1 && current.length() > 0 && paint.measureText(next) > target) {
+                out[index] = current.toString();
+                index += 1;
+                current.setLength(0);
+                current.append(word);
+            } else {
+                current.setLength(0);
+                current.append(next);
+            }
+        }
+        if (current.length() > 0) {
+            out[Math.min(index, lines - 1)] = current.toString();
+        }
+        int count = 0;
+        for (String line : out) if (line != null && !line.isEmpty()) count += 1;
+        String[] result = new String[count];
+        int at = 0;
+        for (String line : out) {
+            if (line != null && !line.isEmpty()) result[at++] = line;
+        }
+        return result;
     }
 
     private static int parseColor(String value, int fallback) {
