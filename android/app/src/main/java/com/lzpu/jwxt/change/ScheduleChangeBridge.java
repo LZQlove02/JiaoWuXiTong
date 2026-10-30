@@ -118,15 +118,37 @@ public class ScheduleChangeBridge extends Plugin {
     public void requestNotificationPermission(PluginCall call) {
         if (Build.VERSION.SDK_INT < 33
                 || ScheduleChangeNotifier.notificationsEnabled(getContext())) {
-            resolvePermission(call);
+            resolvePermission(call, false);
             return;
         }
+        ScheduleChangeStore.markNotificationAsked(getContext());
+        requestPermissionForAlias("notifications", call, "notificationPermissionCallback");
+    }
+
+    /**
+     * 首次成功对账后由 JS 调用：只在 Android 13+、开关开启、尚未授权、前台且没问过时申请一次。
+     * 后台检查不会走这里（没有 Activity），因此不会在用户不知情时弹框。
+     */
+    @PluginMethod
+    public void maybeRequestNotificationPermission(PluginCall call) {
+        boolean shouldAsk = Build.VERSION.SDK_INT >= 33
+                && ScheduleChangeStore.isEnabled(getContext())
+                && !ScheduleChangeNotifier.notificationsEnabled(getContext())
+                && !ScheduleChangeStore.hasAskedNotification(getContext())
+                && AppVisibility.isForeground();
+        if (!shouldAsk) {
+            JSObject result = new JSObject();
+            result.put("asked", false);
+            call.resolve(result);
+            return;
+        }
+        ScheduleChangeStore.markNotificationAsked(getContext());
         requestPermissionForAlias("notifications", call, "notificationPermissionCallback");
     }
 
     @PermissionCallback
     private void notificationPermissionCallback(PluginCall call) {
-        resolvePermission(call);
+        resolvePermission(call, true);
     }
 
     @PluginMethod
@@ -148,9 +170,10 @@ public class ScheduleChangeBridge extends Plugin {
         call.resolve();
     }
 
-    private void resolvePermission(PluginCall call) {
+    private void resolvePermission(PluginCall call, boolean asked) {
         JSObject result = new JSObject();
         result.put("granted", ScheduleChangeNotifier.notificationsEnabled(getContext()));
+        result.put("asked", asked);
         call.resolve(result);
     }
 

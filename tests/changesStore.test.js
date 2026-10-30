@@ -8,6 +8,7 @@ vi.mock('../src/native/scheduleChangeBridge', () => ({
   markAllChangesRead: vi.fn(),
   setScheduleChangeEnabled: vi.fn(),
   requestChangeNotificationPermission: vi.fn(),
+  maybeRequestChangeNotificationPermission: vi.fn(() => Promise.resolve({ asked: false })),
   openScheduleChangeNotificationSettings: vi.fn(),
   clearScheduleChange: vi.fn(),
   addScheduleChangeListener: vi.fn(() => () => {})
@@ -17,6 +18,7 @@ import {
   applyScheduleChange,
   getScheduleChangeState,
   markAllChangesRead,
+  maybeRequestChangeNotificationPermission,
   requestChangeNotificationPermission,
   scheduleChangeAvailable,
   setScheduleChangeEnabled
@@ -93,6 +95,7 @@ describe('changes store', () => {
     expect(payload.term).toEqual({ xnm: '2026', xqm: '3', startDate: '2026-08-31' })
     expect(payload.sectionTimes[1]).toEqual({ start: '08:20', end: '09:00' })
     expect(changes.unread).toBe(3)
+    expect(maybeRequestChangeNotificationPermission).toHaveBeenCalledTimes(1)
   })
 
   it('离线快照或缺少原文时不参与对账', async () => {
@@ -109,6 +112,7 @@ describe('changes store', () => {
       term: { xnm: '2026', xqm: '3', startDate: '2026-08-31' }
     })
     expect(applyScheduleChange).not.toHaveBeenCalled()
+    expect(maybeRequestChangeNotificationPermission).not.toHaveBeenCalled()
   })
 
   it('进入列表后全部已读，红点归零', async () => {
@@ -146,5 +150,6 @@ describe('changes store', () => {
       term: { xnm: '2026', xqm: '3', startDate: '2026-08-31' }
     })
     expect(applyScheduleChange).not.toHaveBeenCalled()
+    expect(maybeRequestChangeNotificationPermission).not.toHaveBeenCalled()
   })
 })

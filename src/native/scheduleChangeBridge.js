@@ -38,6 +38,11 @@ export function requestChangeNotificationPermission() {
   return call('requestNotificationPermission')
 }
 
+// 首次成功对账后调用；原生只在需要时真正弹一次系统权限框
+export function maybeRequestChangeNotificationPermission() {
+  return call('maybeRequestNotificationPermission')
+}
+
 export function openScheduleChangeNotificationSettings() {
   return call('openNotificationSettings')
 }

@@ -26,6 +26,7 @@ public final class ScheduleChangeStore {
     private static final String KEY_BASELINE = "baseline";
     private static final String KEY_ENTRIES = "entries";
     private static final String KEY_ENABLED = "enabled";
+    private static final String KEY_NOTIFICATION_ASKED = "notification_asked";
     private static final String KEY_LAST_EXPIRED = "last_session_expired";
     private static final int MAX_ENTRIES = 200;
     private static final int MAX_AGE_DAYS = 30;
@@ -202,6 +203,14 @@ public final class ScheduleChangeStore {
 
     public static void setEnabled(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply();
+    }
+
+    public static boolean hasAskedNotification(Context context) {
+        return prefs(context).getBoolean(KEY_NOTIFICATION_ASKED, false);
+    }
+
+    public static void markNotificationAsked(Context context) {
+        prefs(context).edit().putBoolean(KEY_NOTIFICATION_ASKED, true).apply();
     }
 
     public static String readLastSessionExpiredDate(Context context) {

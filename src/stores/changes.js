@@ -7,6 +7,7 @@ import {
   applyScheduleChange,
   getScheduleChangeState,
   markAllChangesRead,
+  maybeRequestChangeNotificationPermission,
   openScheduleChangeNotificationSettings,
   requestChangeNotificationPermission,
   scheduleChangeAvailable,
@@ -108,6 +109,12 @@ export const useChangesStore = defineStore('changes', () => {
         sectionTimes: SECTION_TIMES
       })
       applyState(state)
+      if (state) {
+        // 首次成功对账后申请一次；是否真正弹框由原生判断（前台 / 未问过 / 未授权）
+        maybeRequestChangeNotificationPermission().then((result) => {
+          if (result?.asked) refresh()
+        })
+      }
     } finally {
       applying.value = false
     }
