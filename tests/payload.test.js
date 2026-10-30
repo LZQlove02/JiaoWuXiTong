@@ -3,6 +3,7 @@ import {
   buildWidgetPayload,
   currentWeekOf,
   gradeView,
+  pickNextClass,
   sessionsInWeek,
   shortRoom,
   weekAnchorOf
@@ -73,6 +74,7 @@ describe('小组件 payload：课表', () => {
     expect(payload.today[1]).toEqual({
       start: 6,
       end: 7,
+      weekday: 4,
       startTime: '14:30',
       endTime: '15:55',
       name: '机器学习与深度学习',
@@ -113,8 +115,17 @@ describe('小组件 payload：课表', () => {
 
   it('今天课上完后顺延到本周下一有课的一天', () => {
     const payload = build({ now: evening })
-    expect(payload.next).toMatchObject({ name: '鸿蒙开发技术', dayLabel: '周六' })
+    expect(payload.next).toMatchObject({ name: '鸿蒙开发技术', dayLabel: '周六', weekday: 6 })
     expect(payload.remainingToday).toBe(0)
+  })
+
+  it('startTime 缺失的课算「还没开始」，不会被跳过', () => {
+    // startSection 超出 SECTION_TIMES 范围 → startTime 为空
+    const sessions = [
+      { courseId: 'c1', weekday: 4, startSection: 99, endSection: 99, weeks: [9], room: 'T1-101' }
+    ]
+    const next = pickNextClass(sessions, new Map([['c1', { name: '高等数学' }]]), 4, 600)
+    expect(next).toMatchObject({ name: '高等数学', dayLabel: '今天', startTime: '' })
   })
 
   it('本周网格只含当前周，且包含周末', () => {

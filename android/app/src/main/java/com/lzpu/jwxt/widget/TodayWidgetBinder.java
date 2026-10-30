@@ -165,8 +165,10 @@ final class TodayWidgetBinder {
                 : context.getString(R.string.widget_class_finished);
         }
         StringBuilder builder = new StringBuilder(context.getString(R.string.widget_next_prefix));
-        if (!next.isToday()) {
-            builder.append(next.dayLabel).append(' ');
+        // 与 2x2 同口径：不在今天时统一显示「周六 14:30」，不再出现「明天」这种相对日期
+        String prefix = WidgetScheduleDeriver.dayPrefix(next, Calendar.getInstance());
+        if (!prefix.isEmpty()) {
+            builder.append(prefix).append(' ');
         }
         if (!next.startTime.isEmpty()) {
             builder.append(next.startTime).append(' ');

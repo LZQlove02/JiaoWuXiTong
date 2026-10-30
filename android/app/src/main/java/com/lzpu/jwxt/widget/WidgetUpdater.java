@@ -6,6 +6,8 @@ import android.content.Context;
 import android.util.Log;
 import android.widget.RemoteViews;
 
+import java.util.Calendar;
+
 /**
  * 统一刷新入口：读一次 payload + 主题，再按「每个组件实例自己的样式」逐个渲染。
  * 组件不访问网络，全部数据来自 App 写入的快照。
@@ -22,6 +24,11 @@ public final class WidgetUpdater {
 
         WidgetPayload payload = WidgetPayload.parse(WidgetStore.readPayload(app));
         String themeName = WidgetStore.readTheme(app);
+        // 跨周降级放在渲染入口统一兜一次：闹钟可能被 Doze 延迟、开机广播也可能先于重算到达，
+        // 只拦闹钟那一条路径会让组件继续画上一周的课表。
+        if (WidgetScheduleDeriver.isStale(payload, Calendar.getInstance())) {
+            payload.markStale();
+        }
         // 只记状态，不记成绩、未读数等个人数据（日志脱敏）
         Log.i("LzpuWidget", "payload loggedIn=" + payload.loggedIn
             + " loaded=" + payload.scheduleLoaded

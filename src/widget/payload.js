@@ -93,6 +93,8 @@ function classItem(session, courses) {
   return {
     start,
     end,
+    // 1=周一 … 7=周日；原生 2x2 靠它算「周六 14:30」，不再按渲染时刻猜「明天」
+    weekday: Number(session.weekday) || 0,
     startTime: first ? first.start : '',
     endTime: last ? last.end : '',
     name: course.name || '',
@@ -206,7 +208,7 @@ export function buildWidgetPayload(input = {}) {
   }).length
 
   const weekGrid = weekSessions
-    .map((session) => ({ weekday: Number(session.weekday), ...classItem(session, courses) }))
+    .map((session) => classItem(session, courses))
     .sort((a, b) => a.weekday - b.weekday || a.start - b.start)
 
   return {

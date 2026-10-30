@@ -32,6 +32,8 @@ public final class WidgetPayload {
         public String dayLabel = "";
         public int start;
         public int end;
+        /** 1=周一 … 7=周日；0 表示老 payload 没带这个字段。 */
+        public int weekday;
         public String startTime = "";
         public String endTime = "";
         public String name = "";
@@ -122,10 +124,19 @@ public final class WidgetPayload {
         entry.dayLabel = item.optString("dayLabel", "");
         entry.start = item.optInt("start", 0);
         entry.end = item.optInt("end", 0);
+        entry.weekday = item.optInt("weekday", 0);
         entry.startTime = item.optString("startTime", "");
         entry.endTime = item.optString("endTime", "");
         entry.name = item.optString("name", "");
         entry.room = item.optString("room", "");
         return entry;
+    }
+
+    /** 跨周降级：清空今日与下一节，只留 stale 标记，三个组件统一提示回 App 同步。 */
+    public void markStale() {
+        stale = true;
+        next = null;
+        remainingToday = 0;
+        today.clear();
     }
 }

@@ -207,4 +207,26 @@ public class WidgetScheduleDeriverTest {
         // 2026-11-01 是周日 → 明天周一（跨周）
         assertEquals("周一", WidgetScheduleDeriver.dayPrefix(cls("明天"), date(2026, 11, 1, 20, 0)));
     }
+
+    @Test
+    public void dayPrefixPrefersExplicitWeekday() {
+        // payload 带了 weekday 就以它为准：即便 dayLabel 是「明天」，渲染时刻跨日也不会错位
+        WidgetPayload.ClassItem item = cls("明天");
+        item.weekday = 3;
+        assertEquals("周三", WidgetScheduleDeriver.dayPrefix(item, date(2026, 11, 1, 20, 0)));
+    }
+
+    @Test
+    public void missingStartTimeIsStillNext() {
+        // startTime 缺失按「还没开始」处理（与 payload.js 的 startAt === null 一致），
+        // 不能被 > now 判掉
+        WidgetPayload payload = payload(item(Calendar.MONDAY, 1, 2, "", "", "时间待定"));
+
+        WidgetScheduleDeriver.Result result =
+            WidgetScheduleDeriver.derive(payload, at(Calendar.MONDAY, 15, 0));
+
+        assertEquals(1, result.today.size());
+        assertEquals("时间待定", result.next.name);
+        assertEquals("今天", result.next.dayLabel);
+    }
 }

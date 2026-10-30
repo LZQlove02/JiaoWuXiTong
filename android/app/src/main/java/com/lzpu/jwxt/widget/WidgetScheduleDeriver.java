@@ -52,12 +52,14 @@ final class WidgetScheduleDeriver {
     }
 
     /**
-     * 2x2 时间行的日期前缀：下一节课不在今天时返回「周X」，今天返回空串。
-     * payload 里的 dayLabel 只会是「今天 / 明天 / 周X」，周X 直接透传；
-     * 「明天」按当天推算成星期，避免 2x2 上出现「明天 14:30」这种和星期不一致的写法。
+     * 2x2 / 4x2 的日期前缀：下一节课不在今天时返回「周X」，今天返回空串。
+     * 优先用 payload 里的 weekday（同步时就定死了，渲染时刻跨日也不会错位）；
+     * 老 payload 没有 weekday 时退回 dayLabel，「明天」再按当天的 Calendar 推算。
      */
     static String dayPrefix(WidgetPayload.ClassItem item, Calendar now) {
         if (item == null || item.isToday()) return "";
+        String byWeekday = weekdayName(item.weekday);
+        if (!byWeekday.isEmpty()) return byWeekday;
         String label = item.dayLabel == null ? "" : item.dayLabel.trim();
         if (label.isEmpty()) return "";
         if (label.startsWith("周")) return label;
@@ -67,6 +69,12 @@ final class WidgetScheduleDeriver {
             return "周" + WEEKDAY_LABELS[(todayIndex + 1) % 7];
         }
         return label;
+    }
+
+    /** 当天所在周的周一，格式与 JS 侧 weekAnchorOf 一致：yyyy-MM-dd（本地日期）。 */
+    static String weekdayName(int weekday) {
+        if (weekday < 1 || weekday > 7) return "";
+        return "周" + WEEKDAY_LABELS[weekday - 1];
     }
 
     // 当天所在周的周一，格式与 JS 侧 weekAnchorOf 一致：yyyy-MM-dd（本地日期）
@@ -137,6 +145,7 @@ final class WidgetScheduleDeriver {
         cls.dayLabel = dayLabel;
         cls.start = item.start;
         cls.end = item.end;
+        cls.weekday = item.weekday;
         cls.startTime = item.startTime;
         cls.endTime = item.endTime;
         cls.name = item.name;
@@ -156,15 +165,16 @@ final class WidgetScheduleDeriver {
         }
     }
 
-    // "14:30" -> 870；缺失或异常时返回 -1（当作「还没开始」，宁可显示也不空着）
+    // "14:30" -> 870；缺失或异常时返回 MAX_VALUE（当作「还没开始」，与
+    // src/widget/payload.js 的 startAt === null 分支一致，宁可显示也不跳过）
     private static int startMinutes(WidgetPayload.ClassItem item) {
-        if (item.startTime == null || item.startTime.isEmpty()) return -1;
+        if (item.startTime == null || item.startTime.isEmpty()) return Integer.MAX_VALUE;
         String[] parts = item.startTime.split(":");
-        if (parts.length != 2) return -1;
+        if (parts.length != 2) return Integer.MAX_VALUE;
         try {
             return Integer.parseInt(parts[0].trim()) * 60 + Integer.parseInt(parts[1].trim());
         } catch (NumberFormatException error) {
-            return -1;
+            return Integer.MAX_VALUE;
         }
     }
 }
