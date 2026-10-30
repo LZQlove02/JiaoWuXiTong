@@ -19,9 +19,6 @@ public final class WidgetDeepLink {
     public static final int REQUEST_NEXT = 1;
     public static final int REQUEST_TODAY = 2;
     public static final int REQUEST_WEEK_SCHEDULE = 3;
-    public static final int REQUEST_WEEK_MESSAGES = 4;
-    public static final int REQUEST_WEEK_NOTICES = 5;
-    public static final int REQUEST_WEEK_GRADES = 6;
 
     // 组件内「样式」按钮：广播给自己换样式，不打开 App
     public static final String ACTION_CYCLE_STYLE = "com.lzpu.jwxt.widget.CYCLE_STYLE";

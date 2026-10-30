@@ -167,8 +167,4 @@ public final class WidgetTheme {
         return dark ? 0x3DFFFFFF : 0x8CFFFFFF;
     }
 
-    // 课程块内描边：玻璃档给每块加 1px 内描边，相邻课之间才分得开
-    public int blockEdge() {
-        return dark ? 0x33FFFFFF : 0x38FFFFFF;
-    }
 }

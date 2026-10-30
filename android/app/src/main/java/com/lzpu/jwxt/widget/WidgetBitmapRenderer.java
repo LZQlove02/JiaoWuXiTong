@@ -205,6 +205,7 @@ public final class WidgetBitmapRenderer {
             for (WidgetPayload.WeekItem candidate : merged) {
                 if (candidate.weekday == item.weekday
                     && candidate.name.equals(item.name)
+                    && candidate.room.equals(item.room)
                     && item.start <= candidate.end + 1
                     && item.start >= candidate.start) {
                     hit = candidate;
@@ -218,7 +219,6 @@ public final class WidgetBitmapRenderer {
                 copy.end = item.end;
                 copy.name = item.name;
                 copy.room = item.room;
-                copy.color = item.color;
                 merged.add(copy);
             } else {
                 hit.end = Math.max(hit.end, item.end);

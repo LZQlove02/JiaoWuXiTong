@@ -9,21 +9,17 @@ import java.util.List;
 /**
  * 组件数据模型：解析 JS 侧写入的 payload JSON。
  * 解析失败一律退回「未登录」占位，保证组件不崩、不显示脏数据。
+ *
+ * 只解析三个组件真正消费的字段：4x4 用 week[]、4x2 用 today[]、2x2 用 next + remainingToday。
+ * messages / notices / grades 在 4x4 摘要移除后已无消费者，不再解析（见《小组件执行方案》§7.3）。
  */
 public final class WidgetPayload {
-
-    public static final String FALLBACK_COLOR = "#1B5FAA";
 
     public boolean loggedIn;
     public boolean scheduleLoaded;
     public String updatedLabel = "";
-    public String accountName = "";
-    public String termLabel = "";
     public int termWeek;
     public int remainingToday;
-    public int unread;
-    public String latestNotice = "";
-    public String gradeLabel = "";
     public ClassItem next;
     public final List<ClassItem> today = new ArrayList<>();
     public final List<WeekItem> week = new ArrayList<>();
@@ -36,7 +32,6 @@ public final class WidgetPayload {
         public String endTime = "";
         public String name = "";
         public String room = "";
-        public String color = FALLBACK_COLOR;
 
         public String timeRange() {
             if (startTime.isEmpty()) return endTime;
@@ -55,7 +50,6 @@ public final class WidgetPayload {
         public int end;
         public String name = "";
         public String room = "";
-        public String color = FALLBACK_COLOR;
     }
 
     public static WidgetPayload loggedOut() {
@@ -73,14 +67,8 @@ public final class WidgetPayload {
             payload.scheduleLoaded = root.optBoolean("scheduleLoaded", false);
             payload.updatedLabel = root.optString("updatedAtLabel", "");
 
-            JSONObject account = root.optJSONObject("account");
-            if (account != null) {
-                payload.accountName = account.optString("name", "");
-            }
-
             JSONObject term = root.optJSONObject("term");
             if (term != null) {
-                payload.termLabel = term.optString("label", "");
                 payload.termWeek = term.optInt("week", 0);
             }
 
@@ -99,14 +87,6 @@ public final class WidgetPayload {
 
             payload.remainingToday = root.optInt("remainingToday", 0);
 
-            JSONObject messages = root.optJSONObject("messages");
-            if (messages != null) {
-                payload.unread = messages.optInt("unread", 0);
-            }
-
-            payload.latestNotice = firstTitle(root.optJSONObject("notices"));
-            payload.gradeLabel = readGrades(root.optJSONObject("grades"));
-
             JSONArray week = root.optJSONArray("week");
             if (week != null) {
                 for (int i = 0; i < week.length(); i += 1) {
@@ -118,7 +98,6 @@ public final class WidgetPayload {
                     entry.end = item.optInt("end", 0);
                     entry.name = item.optString("name", "");
                     entry.room = item.optString("room", "");
-                    entry.color = item.optString("color", FALLBACK_COLOR);
                     payload.week.add(entry);
                 }
             }
@@ -137,38 +116,6 @@ public final class WidgetPayload {
         entry.endTime = item.optString("endTime", "");
         entry.name = item.optString("name", "");
         entry.room = item.optString("room", "");
-        entry.color = item.optString("color", FALLBACK_COLOR);
         return entry;
-    }
-
-    private static String firstTitle(JSONObject block) {
-        if (block == null) return "";
-        JSONArray latest = block.optJSONArray("latest");
-        if (latest == null || latest.length() == 0) return "";
-        JSONObject first = latest.optJSONObject(0);
-        return first == null ? "" : first.optString("title", "");
-    }
-
-    private static String readGrades(JSONObject grades) {
-        if (grades == null) return "";
-        double gpa = grades.optDouble("gpa", Double.NaN);
-        double credits = grades.optDouble("totalCredits", 0);
-        StringBuilder builder = new StringBuilder();
-        if (!Double.isNaN(gpa)) {
-            // GPA 固定两位小数：trimNumber 会把 1.0 收成 "1"，读起来像整数
-            builder.append("GPA ").append(String.format(java.util.Locale.US, "%.2f", gpa));
-        }
-        if (credits > 0) {
-            if (builder.length() > 0) builder.append(" · ");
-            builder.append(trimNumber(credits)).append(" 学分");
-        }
-        return builder.toString();
-    }
-
-    private static String trimNumber(double value) {
-        if (value == Math.rint(value) && !Double.isInfinite(value)) {
-            return String.valueOf((long) value);
-        }
-        return String.valueOf(Math.round(value * 100) / 100.0);
     }
 }
