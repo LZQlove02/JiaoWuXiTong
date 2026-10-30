@@ -3,7 +3,7 @@
 柳州职业技术大学教务系统的个人只读客户端。前端使用 Vue 3 + Vite，Android 壳使用 Capacitor 6，数据直连学校统一认证后的教务系统，不依赖自建服务器。
 
 > 非官方应用，未登录不可进入业务页面；仅支持学校统一认证登录，不保存账号密码。
-> 当前版本：v1.3.0 / versionCode 23；minSdk 23（Android 6.0），targetSdk 35。
+> 当前版本：v1.3.1 / versionCode 24；minSdk 23（Android 6.0），targetSdk 35。
 
 ## 功能
 

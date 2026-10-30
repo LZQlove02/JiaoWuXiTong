@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-30
+
 ### 修复
 
 - `SupportBridgePlugin` 打开发布页 / 邮件时优先使用当前 Activity，缺少 Activity 时补 `FLAG_ACTIVITY_NEW_TASK`，避免应用上下文启动崩溃
