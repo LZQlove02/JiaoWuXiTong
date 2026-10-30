@@ -225,10 +225,11 @@ courseId + weekday + startSection + endSection + weeksSignature
 | 键 | 类型 | 说明 |
 |---|---|---|
 | `enabled` | boolean | 课表变更提醒开关，默认 `true`；关闭后取消闹钟、清空通知栏，不删历史 |
+| `notification_asked` | boolean | 是否已自动申请过通知权限，默认 `false`；只用于「首次对账后申请一次」 |
 | `last_session_expired` | string | 登录失效提示去重日期（`yyyy-MM-dd`） |
 
-- 通知权限状态不落盘，实时读系统
-- 退出登录时清空 `baseline` 与 `entries`，保留 `enabled`
+- 通知权限**状态**不落盘，实时读系统；`notification_asked` 只记录「问过没有」
+- 退出登录时清空 `baseline` 与 `entries`，保留 `enabled` / `notification_asked`
 
 ### 5.4 节次时间表
 
@@ -294,7 +295,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 - 正文：`周一 3-4 节 · A101`（调课时 `原：周一 3-4 节 A101 → 新：周三 5-6 节 B203`）
 - 每条通知独立 id（取变更 id 的 hash）；单次最多 5 条，超出的只进列表、不补发
 - 点击：`Intent.ACTION_VIEW` + `lzpu://changes`，复用现有深链通道
-- 权限：Android 13+ 首次开启开关时申请 `POST_NOTIFICATIONS`；拒绝后提醒条降级为应用内提示，设置页显示状态与跳转入口
+- 权限：Android 13+ **首次成功对账后**申请一次 `POST_NOTIFICATIONS`（开关默认开，不能等用户手动开启）；拒绝或问过不再自动弹，设置页显示状态与跳转入口
 - 去重：`notified` 标记；登录失效提示按日期去重
 
 ### 6.5 已读与未读
@@ -376,6 +377,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 ```
 
 - 开关关闭：取消后台闹钟、清空通知栏、隐藏提醒条与红点（未读数返回 0）；历史仍可从本页进入
+- 首次成功对账后（前台）若未授权，自动申请一次通知权限；拒绝或问过不再自动弹
 - 通知权限行：`已开启` / `系统已关闭`，点击跳系统通知设置
 - 「查看变更记录」进入 `/changes`
 
@@ -419,7 +421,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 | `ScheduleChangeService.java` | 业务编排：解析、对账、落盘、通知、闹钟、组件刷新 |
 | `ScheduleFetcher.java` | OkHttp + `AuthCookieStore` 拉 kbList，区分会话失效 / 网络 / 其它 |
 | `ScheduleChangeNotifier.java` | 渠道、权限、逐条通知、去重、深链、前台抑制 |
-| `ScheduleChangeBridge.java` | Capacitor 插件：`applySchedule` / `list` / `markAllRead` / `setEnabled` / `clear` / `getState` / `requestNotificationPermission` / `openNotificationSettings` |
+| `ScheduleChangeBridge.java` | Capacitor 插件：`applySchedule` / `list` / `markAllRead` / `setEnabled` / `clear` / `getState` / `requestNotificationPermission` / `maybeRequestNotificationPermission` / `openNotificationSettings` |
 | `ScheduleCheckReceiver.java` | 闹钟触发 → 后台线程执行检查 |
 | `ScheduleCheckScheduler.java` | 排 / 取消 07:10、12:50 两个单次闹钟 |
 | `ScheduleBootReceiver.java` | `BOOT_COMPLETED` 补排闹钟 |
