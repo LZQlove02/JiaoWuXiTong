@@ -60,7 +60,7 @@ describe('changes store', () => {
     markAllChangesRead.mockResolvedValue(state({ unread: 0, entries: [entry({ read: true })] }))
     setScheduleChangeEnabled.mockResolvedValue(state({ enabled: false, unread: 0 }))
     requestChangeNotificationPermission.mockResolvedValue({ granted: true })
-    useAuthStore().user = { id: '20256030154', name: '测试' }
+    useAuthStore().user = { id: '20256030001', name: '测试' }
     changes = useChangesStore()
   })
 
@@ -91,7 +91,7 @@ describe('changes store', () => {
     expect(applyScheduleChange).toHaveBeenCalledTimes(1)
     const payload = applyScheduleChange.mock.calls[0][0]
     expect(payload.raw).toBe('{"kbList":[]}')
-    expect(payload.studentId).toBe('20256030154')
+    expect(payload.studentId).toBe('20256030001')
     expect(payload.term).toEqual({ xnm: '2026', xqm: '3', startDate: '2026-08-31' })
     expect(payload.sectionTimes[1]).toEqual({ start: '08:20', end: '09:00' })
     expect(changes.unread).toBe(3)

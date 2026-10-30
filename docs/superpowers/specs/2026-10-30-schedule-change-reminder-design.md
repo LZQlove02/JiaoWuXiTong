@@ -152,7 +152,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 ```json
 {
   "term": { "xnm": "2025", "xqm": "3", "startDate": "2025-08-31" },
-  "studentId": "20256030154",
+  "studentId": "20256030001",
   "sessions": [
     {
       "courseId": "B0001",

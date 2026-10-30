@@ -34,7 +34,7 @@ const term = {
 }
 
 const snapshot = {
-  profile: { id: '20256030154', name: '测试', className: '', major: '', college: '', avatar: '' },
+  profile: { id: '20256030001', name: '测试', className: '', major: '', college: '', avatar: '' },
   term,
   schedule: {
     term,
@@ -61,7 +61,7 @@ describe('ZfAcademicApi 离线快照', () => {
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
     const api = new ZfAcademicApi()
     const profile = await api.restoreSession()
-    expect(profile.id).toBe('20256030154')
+    expect(profile.id).toBe('20256030001')
     const schedule = await api.getSchedule()
     expect(schedule.source).toBe('教务系统（离线缓存）')
     expect(schedule.courses).toHaveLength(1)
@@ -72,7 +72,7 @@ describe('ZfAcademicApi 离线快照', () => {
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
     const api = new ZfAcademicApi()
     const profile = api.applySnapshot()
-    expect(profile.id).toBe('20256030154')
+    expect(profile.id).toBe('20256030001')
     expect(authGet).not.toHaveBeenCalled()
     await expect(api.getSchedule()).resolves.toMatchObject({
       source: '教务系统（离线缓存）'

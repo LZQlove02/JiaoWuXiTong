@@ -41,7 +41,7 @@ const evening = new Date(2026, 9, 29, 21, 0, 0)
 
 function build(overrides = {}) {
   return buildWidgetPayload({
-    user: { name: '卢再发' },
+    user: { name: '测试同学 B' },
     currentTerm: term,
     schedule,
     now: morning,
@@ -309,7 +309,7 @@ describe('小组件 payload：整体契约', () => {
       'week',
       'weekAnchor'
     ])
-    expect(payload.account).toEqual({ name: '卢再发' })
+    expect(payload.account).toEqual({ name: '测试同学 B' })
     expect(payload.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
     expect(payload.updatedAtLabel).toBe('09:00')
   })
