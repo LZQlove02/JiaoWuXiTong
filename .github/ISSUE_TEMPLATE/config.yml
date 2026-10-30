@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题私下上报
+    url: https://github.com/LZQlove02/JiaoWuXiTong/security/advisories/new
+    about: 涉及凭据泄露、证书绕过、Cookie 跨域等问题请勿公开提单，走私密漏洞报告。
+  - name: 使用说明与文档
+    url: https://github.com/LZQlove02/JiaoWuXiTong/tree/master/docs
+    about: 提 Issue 前先查看方案、验收标准与已知限制。

@@ -21,7 +21,7 @@
 src/                 Vue 前端（views / stores / api / components / utils）
 android/             Android 壳、原生插件、课表变更引擎与桌面小组件
 tests/               Vitest 单测与共享 fixture
-docs/superpowers/    设计与实现文档
+docs/                方案、验证报告与设计规格（索引见 docs/README.md）
 ```
 
 ## 开发
@@ -63,4 +63,10 @@ release 已开启 R8 混淆与资源裁剪；Capacitor 插件通过反射调用�
 
 ## CI
 
-`.github/workflows/ci.yml` 在 push / PR 时运行前端 lint、单测、构建，以及 Android `testDebugUnitTest`。
+`.github/workflows/ci.yml` 在 push / PR 时运行前端 lint、类型检查、单测、构建，以及 Android `testDebugUnitTest`。
+
+## 贡献与许可
+
+- 贡献流程与编码约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 私下上报。
+- 版本变更见 [CHANGELOG.md](CHANGELOG.md)，文档索引见 [docs/README.md](docs/README.md)。
+- 本项目保留所有权利，详见 [LICENSE](LICENSE)。
