@@ -78,8 +78,7 @@
     </p>
 
     <p v-if="hasSchedule" class="tiny legend">
-      左右滑动查看周末 · 点击课程查看详情 ·
-      {{ sourceLabel }}
+      左右滑动查看周末 · 点击课程查看详情
     </p>
   </div>
 </template>
@@ -134,10 +133,6 @@ const visibleSessions = computed(() => {
 })
 
 const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
-
-const sourceLabel = computed(() =>
-  schedule.value?.source ? `数据来源：${schedule.value.source}` : '数据来源：课表尚未同步'
-)
 
 const emptyTitle = computed(() => (errors.value.schedule ? '课表加载失败' : '课表暂无课程'))
 

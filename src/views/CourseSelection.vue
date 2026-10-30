@@ -18,8 +18,8 @@
         <p class="read-only-text">本应用不提供选课、退课操作，仅同步教务系统状态。</p>
       </section>
 
-      <p class="footnote tiny">
-        数据来源：{{ courseSelection.source }}<template v-if="fetchedLabel"> · 更新于 {{ fetchedLabel }}</template>
+      <p v-if="fetchedLabel" class="footnote tiny">
+        更新于 {{ fetchedLabel }}
       </p>
     </template>
 

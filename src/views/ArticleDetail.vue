@@ -15,7 +15,6 @@
 
     <article v-if="article && !error" class="card detail">
       <h1 class="detail-title">{{ article.title }}</h1>
-      <p class="tiny meta">教务处官网</p>
       <p
         v-for="(paragraph, index) in article.paragraphs"
         :key="index"
@@ -24,10 +23,9 @@
         {{ paragraph }}
       </p>
       <p v-if="!article.paragraphs.length" class="paragraph">{{ article.text }}</p>
-      <p v-if="!offline" class="tiny footnote">
-        抓取于 {{ updatedLabel }}，以官网原文为准
+      <p v-if="!offline && updatedLabel" class="tiny footnote">
+        更新于 {{ updatedLabel }}
       </p>
-      <p v-else class="tiny footnote">离线缓存，以官网原文为准</p>
     </article>
   </div>
 </template>
@@ -61,12 +59,8 @@ onMounted(() => {
   font-size: 19px;
   line-height: 1.45;
   font-weight: 600;
-}
-
-.meta {
-  margin: 8px 0 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+  /* 原来的「教务处官网」分隔行已移除，这里补回标题与正文的间距 */
+  margin-bottom: 16px;
 }
 
 .paragraph {

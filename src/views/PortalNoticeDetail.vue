@@ -38,8 +38,6 @@
           {{ file.name }}
         </p>
       </div>
-
-      <p class="tiny footnote">来源：{{ detail.source || '教务系统（学生门户）' }}</p>
     </article>
   </div>
 </template>

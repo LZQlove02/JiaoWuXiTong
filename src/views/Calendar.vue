@@ -14,8 +14,6 @@
     />
 
     <section v-if="calendar && !error" class="card">
-      <p class="tiny calendar-source">来源：柳州职业技术大学官网</p>
-
       <div class="img-box" @click="openViewer">
         <img
           v-if="imageSrc"
@@ -28,7 +26,7 @@
       </div>
 
       <p class="tiny center">点击图片可放大查看</p>
-      <p class="tiny center">更新于 {{ updatedLabel }}，以学校发布为准</p>
+      <p class="tiny center">更新于 {{ updatedLabel }}</p>
     </section>
 
     <div v-if="viewer && calendar" class="viewer" @click.self="viewer = false">
@@ -116,10 +114,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.calendar-source {
-  margin-bottom: 12px;
-}
-
 .img-box {
   position: relative;
   border-radius: 10px;

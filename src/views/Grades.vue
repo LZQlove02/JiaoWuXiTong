@@ -63,8 +63,8 @@
         </section>
       </div>
 
-      <p class="footnote tiny">
-        数据来源：{{ grades.source || '教务系统' }}<template v-if="fetchedLabel"> · 更新于 {{ fetchedLabel }}</template>
+      <p v-if="fetchedLabel" class="footnote tiny">
+        更新于 {{ fetchedLabel }}
       </p>
     </template>
 

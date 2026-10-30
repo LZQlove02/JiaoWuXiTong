@@ -30,7 +30,7 @@
     </section>
 
     <p v-if="!offline && updatedLabel" class="tiny footnote">
-      来源：教务处官网 · 更新于 {{ updatedLabel }}
+      更新于 {{ updatedLabel }}
     </p>
   </div>
 </template>

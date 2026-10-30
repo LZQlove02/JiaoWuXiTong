@@ -83,7 +83,6 @@
         <h2 class="card-title">最新消息</h2>
         <router-link to="/messages" class="link">全部</router-link>
       </div>
-      <p class="tiny source">来源：{{ messages?.source || '教务系统（只读）' }}</p>
       <div v-if="messagesLoading && !messages" class="loading">正在加载消息…</div>
       <template v-else>
         <button
@@ -105,8 +104,9 @@
         <h2 class="card-title">最新通知</h2>
         <router-link to="/notices" class="link">全部</router-link>
       </div>
-      <p class="tiny source">
-        来源：{{ portalNotices?.source || '教务系统（学生门户）' }}<template v-if="portalNoticesOffline">（网络不可用，显示缓存<template v-if="portalNoticesCachedAt">，更新于 {{ formatDateTime(portalNoticesCachedAt) }}</template>）</template><template v-else-if="portalNoticesCachedAt"> · 更新于 {{ formatDateTime(portalNoticesCachedAt) }}</template>
+      <p v-if="portalNoticesOffline || portalNoticesCachedAt" class="tiny notice-updated">
+        <template v-if="portalNoticesOffline">网络不可用，显示缓存<template v-if="portalNoticesCachedAt">（更新于 {{ formatDateTime(portalNoticesCachedAt) }}）</template></template>
+        <template v-else>更新于 {{ formatDateTime(portalNoticesCachedAt) }}</template>
       </p>
       <div v-if="portalNoticesLoading && !portalNotices" class="loading">正在加载通知…</div>
       <template v-else>
@@ -639,7 +639,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.source {
+.notice-updated {
   margin-top: 2px;
   margin-bottom: 4px;
 }

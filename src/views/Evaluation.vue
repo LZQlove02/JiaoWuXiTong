@@ -33,11 +33,9 @@
         />
       </section>
 
-      <p class="footnote tiny">
-        数据来源：{{ evaluations.source }}<template v-if="fetchedLabel"> · 更新于 {{ fetchedLabel }}</template>
-        <template v-if="evaluations.total > evaluations.items.length">
-          · 当前显示 {{ evaluations.items.length }} 条
-        </template>
+      <p v-if="fetchedLabel || evaluations.total > evaluations.items.length" class="footnote tiny">
+        <template v-if="fetchedLabel">更新于 {{ fetchedLabel }}</template>
+        <template v-if="evaluations.total > evaluations.items.length">{{ fetchedLabel ? ' · ' : '' }}当前显示 {{ evaluations.items.length }} 条</template>
       </p>
     </template>
 

@@ -42,8 +42,8 @@
       <EmptyState title="暂无通知" description="教务系统暂无通知公告。" />
     </section>
 
-    <p v-if="!error" class="tiny footnote">
-      来源：{{ portalNoticeList?.source || '教务系统（学生门户）' }}<template v-if="portalNoticeListCachedAt"> · 更新于 {{ formatDateTime(portalNoticeListCachedAt) }}</template>
+    <p v-if="!error && portalNoticeListCachedAt" class="tiny footnote">
+      更新于 {{ formatDateTime(portalNoticeListCachedAt) }}
     </p>
   </div>
 </template>

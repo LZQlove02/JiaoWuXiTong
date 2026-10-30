@@ -40,8 +40,6 @@
       <section v-else class="card">
         <EmptyState icon="message" title="暂无未阅消息" description="教务系统当前没有未阅消息。" />
       </section>
-
-      <p class="tiny footnote">来源：{{ messages.source || '教务系统（只读）' }}</p>
     </template>
   </div>
 </template>
