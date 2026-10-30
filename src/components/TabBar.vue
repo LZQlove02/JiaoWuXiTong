@@ -9,11 +9,22 @@
     >
       <span class="tab-icon" v-html="item.icon"></span>
       <span class="tab-label">{{ item.label }}</span>
+      <span
+        v-if="item.path === '/schedule' && changes.badgeText > 0"
+        class="tab-badge"
+      >{{ badgeText }}</span>
     </router-link>
   </nav>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useChangesStore } from '../stores/changes'
+import { unreadBadgeText } from '../utils/changeLabels'
+
+const changes = useChangesStore()
+const badgeText = computed(() => unreadBadgeText(changes.badgeText))
+
 const items = [
   {
     path: '/',
@@ -53,6 +64,7 @@ const items = [
 }
 
 .tab-item {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -61,6 +73,23 @@ const items = [
   gap: 3px;
   color: var(--text-tertiary);
   font-size: 11px;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(8px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-weight: 600;
 }
 
 .tab-item.is-active {

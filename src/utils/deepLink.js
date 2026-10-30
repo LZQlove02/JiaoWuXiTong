@@ -4,7 +4,9 @@ export const DEEP_LINK_PATHS = {
   schedule: '/schedule',
   messages: '/messages',
   grades: '/grades',
-  notices: '/notices'
+  notices: '/notices',
+  changes: '/changes',
+  login: '/login'
 }
 
 // 不用 new URL()：自定义 scheme 在 WebView 里解析不可靠，正则更稳

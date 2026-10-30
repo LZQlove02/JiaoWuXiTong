@@ -16,6 +16,7 @@ import Calendar from '../views/Calendar.vue'
 import Evaluation from '../views/Evaluation.vue'
 import CourseSelection from '../views/CourseSelection.vue'
 import Settings from '../views/Settings.vue'
+import Changes from '../views/Changes.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -28,6 +29,12 @@ const routes = [
     name: 'settings',
     component: Settings,
     meta: { title: '设置' }
+  },
+  {
+    path: '/changes',
+    name: 'changes',
+    component: Changes,
+    meta: { title: '课表变更' }
   },
   { path: '/exams', name: 'exams', component: Exams },
   { path: '/notices', name: 'notices', component: Notices },

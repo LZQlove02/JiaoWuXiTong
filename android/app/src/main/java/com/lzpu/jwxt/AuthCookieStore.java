@@ -19,7 +19,7 @@ import javax.crypto.spec.GCMParameterSpec;
  * 使用 Android Keystore 中的 AES-GCM 密钥加密保存登录 Cookie。
  * 不保存密码，不保存明文 Cookie。
  */
-final class AuthCookieStore {
+public final class AuthCookieStore {
 
     private static final String PREFS = "auth_session";
     private static final String KEY = "cookie";
@@ -46,7 +46,7 @@ final class AuthCookieStore {
         }
     }
 
-    static String load(Context context) {
+    public static String load(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null;
         try {
             String stored = prefs(context).getString(KEY, null);

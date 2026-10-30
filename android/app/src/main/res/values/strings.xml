@@ -30,6 +30,10 @@
     <string name="widget_title_week_no">本周课表 · 第 %1$d 周</string>
     <string name="widget_empty_week">本周暂无课程</string>
 
+    <!-- 课表变更提醒 -->
+    <string name="notification_channel_schedule_change">课表变更</string>
+    <string name="widget_change_badge">有变</string>
+
     <!-- 桌面小组件：3 尺寸 × 3 样式 -->
     <!-- 组件内「样式」按钮 -->
     <string name="widget_style_action">切换小组件样式</string>

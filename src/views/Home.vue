@@ -38,6 +38,8 @@
       <EmptyState v-else icon="calendar" title="今天没有课" description="好好休息，或者去图书馆看看。" />
     </section>
 
+    <ChangeBanner />
+
     <section v-if="nextExam" class="card exam-card">
       <div class="row">
         <div>
@@ -146,6 +148,7 @@ import { daysUntil, formatDate, formatDateTime, getWeekNumber, getWeekday, greet
 import { mergeEntryOrder, movePath } from '../utils/entryOrder'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ChangeBanner from '../components/ChangeBanner.vue'
 
 const auth = useAuthStore()
 const academic = useAcademicStore()

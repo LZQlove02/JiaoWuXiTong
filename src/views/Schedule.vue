@@ -66,9 +66,28 @@
           }"
           @click="openCourse(item.courseId)"
         >
+          <span
+            v-if="changeMarkOf(item)"
+            class="change-badge"
+            :class="`change-badge--${changeMarkOf(item)}`"
+          >{{ changeMarkLabel(changeMarkOf(item)) }}</span>
           <span class="block-name">{{ courseName(item.courseId) }}</span>
           <span class="block-room">{{ item.room }}</span>
         </button>
+
+        <div
+          v-for="entry in changeGhosts"
+          :key="'ghost-' + entry.id"
+          class="course-block ghost"
+          :style="{
+            gridColumn: entry.from.weekday + 1,
+            gridRow: `${entry.from.startSection + 1} / span ${entry.from.endSection - entry.from.startSection + 1}`
+          }"
+        >
+          <span class="change-badge change-badge--cancel">停</span>
+          <span class="block-name">{{ entry.courseName }}</span>
+          <span class="block-room">{{ entry.from.room }}</span>
+        </div>
       </div>
     </div>
 
@@ -80,6 +99,9 @@
     <p v-if="hasSchedule" class="tiny legend">
       左右滑动查看周末 · 点击课程查看详情
     </p>
+    <p v-if="hasChangeMarks" class="tiny legend change-legend">
+      本周变化已标出：停课 · 调课 · 新增
+    </p>
   </div>
 </template>
 
@@ -88,11 +110,15 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
+import { useChangesStore } from '../stores/changes'
 import { SECTION_TIMES, WEEKDAY_LABELS, formatDate, getWeekNumber, getWeekday } from '../utils/date'
+import { buildChangeMarks, markOf } from '../utils/changeMarks'
+import { changeMeta } from '../utils/changeLabels'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
+const changes = useChangesStore()
 const router = useRouter()
 const { schedule, currentTerm, loading, errors } = storeToRefs(academic)
 
@@ -134,6 +160,31 @@ const visibleSessions = computed(() => {
 
 const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
 
+const changeMarks = computed(() => buildChangeMarks(changes.entries))
+const showChangeMarks = computed(() => selectedWeek.value === currentWeek.value)
+const occupiedSlots = computed(
+  () => new Set(visibleSessions.value.map((item) => `${item.weekday}-${item.startSection}`))
+)
+const changeGhosts = computed(() => {
+  if (!showChangeMarks.value) return []
+  return changeMarks.value.ghosts.filter(
+    (entry) => entry.from && !occupiedSlots.value.has(`${entry.from.weekday}-${entry.from.startSection}`)
+  )
+})
+const hasChangeMarks = computed(
+  () => showChangeMarks.value
+    && (Object.keys(changeMarks.value.marks).length > 0 || changeGhosts.value.length > 0)
+)
+
+function changeMarkOf(item) {
+  if (!showChangeMarks.value) return ''
+  return markOf(changeMarks.value.marks, item)
+}
+
+function changeMarkLabel(type) {
+  return changeMeta(type).mark
+}
+
 const emptyTitle = computed(() => (errors.value.schedule ? '课表加载失败' : '课表暂无课程'))
 
 const emptyDescription = computed(
@@ -174,7 +225,7 @@ onMounted(async () => {
   clockTimer = setInterval(() => {
     now.value = new Date()
   }, 60 * 1000)
-  await academic.initTerms()
+  await Promise.all([academic.initTerms(), changes.init()])
   if (!schedule.value) await academic.loadSchedule(currentTerm.value)
   selectedWeek.value = currentWeek.value
 })
@@ -306,6 +357,7 @@ onUnmounted(() => {
 }
 
 .course-block {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -326,6 +378,46 @@ onUnmounted(() => {
 .block-room {
   font-size: 9px;
   opacity: 0.85;
+}
+
+.change-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 1.2;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+}
+
+.change-badge--cancel {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.change-badge--move {
+  background: rgba(183, 121, 31, 0.95);
+}
+
+.change-badge--add {
+  background: rgba(30, 142, 90, 0.95);
+}
+
+.course-block.ghost {
+  background: transparent;
+  border: 1px dashed var(--text-tertiary);
+  color: var(--text-tertiary);
+  opacity: 0.9;
+}
+
+.course-block.ghost .block-name {
+  text-decoration: line-through;
+}
+
+.change-legend {
+  margin-top: 2px;
 }
 
 .legend {

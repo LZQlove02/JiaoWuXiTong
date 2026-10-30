@@ -17,6 +17,7 @@ import { App as CapApp } from '@capacitor/app'
 import TabBar from './components/TabBar.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
+import { useChangesStore } from './stores/changes'
 import { useUiStore } from './stores/ui'
 import { clearWidgetNow, resyncWidget, syncWidget, syncWidgetTheme } from './widget/sync'
 import { deepLinkPath } from './utils/deepLink'
@@ -26,6 +27,7 @@ const router = useRouter()
 const ui = useUiStore()
 const auth = useAuthStore()
 const academic = useAcademicStore()
+const changes = useChangesStore()
 const showTabBar = computed(() => route.meta.tab === true)
 
 // 深链解析在 src/utils/deepLink.js，这里只负责跳转
@@ -89,6 +91,7 @@ function installWidgetSync() {
     () => auth.isLoggedIn,
     (loggedIn) => {
       if (!loggedIn) clearWidgetNow()
+      else changes.init()
     }
   )
 }
@@ -106,6 +109,11 @@ onMounted(() => {
   if (!Capacitor.isNativePlatform()) return
 
   installWidgetSync()
+  changes.init()
+  changes.listen()
+  CapApp.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) changes.refresh()
+  })
   CapApp.getLaunchUrl()
     .then((result) => openDeepLink(result?.url))
     .catch(() => {})

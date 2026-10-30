@@ -3,6 +3,8 @@
 
     <!-- 重启后补排「跨天重算」闹钟 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 课表变更提醒（Android 13+ 运行时申请） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -84,6 +86,21 @@
         <receiver
             android:name=".widget.WidgetStyleReceiver"
             android:exported="false" />
+
+        <!-- 课表变更：每天 07:10 / 12:50 后台对账 -->
+        <receiver
+            android:name=".change.ScheduleCheckReceiver"
+            android:exported="false" />
+
+        <!-- 课表变更：开机 / 覆盖安装后补排检查闹钟 -->
+        <receiver
+            android:name=".change.ScheduleBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".SsoLoginActivity"

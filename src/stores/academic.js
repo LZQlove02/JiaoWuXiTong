@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '../api'
+import { useChangesStore } from './changes'
 import { PORTAL_NOTICE_TTL, readPortalCache, writePortalCache } from '../utils/portalCache'
 
 const EMPTY_ERRORS = {
@@ -16,6 +17,7 @@ const EMPTY_ERRORS = {
 }
 
 export const useAcademicStore = defineStore('academic', () => {
+  const changes = useChangesStore()
   const terms = ref([])
   const currentTerm = ref(null)
   const schedule = ref(null)
@@ -54,11 +56,13 @@ export const useAcademicStore = defineStore('academic', () => {
       terms.value.find((item) => item.isCurrent) || terms.value[0] || null
   }
 
-  async function loadSchedule(term = currentTerm.value) {
+  async function loadSchedule(term = currentTerm.value, options = {}) {
     loading.value = true
     setError('schedule', '')
     try {
-      schedule.value = await api.getSchedule(term)
+      // 默认强制刷新：打开 App / 进入课表时对一次账，60 秒内不重复请求
+      schedule.value = await api.getSchedule(term, { force: options.force !== false })
+      changes.applyFromSchedule(schedule.value)
     } catch (err) {
       setError('schedule', err.message || '课表加载失败')
     } finally {

@@ -1,0 +1,93 @@
+package com.lzpu.jwxt.change;
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import android.util.Log;
+
+import java.util.Calendar;
+
+/**
+ * 每天 07:10 / 12:50 两次单次闹钟，触发后各自排下一天。
+ * 用 setAndAllowWhileIdle（非精确），避免申请 SCHEDULE_EXACT_ALARM 权限。
+ */
+public final class ScheduleCheckScheduler {
+
+    static final int SLOT_MORNING = 1;
+    static final int SLOT_NOON = 2;
+    private static final int[] HOURS = {7, 12};
+    private static final int[] MINUTES = {10, 50};
+    private static final int REQUEST_BASE = 2100;
+    private static final String TAG = "LzpuChange";
+
+    private ScheduleCheckScheduler() {
+    }
+
+    public static void scheduleAll(Context context) {
+        Context app = context.getApplicationContext();
+        if (!ScheduleChangeStore.isEnabled(app)) {
+            cancelAll(app);
+            return;
+        }
+        scheduleSlot(app, SLOT_MORNING);
+        scheduleSlot(app, SLOT_NOON);
+    }
+
+    public static void cancelAll(Context context) {
+        Context app = context.getApplicationContext();
+        AlarmManager manager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
+        if (manager == null) return;
+        cancelSlot(manager, app, SLOT_MORNING);
+        cancelSlot(manager, app, SLOT_NOON);
+    }
+
+    static void scheduleSlot(Context context, int slot) {
+        if (slot < SLOT_MORNING || slot > SLOT_NOON) return;
+        Context app = context.getApplicationContext();
+        if (!ScheduleChangeStore.isEnabled(app)) return;
+        AlarmManager manager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
+        if (manager == null) return;
+
+        long triggerAt = nextTrigger(slot, System.currentTimeMillis());
+        PendingIntent pending = pending(app, slot);
+        if (pending == null) return;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending);
+            } else {
+                manager.set(AlarmManager.RTC_WAKEUP, triggerAt, pending);
+            }
+        } catch (RuntimeException error) {
+            Log.w(TAG, "课表检查闹钟排程失败 slot=" + slot, error);
+        }
+    }
+
+    private static void cancelSlot(AlarmManager manager, Context context, int slot) {
+        PendingIntent pending = pending(context, slot);
+        if (pending != null) manager.cancel(pending);
+    }
+
+    private static PendingIntent pending(Context context, int slot) {
+        Intent intent = new Intent(context, ScheduleCheckReceiver.class);
+        intent.setAction(ScheduleCheckReceiver.ACTION_CHECK);
+        intent.putExtra(ScheduleCheckReceiver.EXTRA_SLOT, slot);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
+        return PendingIntent.getBroadcast(context, REQUEST_BASE + slot, intent, flags);
+    }
+
+    private static long nextTrigger(int slot, long now) {
+        int index = slot - 1;
+        Calendar next = Calendar.getInstance();
+        next.set(Calendar.HOUR_OF_DAY, HOURS[index]);
+        next.set(Calendar.MINUTE, MINUTES[index]);
+        next.set(Calendar.SECOND, 0);
+        next.set(Calendar.MILLISECOND, 0);
+        if (next.getTimeInMillis() <= now) {
+            next.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return next.getTimeInMillis();
+    }
+}

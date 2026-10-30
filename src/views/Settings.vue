@@ -17,6 +17,32 @@
       </div>
     </section>
 
+    <h2 class="section-title">课表变更提醒</h2>
+    <section class="card settings">
+      <div class="setting-row">
+        <span class="setting-left"><AppIcon name="notice" />课表变更提醒</span>
+        <button
+          class="switch"
+          :class="{ 'is-on': changes.enabled }"
+          role="switch"
+          :aria-checked="changes.enabled"
+          aria-label="课表变更提醒"
+          @click="toggleChanges"
+        >
+          <span class="switch-dot"></span>
+        </button>
+      </div>
+      <p class="setting-note">每天 07:10、12:50 自动检查；只提醒本周的停课、调课与新增。</p>
+      <button class="setting-row" @click="openNotificationSettings">
+        <span class="setting-left">通知权限</span>
+        <span class="tiny">{{ changes.notificationsEnabled ? '已开启' : '系统已关闭' }}</span>
+      </button>
+      <router-link class="setting-row" to="/changes">
+        <span class="setting-left">查看变更记录</span>
+        <AppIcon name="chevron-right" />
+      </router-link>
+    </section>
+
     <h2 class="section-title">通用</h2>
     <section class="card settings">
       <button class="setting-row" @click="clearCache">
@@ -40,10 +66,12 @@ import { onMounted, ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import { useUiStore } from '../stores/ui'
+import { useChangesStore } from '../stores/changes'
 import AppIcon from '../components/AppIcon.vue'
 import BackBar from '../components/BackBar.vue'
 
 const ui = useUiStore()
+const changes = useChangesStore()
 
 const themeOptions = [
   { value: 'system', label: '跟随系统' },
@@ -73,7 +101,24 @@ function showAbout() {
   showToast(version.value ? `柳职教务 v${version.value}` : '柳职教务')
 }
 
+async function toggleChanges() {
+  const next = !changes.enabled
+  if (next) {
+    const granted = await changes.requestNotificationPermission()
+    await changes.setEnabled(true)
+    showToast(granted ? '已开启课表变更提醒' : '已开启（系统通知未授权）')
+    return
+  }
+  await changes.setEnabled(false)
+  showToast('已关闭课表变更提醒')
+}
+
+function openNotificationSettings() {
+  changes.openNotificationSettings()
+}
+
 onMounted(async () => {
+  changes.init()
   if (!Capacitor.isNativePlatform()) return
   try {
     const info = await CapApp.getInfo()
@@ -137,6 +182,44 @@ onMounted(async () => {
   gap: 10px;
   font-size: 15px;
   color: var(--text);
+}
+
+.setting-note {
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--card-muted);
+  transition: background 0.15s;
+}
+
+.switch.is-on {
+  background: var(--brand);
+}
+
+.switch-dot {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s;
+}
+
+.switch.is-on .switch-dot {
+  transform: translateX(20px);
 }
 
 .toast {

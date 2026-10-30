@@ -565,6 +565,9 @@ export class ZfAcademicApi {
     this.fetchedAt = ''
     this.offline = false
     this.terms = null
+    // 课表接口原文：交给原生变更引擎对账，避免前后两端各解析一遍
+    this.lastRawPayload = ''
+    this.lastFetchedAtMs = 0
   }
 
   // 冷启动先用本地快照渲染，随后由后台刷新替换为实时数据
@@ -576,6 +579,7 @@ export class ZfAcademicApi {
     this.schedule = snapshot.schedule
     this.fetchedAt = snapshot.fetchedAt
     this.offline = true
+    this.lastRawPayload = ''
     return this.profile
   }
 
@@ -624,6 +628,7 @@ export class ZfAcademicApi {
         this.schedule = snapshot.schedule
         this.fetchedAt = snapshot.fetchedAt
         this.offline = true
+        this.lastRawPayload = ''
         return this.profile
       }
       throw error
@@ -663,6 +668,8 @@ export class ZfAcademicApi {
       throw failure
     }
     try {
+      this.lastRawPayload = body
+      this.lastFetchedAtMs = Date.now()
       return JSON.parse(body)
     } catch (error) {
       const failure = new Error('课表数据解析失败')
@@ -728,21 +735,38 @@ export class ZfAcademicApi {
     return sortTerms(terms)
   }
 
-  async getSchedule(term) {
+  async getSchedule(term, options = {}) {
     if (!this.term) throw new Error('尚未登录')
-    if (term && `${term.xnm}_${term.xqm}` !== `${this.term.xnm}_${this.term.xqm}`) {
-      const payload = await this.fetchSchedule(term)
-      const nextTerm = mapTerm(payload.xsxx || {}, term)
-      this.term = nextTerm
-      this.schedule = mapSchedule(payload, nextTerm)
-      this.fetchedAt = new Date().toISOString()
-      this.offline = false
-      writeSnapshot(this)
+    const force = Boolean(options.force)
+    const target = term || this.term
+    const sameTerm = `${target.xnm}_${target.xqm}` === `${this.term.xnm}_${this.term.xqm}`
+    // 60 秒内刚拉过就不再重复请求：首页与课表连续挂载时只打一次接口
+    const fresh = this.lastFetchedAtMs > 0 && Date.now() - this.lastFetchedAtMs < 60000
+    if (!sameTerm || (force && !fresh)) {
+      try {
+        const payload = await this.fetchSchedule(target)
+        const nextTerm = mapTerm(payload.xsxx || {}, target)
+        this.term = nextTerm
+        this.schedule = mapSchedule(payload, nextTerm)
+        this.fetchedAt = new Date().toISOString()
+        this.lastFetchedAtMs = Date.now()
+        this.offline = false
+        writeSnapshot(this)
+      } catch (error) {
+        // 主动刷新失败但本地还有课表：保留旧数据并标注离线，不打断使用
+        if (force && sameTerm && this.schedule && error?.network) {
+          this.offline = true
+        } else {
+          throw error
+        }
+      }
     }
     return {
       ...this.schedule,
       source: this.offline ? '教务系统（离线缓存）' : '教务系统（实时）',
-      fetchedAt: this.fetchedAt
+      fetchedAt: this.fetchedAt,
+      rawPayload: this.offline ? '' : this.lastRawPayload,
+      term: this.term
     }
   }
 
