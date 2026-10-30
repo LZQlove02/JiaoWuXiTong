@@ -61,6 +61,7 @@
 | 11 | 课表标记 | 角标 + 停课虚框：停课灰虚框「停」、调课橙「调」、新增绿「新」 |
 | 12 | 架构 | 原生变更引擎，前后台共用一套解析与判定 |
 | 13 | 前台通知抑制 | App 在前台时只写日志、由应用内提醒条展示，不发系统通知 |
+| 14 | 换账号 | 基线与日志按学号归属；学号变化时重置基线并清空旧日志，不产生跨账号误报 |
 
 ## 4. 变更判定规则
 
@@ -130,6 +131,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 |---|---|
 | 首次使用 / 重装 / 无基线 | 只写基线，不报变更 |
 | 学期切换（xnm 或 xqm 变化） | 重置基线，不报变更 |
+| 换账号（学号变化） | 重置基线并清空旧日志，不报变更 |
 | 离线快照（`source` 非实时） | 不上交、不对比 |
 | 新解析结果为空且旧基线非空 | 判定为接口异常，跳过本轮，保留旧基线（防「全部停课」误报） |
 | 新解析抛错 | 跳过本轮，静默；debug 包记录原始响应摘要 |
@@ -148,6 +150,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 ```json
 {
   "term": { "xnm": "2025", "xqm": "3", "startDate": "2025-08-31" },
+  "studentId": "20256030154",
   "sessions": [
     {
       "courseId": "B0001",
@@ -304,6 +307,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 - 基线 / 日志的读改写全部在 `ScheduleChangeStore` 的静态锁内完成
 - 前台对账与后台对账互斥，后到的直接复用已更新的基线
+- 后台拉取期间若前台已用更新的课表对过账，后台响应标记为过时并丢弃（比较基线 `savedAt`），避免反向变更
 - 前台判定：`MainActivity.onStart/onStop` 维护静态可见标志；后台检查读该标志决定是否发通知
 
 ## 7. 界面设计
@@ -410,6 +414,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 | `ScheduleParser.java` | kbList JSON → 规范化会话；纯函数，可单测 |
 | `ScheduleChangeEngine.java` | 配对、分类、本周过滤、已过时段判定；纯函数，可单测 |
 | `ScheduleChangeStore.java` | 基线 / 日志 / 设置读写，静态锁，30 天 / 200 条淘汰 |
+| `ScheduleChangeService.java` | 业务编排：解析、对账、落盘、通知、闹钟、组件刷新 |
 | `ScheduleFetcher.java` | OkHttp + `AuthCookieStore` 拉 kbList，区分会话失效 / 网络 / 其它 |
 | `ScheduleChangeNotifier.java` | 渠道、权限、逐条通知、去重、深链、前台抑制 |
 | `ScheduleChangeBridge.java` | Capacitor 插件：`applySchedule` / `list` / `markAllRead` / `setEnabled` / `getState` / `requestNotificationPermission` / `openNotificationSettings` |
@@ -445,7 +450,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ## 10. 测试计划
 
-### 10.1 Java 单测（约 20 项）
+### 10.1 Java 单测（19 项：解析 6 + 引擎 13）
 
 - `ScheduleParser`
   - 常规 kbList → 会话集合正确
@@ -462,7 +467,7 @@ ScheduleChangeBridge (Capacitor Plugin)
   - 学期切换 → 无变更
   - 空新课表 → 不产生「全部停课」
 
-### 10.2 JS 单测（约 12 项）
+### 10.2 JS 单测（19 项：文案 6 + 课表标记 5 + store 8）
 
 - `changeLabels`：周一/3-4 节、周次标签、类型文案与颜色、相对日期
 - `stores/changes`：未读数、筛选、已读、开关持久化（mock bridge）
@@ -486,8 +491,8 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ### 10.4 回归命令
 
-- `npm test`（现有 84 项 + 新增）
-- `cd android && ./gradlew test`（现有 15 项 + 新增）
+- `npm test`（84 项存量 + 19 项新增）
+- `cd android && ./gradlew test`（15 项存量 + 19 项新增）
 - `npm run build`
 
 ## 11. 验收标准
@@ -498,7 +503,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 4. 首次使用、换学期、离线快照、空课表均不产生误报
 5. 解析失败不影响课表显示与现有功能
 6. 通知权限被拒时功能降级为应用内提醒，不崩溃
-7. 现有 84 项 JS + 15 项 Android 单测与本次新增测试全部通过
+7. 现有 84 项 JS + 15 项 Android 单测与本次新增（JS 19、Java 19）全部通过
 8. 真机 12 项清单逐条通过并记录进《真机验证报告》
 
 ## 12. 风险与已知限制
