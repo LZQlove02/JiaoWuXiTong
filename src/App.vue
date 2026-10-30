@@ -1,5 +1,11 @@
 <template>
-  <div v-if="auth.restoring" class="boot">
+  <DisclaimerGate
+    v-if="!consented"
+    :declined="declined"
+    @accept="onAccept"
+    @decline="onDecline"
+  />
+  <div v-else-if="auth.restoring" class="boot">
     <img class="boot-logo" src="./assets/app-icon.png" alt="" />
     <p class="boot-text">正在恢复登录状态…</p>
   </div>
@@ -10,15 +16,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import TabBar from './components/TabBar.vue'
+import DisclaimerGate from './components/DisclaimerGate.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
 import { useChangesStore } from './stores/changes'
 import { useUiStore } from './stores/ui'
+import { acceptDisclaimer, isDisclaimerAccepted } from './utils/disclaimer'
 import { clearWidgetNow, resyncWidget, syncWidget, syncWidgetTheme } from './widget/sync'
 import { deepLinkPath } from './utils/deepLink'
 
@@ -29,6 +37,33 @@ const auth = useAuthStore()
 const academic = useAcademicStore()
 const changes = useChangesStore()
 const showTabBar = computed(() => route.meta.tab === true)
+
+const consented = ref(isDisclaimerAccepted())
+const declined = ref(false)
+let nativeReady = false
+
+// 同意免责声明后才恢复会话：未同意前不读 Cookie、不发请求
+async function onAccept() {
+  acceptDisclaimer()
+  consented.value = true
+  const booting = auth.bootstrap()
+  setupNative()
+  await router.isReady()
+  await booting
+  // 初始导航按「未登录」落到了登录页，恢复出会话后补一次跳转
+  if (auth.isLoggedIn && router.currentRoute.value.name === 'login') {
+    router.replace('/')
+  }
+}
+
+function onDecline() {
+  if (Capacitor.isNativePlatform()) {
+    CapApp.exitApp()
+    return
+  }
+  // Web 预览无法退出进程，给一句静态提示
+  declined.value = true
+}
 
 // 深链解析在 src/utils/deepLink.js，这里只负责跳转
 async function openDeepLink(url) {
@@ -113,8 +148,10 @@ watch(
   }
 )
 
-onMounted(async () => {
-  ui.initTheme()
+// 原生能力延迟到「已同意」之后初始化：未同意时不写组件、不注册深链与返回键监听
+async function setupNative() {
+  if (nativeReady) return
+  nativeReady = true
   if (!Capacitor.isNativePlatform()) return
 
   // 先读出变更状态再首次写组件 payload，避免用未加载的 0 覆盖原生角标
@@ -151,6 +188,12 @@ onMounted(async () => {
     }
     router.back()
   })
+}
+
+onMounted(() => {
+  ui.initTheme()
+  // 已同意（老用户）时立即初始化；首次启动等门禁页同意后再走 setupNative
+  if (consented.value) setupNative()
 })
 </script>
 

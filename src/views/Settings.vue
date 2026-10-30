@@ -55,22 +55,30 @@
         <span class="setting-left"><AppIcon name="info" />关于</span>
         <span v-if="version" class="tiny">v{{ version }}</span>
       </button>
+      <button class="setting-row" @click="openDisclaimer">
+        <span class="setting-left"><AppIcon name="shield" />免责声明</span>
+        <span class="tiny">v{{ disclaimerVersion }}</span>
+      </button>
     </section>
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
     </transition>
+
+    <DisclaimerGate v-if="disclaimerOpen" mode="reader" @close="closeDisclaimer" />
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import { useUiStore } from '../stores/ui'
 import { useChangesStore } from '../stores/changes'
+import { DISCLAIMER_VERSION } from '../utils/disclaimer'
 import AppIcon from '../components/AppIcon.vue'
 import BackBar from '../components/BackBar.vue'
+import DisclaimerGate from '../components/DisclaimerGate.vue'
 
 const ui = useUiStore()
 const changes = useChangesStore()
@@ -83,6 +91,8 @@ const themeOptions = [
 
 const toast = ref('')
 const version = ref('')
+const disclaimerOpen = ref(false)
+const disclaimerVersion = DISCLAIMER_VERSION
 
 function showToast(message) {
   toast.value = message
@@ -90,6 +100,21 @@ function showToast(message) {
     toast.value = ''
   }, 1600)
 }
+
+// 只读重读声明，不改变同意状态；返回键交给 ui store 关闭浮层
+function openDisclaimer() {
+  disclaimerOpen.value = true
+  ui.setOverlayCloser(closeDisclaimer)
+}
+
+function closeDisclaimer() {
+  disclaimerOpen.value = false
+  ui.clearOverlayCloser()
+}
+
+onBeforeUnmount(() => {
+  if (disclaimerOpen.value) ui.clearOverlayCloser()
+})
 
 // 清理范围与「我的」页时代一致：只清公开内容的本地缓存，不动登录态与主题
 function clearCache() {
