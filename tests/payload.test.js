@@ -81,7 +81,7 @@ describe('小组件 payload：课表', () => {
     })
   })
 
-  it('下一节课取今天最近一节未结束的课', () => {
+  it('下一节课取今天最近一节还没开始的课', () => {
     const payload = build()
     expect(payload.next).toMatchObject({
       name: '形势与政策（三）',
@@ -90,6 +90,25 @@ describe('小组件 payload：课表', () => {
       endTime: '12:15'
     })
     expect(payload.remainingToday).toBe(2)
+  })
+
+  it('进行中的课不算「下一节」，取下一门没开始的', () => {
+    // 12:00：形势与政策（三）11:35-12:15 正在进行，下一节应是 14:30 的机器学习
+    const payload = build({ now: new Date(2026, 9, 29, 12, 0) })
+    expect(payload.next).toMatchObject({
+      name: '机器学习与深度学习',
+      dayLabel: '今天',
+      startTime: '14:30'
+    })
+    // 剩余节数仍把进行中的算进去
+    expect(payload.remainingToday).toBe(2)
+  })
+
+  it('今天的课都在进行中或已结束，才顺延到下一有课的一天', () => {
+    // 15:00：机器学习 14:30-15:55 正在进行，今天没有未开始的课 → 顺延到周六
+    const payload = build({ now: new Date(2026, 9, 29, 15, 0) })
+    expect(payload.next).toMatchObject({ name: '鸿蒙开发技术', dayLabel: '周六' })
+    expect(payload.remainingToday).toBe(1)
   })
 
   it('今天课上完后顺延到本周下一有课的一天', () => {

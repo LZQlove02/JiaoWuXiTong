@@ -105,15 +105,17 @@ function byStart(a, b) {
   return (Number(a.startSection) || 0) - (Number(b.startSection) || 0)
 }
 
-// 下一节课：今天还有未结束的课取最近一节，否则顺延到本周内最近有课的一天
+// 下一节课：今天还没开始上课的最近一节；进行中的课不算「下一节」，也不越过它顺延到明天。
+// 今天没有未开始的课，才顺延到本周内最近有课的一天。
 export function pickNextClass(weekSessions, courses, weekday, nowMinutes) {
   const today = weekSessions
     .filter((session) => Number(session.weekday) === weekday)
     .sort(byStart)
   for (const session of today) {
     const item = classItem(session, courses)
-    const endAt = toMinutes(item.endTime)
-    if (endAt === null || endAt >= nowMinutes) return { ...item, dayLabel: '今天' }
+    const startAt = toMinutes(item.startTime)
+    // 时间缺失时按「还没开始」处理，宁可显示也不空着
+    if (startAt === null || startAt > nowMinutes) return { ...item, dayLabel: '今天' }
   }
   for (let offset = 1; offset <= 7; offset += 1) {
     const target = ((weekday - 1 + offset) % 7) + 1

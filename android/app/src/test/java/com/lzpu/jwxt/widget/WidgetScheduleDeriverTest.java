@@ -46,7 +46,9 @@ public class WidgetScheduleDeriverTest {
     }
 
     @Test
-    public void ongoingSecondClassKeepsOneRemaining() {
+    public void ongoingClassIsNotNext() {
+        // 10:20：毛泽东思想 10:05-11:45 正在进行 → 不算「下一节」，今天没有未开始的课，
+        // 顺延到下周一第一节；剩余节数仍把它算进去
         WidgetPayload payload = payload(
             item(Calendar.MONDAY, 1, 2, "08:00", "09:40", "高等数学"),
             item(Calendar.MONDAY, 3, 4, "10:05", "11:45", "毛泽东思想"));
@@ -56,6 +58,21 @@ public class WidgetScheduleDeriverTest {
 
         assertEquals(2, result.today.size());
         assertEquals(1, result.remainingToday);
+        assertEquals("高等数学", result.next.name);
+        assertEquals("周一", result.next.dayLabel);
+    }
+
+    @Test
+    public void pendingClassIsNextWhileAnotherIsOngoing() {
+        // 08:30：高等数学 08:00-09:40 进行中，毛泽东思想 10:05 还没开始 → 后者是下一节
+        WidgetPayload payload = payload(
+            item(Calendar.MONDAY, 1, 2, "08:00", "09:40", "高等数学"),
+            item(Calendar.MONDAY, 3, 4, "10:05", "11:45", "毛泽东思想"));
+
+        WidgetScheduleDeriver.Result result =
+            WidgetScheduleDeriver.derive(payload, at(Calendar.MONDAY, 8, 30));
+
+        assertEquals(2, result.remainingToday);
         assertEquals("毛泽东思想", result.next.name);
         assertEquals("今天", result.next.dayLabel);
     }

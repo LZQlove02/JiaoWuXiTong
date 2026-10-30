@@ -102,9 +102,9 @@ final class WidgetScheduleDeriver {
             if (endMinutes(cls) >= nowMinutes) result.remainingToday += 1;
         }
 
-        // 下一节：今天还有没结束的就取最近一节，否则往后 7 天找最近有课的一天
+        // 下一节：今天还没开始上课的最近一节（进行中的不算），否则往后 7 天找最近有课的一天
         for (WidgetPayload.ClassItem cls : result.today) {
-            if (endMinutes(cls) >= nowMinutes) {
+            if (startMinutes(cls) > nowMinutes) {
                 result.next = cls;
                 break;
             }
@@ -153,6 +153,18 @@ final class WidgetScheduleDeriver {
             return Integer.parseInt(parts[0].trim()) * 60 + Integer.parseInt(parts[1].trim());
         } catch (NumberFormatException error) {
             return Integer.MAX_VALUE;
+        }
+    }
+
+    // "14:30" -> 870；缺失或异常时返回 -1（当作「还没开始」，宁可显示也不空着）
+    private static int startMinutes(WidgetPayload.ClassItem item) {
+        if (item.startTime == null || item.startTime.isEmpty()) return -1;
+        String[] parts = item.startTime.split(":");
+        if (parts.length != 2) return -1;
+        try {
+            return Integer.parseInt(parts[0].trim()) * 60 + Integer.parseInt(parts[1].trim());
+        } catch (NumberFormatException error) {
+            return -1;
         }
     }
 }
