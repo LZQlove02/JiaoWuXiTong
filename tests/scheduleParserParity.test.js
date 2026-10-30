@@ -19,7 +19,9 @@ const term = {
 describe('课表解析：JS / Java 共享 fixture', () => {
   it('mapSchedule 与 expectedSessions 完全一致', () => {
     const { sessions } = mapSchedule(fixture, term)
-    const expected = fixture.expectedSessions.map(({ courseName, ...rest }) => rest)
+    const expected = fixture.expectedSessions.map(
+      ({ courseName: _courseName, ...rest }) => rest
+    )
     expect(sessions).toEqual(expected)
   })
 })

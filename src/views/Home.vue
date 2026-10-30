@@ -17,7 +17,7 @@
         <h2 class="card-title">今日课程</h2>
         <router-link to="/schedule" class="link">查看课表</router-link>
       </div>
-      <div v-if="academic.loading && !schedule" class="loading">正在加载今日课程…</div>
+      <div v-if="scheduleLoading && !schedule" class="loading">正在加载今日课程…</div>
       <div v-else-if="todayCourses.length" class="today-list">
         <div v-for="item in todayCourses" :key="item.courseId + item.startSection" class="course-row">
           <span class="course-time">{{ sectionRange(item.startSection, item.endSection) }}</span>
@@ -56,7 +56,7 @@
 
     <div class="section-head">
       <h2 class="section-title">快捷入口</h2>
-      <span class="tiny sort-hint">长按拖动排序</span>
+      <span class="tiny sort-hint">长按拖动排序 · Alt+方向键</span>
     </div>
     <div
       class="grid"
@@ -70,7 +70,9 @@
         :data-path="entry.path"
         class="entry card"
         :class="{ 'entry--dragging': drag.active && drag.path === entry.path }"
+        :aria-label="`${entry.label}，${entry.desc}。长按拖动排序，或按 Alt 加方向键移动`"
         @click="goEntry(entry)"
+        @keydown="onEntryKeydown($event, entry)"
       >
         <span class="entry-icon" :style="{ color: entry.color }">
           <AppIcon :name="entry.icon" />
@@ -85,6 +87,10 @@
         <h2 class="card-title">最新消息</h2>
         <router-link to="/messages" class="link">全部</router-link>
       </div>
+      <p v-if="messagesOffline || messagesCachedAt" class="tiny notice-updated">
+        <template v-if="messagesOffline">网络不可用，显示缓存<template v-if="messagesCachedAt">（更新于 {{ formatDateTime(messagesCachedAt) }}{{ messagesExpired ? '，已过期' : '' }}）</template></template>
+        <template v-else>更新于 {{ formatDateTime(messagesCachedAt) }}</template>
+      </p>
       <div v-if="messagesLoading && !messages" class="loading">正在加载消息…</div>
       <template v-else>
         <button
@@ -107,7 +113,7 @@
         <router-link to="/notices" class="link">全部</router-link>
       </div>
       <p v-if="portalNoticesOffline || portalNoticesCachedAt" class="tiny notice-updated">
-        <template v-if="portalNoticesOffline">网络不可用，显示缓存<template v-if="portalNoticesCachedAt">（更新于 {{ formatDateTime(portalNoticesCachedAt) }}）</template></template>
+        <template v-if="portalNoticesOffline">网络不可用，显示缓存<template v-if="portalNoticesCachedAt">（更新于 {{ formatDateTime(portalNoticesCachedAt) }}{{ portalNoticesExpired ? '，已过期' : '' }}）</template></template>
         <template v-else>更新于 {{ formatDateTime(portalNoticesCachedAt) }}</template>
       </p>
       <div v-if="portalNoticesLoading && !portalNotices" class="loading">正在加载通知…</div>
@@ -155,6 +161,7 @@ const academic = useAcademicStore()
 const router = useRouter()
 const {
   schedule,
+  scheduleLoading,
   exams,
   currentTerm,
   errors,
@@ -162,8 +169,12 @@ const {
   portalNoticesLoading,
   portalNoticesOffline,
   portalNoticesCachedAt,
+  portalNoticesExpired,
   messages,
-  messagesLoading
+  messagesLoading,
+  messagesOffline,
+  messagesCachedAt,
+  messagesExpired
 } = storeToRefs(academic)
 const isOffline = computed(() => Boolean(schedule.value?.offline))
 const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
@@ -375,6 +386,25 @@ function goEntry(entry) {
     return
   }
   go(entry.path)
+}
+
+// 键盘/读屏替代方案：Alt + 方向键调整快捷入口顺序（三列布局，上下移动三位）
+function onEntryKeydown(event, entry) {
+  if (!event.altKey) return
+  const step = {
+    ArrowLeft: -1,
+    ArrowRight: 1,
+    ArrowUp: -3,
+    ArrowDown: 3
+  }[event.key]
+  if (!step) return
+  const list = orderedEntries.value.map((item) => item.path)
+  const from = list.indexOf(entry.path)
+  const target = from + step
+  if (from < 0 || target < 0 || target >= list.length) return
+  event.preventDefault()
+  applyOrder(movePath(list, entry.path, target))
+  commitOrder()
 }
 
 const avatarText = computed(() => (auth.user?.name || '我').slice(-1))

@@ -36,8 +36,9 @@ android {
         release {
             // 缺少正式签名配置时不回退 debug 签名，避免产出无法覆盖升级的正式包
             signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : null
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     // 与 JS 单测共用同一份课表 fixture（仓库根 tests/fixtures）

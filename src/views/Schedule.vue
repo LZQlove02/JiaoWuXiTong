@@ -23,7 +23,7 @@
       </button>
     </div>
 
-    <div v-if="academic.loading && !schedule" class="card loading">正在加载课表…</div>
+    <div v-if="scheduleLoading && !schedule" class="card loading">正在加载课表…</div>
 
     <div v-else-if="!hasSchedule" class="card empty-card">
       <EmptyState
@@ -121,7 +121,7 @@ import EmptyState from '../components/EmptyState.vue'
 const academic = useAcademicStore()
 const changes = useChangesStore()
 const router = useRouter()
-const { schedule, currentTerm, loading, errors } = storeToRefs(academic)
+const { schedule, currentTerm, scheduleLoading, errors } = storeToRefs(academic)
 
 const weekdayLabels = WEEKDAY_LABELS.map((item) => `周${item}`)
 const now = ref(new Date())

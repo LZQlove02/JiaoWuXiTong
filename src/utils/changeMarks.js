@@ -16,6 +16,7 @@ export function sessionMarkKey(session) {
  * @returns {{ marks: Record<string, string>, ghosts: Array }}
  */
 export function buildChangeMarks(entries) {
+  /** @type {Record<string, string>} */
   const marks = {}
   const ghosts = []
   const ghostKeys = new Set()

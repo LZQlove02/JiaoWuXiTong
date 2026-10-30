@@ -5,6 +5,7 @@ import {
   clearScheduleSnapshot,
   mapEvaluations,
   mapGrades,
+  mapSchedule,
   mergeGradeGroups,
   parseCourseSelectionStatus,
   parseMessages,
@@ -104,6 +105,33 @@ describe('ZfAcademicApi 离线快照', () => {
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
     clearScheduleSnapshot()
     expect(localStorage.getItem(SNAPSHOT_KEY)).toBeNull()
+  })
+})
+
+describe('课表解析与响应校验', () => {
+  beforeEach(() => {
+    authGet.mockReset()
+  })
+
+  it('缺少 zcd 时按 20 周兜底，避免第 17-20 周的课被漏掉', () => {
+    const result = mapSchedule(
+      {
+        kbList: [
+          { kch: 'c1', kcmc: '高等数学', jcs: '3-4', xqj: 1, cdmc: 'A101' }
+        ]
+      },
+      term
+    )
+    expect(result.sessions[0].weeks).toHaveLength(20)
+  })
+
+  it('getSchedule 遇到缺少 xsxx 的异常响应时按解析失败处理，而不是显示空课表', async () => {
+    authGet.mockResolvedValue({ status: 200, body: '{"kbList":[]}' })
+    const api = new ZfAcademicApi()
+    api.term = term
+    await expect(api.getSchedule(term, { force: true })).rejects.toMatchObject({
+      parseError: true
+    })
   })
 })
 

@@ -3,7 +3,7 @@
     <BackBar title="通知公告" />
 
     <p v-if="portalNoticeListOffline" class="cache-tip">
-      网络不可用，显示缓存<template v-if="portalNoticeListCachedAt">（更新于 {{ formatDateTime(portalNoticeListCachedAt) }}）</template>
+      网络不可用，显示缓存<template v-if="portalNoticeListCachedAt">（更新于 {{ formatDateTime(portalNoticeListCachedAt) }}{{ portalNoticeListExpired ? '，已过期' : '' }}）</template>
     </p>
 
     <p v-if="error && items.length" class="tiny error-tip">
@@ -61,8 +61,14 @@ import LoadState from '../components/LoadState.vue'
 
 const router = useRouter()
 const academic = useAcademicStore()
-const { portalNoticeList, portalNoticeListLoading, portalNoticeListOffline, portalNoticeListCachedAt, errors } =
-  storeToRefs(academic)
+const {
+  portalNoticeList,
+  portalNoticeListLoading,
+  portalNoticeListOffline,
+  portalNoticeListCachedAt,
+  portalNoticeListExpired,
+  errors
+} = storeToRefs(academic)
 const loading = portalNoticeListLoading
 
 const items = computed(() => portalNoticeList.value?.items || [])

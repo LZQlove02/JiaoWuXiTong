@@ -1,0 +1,8 @@
+node_modules
+dist
+package-lock.json
+android
+preview
+.screenshots
+.trae-html-share-packages
+icon-design

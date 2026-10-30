@@ -120,7 +120,17 @@ public final class ScheduleChangeNotifier {
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(WidgetDeepLink.open(context, deepLinkPath, requestCode))
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
+        // 锁屏只显示脱敏版本，课程名、教室等个人信息不进入锁屏通知
+        NotificationCompat.Builder publicBuilder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_calendar)
+                .setContentTitle("课表有更新")
+                .setContentText("打开应用查看详情")
+                .setAutoCancel(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(WidgetDeepLink.open(context, deepLinkPath, requestCode));
+        builder.setPublicVersion(publicBuilder.build());
         Notification notification = builder.build();
         try {
             manager.notify(id, notification);

@@ -4,6 +4,8 @@ import { resetAcademicApi, setAcademicApi } from '../api'
 import { ZfAcademicApi, clearScheduleSnapshot } from '../api/zf'
 import { clearAuthCookies, loadAuthCookies } from '../api/nativeHttp'
 import { clearScheduleChange } from '../native/scheduleChangeBridge'
+import { setSessionExpiredHandler } from '../utils/sessionExpiry'
+import { clearDataCaches } from '../utils/dataCache'
 
 const RESTORE_TIMEOUT_MS = 15000
 
@@ -34,11 +36,35 @@ export const useAuthStore = defineStore('auth', () => {
   const restoring = ref(false)
   const isLoggedIn = computed(() => Boolean(user.value))
   let bootstrapPromise = null
+  let expiringPromise = null
 
   async function resetAcademic() {
     const { useAcademicStore } = await import('./academic')
     useAcademicStore().reset()
   }
+
+  // 清掉本机所有会话相关数据：加密 Cookie、课表快照、变更记录与个人数据缓存
+  async function clearLocalSession() {
+    await clearScheduleChange()
+    await clearAuthCookies()
+    clearScheduleSnapshot()
+    clearDataCaches()
+    resetAcademicApi()
+    user.value = null
+  }
+
+  // 会话失效统一出口：任一业务请求判定 401/登录页后，只清理一次并回登录页
+  async function expireSession() {
+    if (expiringPromise) return expiringPromise
+    expiringPromise = clearLocalSession()
+      .then(() => resetAcademic())
+      .finally(() => {
+        expiringPromise = null
+      })
+    return expiringPromise
+  }
+
+  setSessionExpiredHandler(expireSession)
 
   async function restoreSession() {
     try {
@@ -58,7 +84,10 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (error) {
       // 仅在服务端明确判定会话失效时清除凭据；网络不可达或解析失败时保留，避免误登出
-      if (error?.sessionExpired) await clearAuthCookies()
+      if (error?.sessionExpired) {
+        await clearAuthCookies()
+        clearDataCaches()
+      }
     }
     return false
   }
@@ -80,10 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
       })
       .catch(async (error) => {
         if (!error?.sessionExpired) return
-        await clearAuthCookies()
-        clearScheduleSnapshot()
-        resetAcademicApi()
-        user.value = null
+        await expireSession()
       })
   }
 
@@ -104,6 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       clearScheduleSnapshot()
+      clearDataCaches()
       const zf = new ZfAcademicApi()
       const profile = await zf.loginWithSso()
       setAcademicApi(zf)
@@ -121,11 +148,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    await clearScheduleChange()
-    await clearAuthCookies()
-    clearScheduleSnapshot()
-    resetAcademicApi()
-    user.value = null
+    await clearLocalSession()
     await resetAcademic()
   }
 

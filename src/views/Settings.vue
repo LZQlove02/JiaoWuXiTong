@@ -33,7 +33,7 @@
         </button>
       </div>
       <p class="setting-note">
-        每天 07:10、12:50 自动检查；只提醒本周的停课、调课与新增。系统清理后台后，重新打开 App 会自动恢复检查。
+        每天约 07:10、12:50 自动检查（系统省电策略下可能略有延迟）；只提醒本周的停课、调课与新增。系统清理后台后，重新打开 App 会自动恢复检查。
       </p>
       <button class="setting-row" @click="openNotificationSettings">
         <span class="setting-left">通知权限</span>
@@ -116,10 +116,15 @@ onBeforeUnmount(() => {
   if (disclaimerOpen.value) ui.clearOverlayCloser()
 })
 
-// 清理范围与「我的」页时代一致：只清公开内容的本地缓存，不动登录态与主题
+// 清理范围：公开内容缓存 + 个人数据缓存，不动登录态与主题
 function clearCache() {
   Object.keys(localStorage)
-    .filter((key) => key.startsWith('lzpu.cache') || key.startsWith('lzpu.portal.v1.'))
+    .filter(
+      (key) =>
+        key.startsWith('lzpu.cache') ||
+        key.startsWith('lzpu.portal.v1.') ||
+        key.startsWith('lzpu.data.v1.')
+    )
     .forEach((key) => localStorage.removeItem(key))
   showToast('已清除本地缓存')
 }

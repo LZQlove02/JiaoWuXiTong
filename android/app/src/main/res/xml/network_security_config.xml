@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <!-- 统一认证证书固定：与 SsoLoginActivity 内置指纹一致；证书轮换时需随 App 更新 -->
+    <domain-config>
+        <domain includeSubdomains="false">authserver.lzzy.net</domain>
+        <pin-set>
+            <pin digest="SHA-256">mVtgakG94EeWQ9qFNHrYRx2ECmXj3mbWRSHTfw3l1aA=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>

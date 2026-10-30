@@ -3,7 +3,6 @@ package com.lzpu.jwxt;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.net.http.SslCertificate;
 import android.net.http.SslError;
@@ -31,14 +30,22 @@ import java.util.Map;
  */
 public class SsoLoginActivity extends Activity {
 
+    private static final String AUTH_SERVER_HOST = "authserver.lzzy.net";
     private static final String LOGIN_URL =
             "https://authserver.lzzy.net/authserver/login"
                     + "?service=http%3A%2F%2Fzfjw.lzzy.net%2Fsso%2Fjziotlogin";
-    private static final String PREFS = "sso_login";
-    private static final String PIN_KEY = "authserver_sha256";
+    /**
+     * 统一认证服务器固定证书指纹（SHA-256，证书有效期至 2027-01-12）。
+     * 与 res/xml/network_security_config.xml 的 SPKI pin 对应；证书轮换时必须同步更新两者。
+     * 只有指纹完全一致才放行，不一致直接阻止登录并提示更新 App，不再使用首次信任（TOFU）。
+     */
+    private static final String AUTH_SERVER_SHA256 =
+            "85:BA:F1:69:43:27:A8:B7:82:D2:CE:BC:A6:A1:A8:14:"
+                    + "E1:22:19:D3:F2:D6:4F:1B:F3:6B:A5:66:E9:13:4A:50";
 
     private WebView webView;
     private boolean finished;
+    private boolean sslDialogShown;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,7 +111,7 @@ public class SsoLoginActivity extends Activity {
 
     private boolean isAllowed(Uri uri) {
         String host = uri.getHost();
-        return "authserver.lzzy.net".equals(host) || "zfjw.lzzy.net".equals(host);
+        return AUTH_SERVER_HOST.equals(host) || "zfjw.lzzy.net".equals(host);
     }
 
     /**
@@ -122,24 +129,38 @@ public class SsoLoginActivity extends Activity {
 
     private void handleSslError(SslErrorHandler handler, SslError error) {
         Uri uri = Uri.parse(error.getUrl());
-        if (!"authserver.lzzy.net".equals(uri.getHost())) {
-            handler.cancel();
+        if (!AUTH_SERVER_HOST.equals(uri.getHost())) {
+            blockSsl(handler, "证书校验失败", "zfjw.lzzy.net 的证书无法通过系统校验，已停止登录。");
             return;
         }
 
         CertInfo info = certInfoFrom(error.getCertificate());
         if (info == null) {
-            showUnpinnedDialog(handler, error);
+            blockSsl(handler, "无法读取证书指纹", "已停止登录，请检查网络环境后重试。");
             return;
         }
-
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String pinned = prefs.getString(PIN_KEY, null);
-        if (pinned != null && pinned.equals(info.sha256)) {
+        if (AUTH_SERVER_SHA256.equals(info.sha256)) {
             handler.proceed();
             return;
         }
-        showPinDialog(handler, prefs, info, pinned != null);
+        blockSsl(handler, "证书指纹不一致",
+                info.describe() + "\n\n内置指纹：\n" + AUTH_SERVER_SHA256
+                        + "\n\n证书可能已变更或被篡改，已阻止登录。请更新 App 后再试。");
+    }
+
+    /**
+     * 证书异常一律失败关闭：不再提供「仍然继续」选项，避免首次信任被中间人利用。
+     */
+    private void blockSsl(SslErrorHandler handler, String title, String message) {
+        handler.cancel();
+        if (sslDialogShown) return;
+        sslDialogShown = true;
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("知道了", (dialog, which) -> cancel())
+                .setCancelable(false)
+                .show();
     }
 
     /**
@@ -164,53 +185,6 @@ public class SsoLoginActivity extends Activity {
         } catch (Exception error) {
             return null;
         }
-    }
-
-    private void showPinDialog(SslErrorHandler handler, SharedPreferences prefs,
-                               CertInfo info, boolean changed) {
-        String title = changed ? "authserver 证书已变化" : "authserver 证书异常";
-        String action = changed
-                ? "与上次固定的指纹不一致。\n是否重新固定并继续？"
-                : "是否固定该证书并继续登录？";
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(info.describe() + "\n\n" + action)
-                .setPositiveButton(changed ? "重新固定" : "继续", (dialog, which) -> {
-                    prefs.edit().putString(PIN_KEY, info.sha256).apply();
-                    handler.proceed();
-                })
-                .setNegativeButton("取消", (dialog, which) -> {
-                    handler.cancel();
-                    cancel();
-                })
-                .setCancelable(false)
-                .show();
-    }
-
-    private void showUnpinnedDialog(SslErrorHandler handler, SslError error) {
-        SslCertificate certificate = error.getCertificate();
-        String details = "无法获取证书 SHA-256 指纹，无法完成固定校验。";
-        if (certificate != null) {
-            String subject = certificate.getIssuedTo() == null
-                    ? "" : certificate.getIssuedTo().getCName();
-            String issuer = certificate.getIssuedBy() == null
-                    ? "" : certificate.getIssuedBy().getCName();
-            details = "主题：" + subject
-                    + "\n颁发者：" + issuer
-                    + "\n有效期：" + certificate.getValidNotBeforeDate()
-                    + " - " + certificate.getValidNotAfterDate()
-                    + "\n\n无法获取 SHA-256 指纹。是否仍继续登录？";
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("无法固定证书指纹")
-                .setMessage(details)
-                .setPositiveButton("仍继续", (dialog, which) -> handler.proceed())
-                .setNegativeButton("取消", (dialog, which) -> {
-                    handler.cancel();
-                    cancel();
-                })
-                .setCancelable(false)
-                .show();
     }
 
     private static String sha256(byte[] data) {

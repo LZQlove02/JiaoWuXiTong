@@ -3,7 +3,7 @@
     <BackBar title="通知详情" />
 
     <p v-if="offline" class="cache-tip">
-      网络不可用，显示缓存<template v-if="cachedAt">（更新于 {{ formatDateTime(cachedAt) }}）</template>
+      网络不可用，显示缓存<template v-if="cachedAt">（更新于 {{ formatDateTime(cachedAt) }}{{ expired ? '，已过期' : '' }}）</template>
     </p>
 
     <p v-if="loading && !detail" class="card loading">正在加载通知…</p>
@@ -57,6 +57,7 @@ const loading = ref(false)
 const error = ref('')
 const offline = ref(false)
 const cachedAt = ref('')
+const expired = ref(false)
 
 async function load() {
   const id = String(route.params.id || '').trim()
@@ -70,17 +71,20 @@ async function load() {
   if (cached?.data) {
     detail.value = cached.data
     cachedAt.value = cached.cachedAt
+    expired.value = cached.expired
   }
   loading.value = !detail.value
   error.value = ''
   offline.value = false
   try {
     detail.value = await api.getPortalNoticeDetail(id)
+    expired.value = false
     cachedAt.value = detail.value.fetchedAt || new Date().toISOString()
     writePortalCache(cacheKey, detail.value)
   } catch (err) {
     if (detail.value) {
       offline.value = true
+      expired.value = Boolean(readPortalCache(cacheKey, PORTAL_NOTICE_DETAIL_TTL)?.expired)
     } else {
       error.value = err.message || '通知加载失败'
     }

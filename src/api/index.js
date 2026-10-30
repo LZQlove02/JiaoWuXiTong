@@ -1,4 +1,5 @@
 import { ZfAcademicApi } from './zf'
+import { notifySessionExpired } from '../utils/sessionExpiry'
 
 // 个人教务数据统一来自学校统一认证后的教务系统；
 // 公开内容（通知/办事指南/校历）走 api/public.js。
@@ -13,17 +14,30 @@ export function resetAcademicApi() {
   target = createTarget()
 }
 
+// 所有业务请求都经过这里：任一处判定会话失效，统一通知登录态清理，
+// 不再依赖各个页面/仓库自行处理，避免用户卡在「所有页面都报会话失效」。
+function guarded(method) {
+  return async (...args) => {
+    try {
+      return await target[method](...args)
+    } catch (error) {
+      if (error?.sessionExpired) notifySessionExpired()
+      throw error
+    }
+  }
+}
+
 export const api = {
-  getTerms: (...args) => target.getTerms(...args),
-  getSchedule: (...args) => target.getSchedule(...args),
-  getGrades: (...args) => target.getGrades(...args),
-  getAllGrades: (...args) => target.getAllGrades(...args),
-  getExams: (...args) => target.getExams(...args),
-  getEvaluations: (...args) => target.getEvaluations(...args),
-  getCourseSelectionStatus: (...args) => target.getCourseSelectionStatus(...args),
-  getPortalNotices: (...args) => target.getPortalNotices(...args),
-  getPortalNoticeList: (...args) => target.getPortalNoticeList(...args),
-  getPortalNoticeDetail: (...args) => target.getPortalNoticeDetail(...args),
-  getMessages: (...args) => target.getMessages(...args),
-  getCourse: (...args) => target.getCourse(...args)
+  getTerms: guarded('getTerms'),
+  getSchedule: guarded('getSchedule'),
+  getGrades: guarded('getGrades'),
+  getAllGrades: guarded('getAllGrades'),
+  getExams: guarded('getExams'),
+  getEvaluations: guarded('getEvaluations'),
+  getCourseSelectionStatus: guarded('getCourseSelectionStatus'),
+  getPortalNotices: guarded('getPortalNotices'),
+  getPortalNoticeList: guarded('getPortalNoticeList'),
+  getPortalNoticeDetail: guarded('getPortalNoticeDetail'),
+  getMessages: guarded('getMessages'),
+  getCourse: guarded('getCourse')
 }

@@ -33,7 +33,7 @@ public final class ScheduleSession {
 
     private static int[] normalizeWeeks(int[] source) {
         if (source == null) {
-            int[] fallback = new int[16];
+            int[] fallback = new int[20];
             for (int i = 0; i < fallback.length; i += 1) fallback[i] = i + 1;
             return fallback;
         }

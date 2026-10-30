@@ -7,7 +7,11 @@
       <p class="read-only-text">仅只读展示，不提供评教提交</p>
     </section>
 
-    <div v-if="loading && !evaluations" class="card loading">正在加载评教记录…</div>
+    <p v-if="evaluationsOffline" class="cache-tip">
+      网络不可用，显示缓存<template v-if="evaluationsCachedAt">（更新于 {{ formatDateTime(evaluationsCachedAt) }}{{ evaluationsExpired ? '，已过期' : '' }}）</template>
+    </p>
+
+    <div v-if="evaluationsLoading && !evaluations" class="card loading">正在加载评教记录…</div>
 
     <template v-else-if="evaluations">
       <div class="section-head">
@@ -55,12 +59,20 @@
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAcademicStore } from '../stores/academic'
+import { formatDateTime } from '../utils/date'
 import BackBar from '../components/BackBar.vue'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { evaluations, loading, errors } = storeToRefs(academic)
+const {
+  evaluations,
+  evaluationsLoading,
+  evaluationsOffline,
+  evaluationsCachedAt,
+  evaluationsExpired,
+  errors
+} = storeToRefs(academic)
 
 const fetchedLabel = computed(() => {
   const value = evaluations.value?.fetchedAt

@@ -1,6 +1,6 @@
 import { authGet, authPost, isDebugBuild, loginWithSso as nativeSsoLogin, setAuthCookies } from './nativeHttp'
 import { probeZfjwEndpoints } from './probe'
-import { buildTerm, termParamsFor } from '../utils/term'
+import { buildTerm, termCandidatesFor, termParamsFor } from '../utils/term'
 
 const COURSE_COLORS = ['#1B5FAA', '#2F855A', '#B7791F', '#805AD5', '#C05621', '#2C7A7B']
 const SCHEDULE_ENDPOINT = 'https://zfjw.lzzy.net/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151'
@@ -59,7 +59,8 @@ function probeInDebugBuild(term) {
 }
 
 function parseWeeks(text) {
-  if (!text) return Array.from({ length: 16 }, (_, index) => index + 1)
+  // 与课表页/桌面组件的 20 周上限保持一致，接口缺周次时不会漏掉第 17-20 周
+  if (!text) return Array.from({ length: 20 }, (_, index) => index + 1)
   const weeks = new Set()
   for (const match of text.matchAll(/(\d+)\s*[-~至]\s*(\d+)\s*周?/g)) {
     const start = Number(match[1])
@@ -70,7 +71,7 @@ function parseWeeks(text) {
     weeks.add(Number(match[1]))
   }
   let result = [...weeks].sort((a, b) => a - b)
-  if (!result.length) result = Array.from({ length: 16 }, (_, index) => index + 1)
+  if (!result.length) result = Array.from({ length: 20 }, (_, index) => index + 1)
   if (/单/.test(text) && !/双/.test(text)) result = result.filter((week) => week % 2 === 1)
   if (/双/.test(text) && !/单/.test(text)) result = result.filter((week) => week % 2 === 0)
   return result
@@ -582,6 +583,57 @@ export class ZfAcademicApi {
     return this.profile
   }
 
+  // 统一处理网络失败、状态码、登录页 HTML 与 BOM；各业务方法只负责自己的结构校验
+  async requestText(url, options = {}) {
+    const { method = 'GET', body = '', label = '接口', allowHtml = false } = options
+    let response
+    try {
+      response = method === 'POST' ? await authPost(url, body) : await authGet(url)
+    } catch (error) {
+      const message = String(error?.message || '')
+      // 未登录时教务系统会 302 到 http 登录页，被网络策略拦截，应判定为会话失效
+      if (message.includes('仅允许 HTTPS 请求')) {
+        const failure = new Error('登录会话已失效')
+        failure.sessionExpired = true
+        throw failure
+      }
+      const failure = new Error('无法连接教务系统')
+      failure.network = true
+      throw failure
+    }
+    if (response?.status !== 200) {
+      const failure = new Error(`${label}接口返回 ${response?.status ?? '未知状态'}`)
+      failure.status = response?.status
+      failure.sessionExpired = response?.status === 401 || response?.status === 403
+      throw failure
+    }
+    const raw = String(response.body || '').replace(/^\uFEFF/, '')
+    if (/^\s*</.test(raw)) {
+      const expired = /login_slogin|统一身份认证|authserver/i.test(raw)
+      if (expired) {
+        const failure = new Error('登录会话已失效')
+        failure.sessionExpired = true
+        throw failure
+      }
+      if (!allowHtml) {
+        const failure = new Error(`${label}数据解析失败`)
+        failure.parseError = true
+        throw failure
+      }
+    }
+    return raw
+  }
+
+  parseJson(raw, label) {
+    try {
+      return JSON.parse(raw)
+    } catch (error) {
+      const failure = new Error(`${label}数据解析失败`)
+      failure.parseError = true
+      throw failure
+    }
+  }
+
   async loginWithSso() {
     const result = await nativeSsoLogin()
     if (!result?.cookieHeader) throw new Error('未获取到登录会话')
@@ -594,15 +646,12 @@ export class ZfAcademicApi {
     const snapshot = readSnapshot()
     let params = termParamsFor()
     try {
-      let payload = await this.fetchSchedule(params)
-      if (!payload?.xsxx) {
-        const alternative = params.xqm === '3'
-          ? { xnm: params.xnm, xqm: '12' }
-          : { xnm: String(Number(params.xnm) + 1), xqm: '3' }
-        const second = await this.fetchSchedule(alternative)
-        if (second?.xsxx) {
-          params = alternative
-          payload = second
+      let payload = null
+      for (const candidate of termCandidatesFor(params)) {
+        payload = await this.fetchSchedule(candidate)
+        if (payload?.xsxx) {
+          params = candidate
+          break
         }
       }
       if (!payload?.xsxx) {
@@ -636,44 +685,9 @@ export class ZfAcademicApi {
 
   async fetchSchedule(params) {
     const url = `${SCHEDULE_ENDPOINT}&xnm=${encodeURIComponent(params.xnm)}&xqm=${encodeURIComponent(params.xqm)}`
-    let response
-    try {
-      response = await authGet(url)
-    } catch (error) {
-      const message = String(error?.message || '')
-      // 未登录时教务系统会 302 到 http 登录页，被网络策略拦截，应判定为会话失效
-      if (message.includes('仅允许 HTTPS 请求')) {
-        const failure = new Error('登录会话已失效')
-        failure.sessionExpired = true
-        throw failure
-      }
-      const failure = new Error('无法连接教务系统')
-      failure.network = true
-      throw failure
-    }
-    if (response.status !== 200) {
-      const failure = new Error(`课表接口返回 ${response.status}`)
-      failure.status = response.status
-      failure.sessionExpired = response.status === 401 || response.status === 403
-      throw failure
-    }
-    const body = String(response.body || '').replace(/^\uFEFF/, '')
-    // 会话失效时教务系统会返回 200 + 登录页 HTML，不能只按状态码判定成功
-    if (/^\s*</.test(body)) {
-      const expired = /login_slogin|统一身份认证|authserver/i.test(body)
-      const failure = new Error(expired ? '登录会话已失效' : '课表数据解析失败')
-      if (expired) failure.sessionExpired = true
-      else failure.parseError = true
-      throw failure
-    }
-    try {
-      this.lastRawPayload = body
-      return JSON.parse(body)
-    } catch (error) {
-      const failure = new Error('课表数据解析失败')
-      failure.parseError = true
-      throw failure
-    }
+    const body = await this.requestText(url, { label: '课表' })
+    this.lastRawPayload = body
+    return this.parseJson(body, '课表')
   }
 
   async getProfile() {
@@ -693,9 +707,10 @@ export class ZfAcademicApi {
   // 成绩查询页的学年 / 学期下拉框包含全部可选学期
   async fetchTerms() {
     try {
-      const response = await authGet(GRADE_PAGE_ENDPOINT)
-      if (response?.status !== 200) return []
-      const body = String(response.body || '').replace(/^\uFEFF/, '')
+      const body = await this.requestText(GRADE_PAGE_ENDPOINT, {
+        label: '成绩页',
+        allowHtml: true
+      })
       if (!/^\s*</.test(body)) return []
       return parseTermsFromHtml(body, this.term, { enrollmentYear: this.profile?.enrollmentYear })
     } catch (error) {
@@ -741,7 +756,13 @@ export class ZfAcademicApi {
     if (!sameTerm || force) {
       try {
         const payload = await this.fetchSchedule(target)
-        const nextTerm = mapTerm(payload.xsxx || {}, target)
+        // 接口异常返回空对象时不能静默变成「本周没课」，必须按解析失败处理
+        if (!payload?.xsxx) {
+          const failure = new Error('课表数据缺少必要字段')
+          failure.parseError = true
+          throw failure
+        }
+        const nextTerm = mapTerm(payload.xsxx, target)
         this.term = nextTerm
         this.schedule = mapSchedule(payload, nextTerm)
         this.fetchedAt = new Date().toISOString()
@@ -769,42 +790,12 @@ export class ZfAcademicApi {
   async fetchGradesPage(term, page, pageSize = 100) {
     const form = `xnm=${encodeURIComponent(term.xnm)}&xqm=${encodeURIComponent(term.xqm)}`
       + `&queryModel.showCount=${pageSize}&queryModel.currentPage=${page}`
-    let response
-    try {
-      response = await authPost(GRADES_ENDPOINT, form)
-    } catch (error) {
-      const message = String(error?.message || '')
-      if (message.includes('仅允许 HTTPS 请求')) {
-        const failure = new Error('登录会话已失效')
-        failure.sessionExpired = true
-        throw failure
-      }
-      const failure = new Error('无法连接教务系统')
-      failure.network = true
-      throw failure
-    }
-    if (response?.status !== 200) {
-      const failure = new Error(`成绩接口返回 ${response?.status ?? '未知状态'}`)
-      failure.status = response?.status
-      failure.sessionExpired = response?.status === 401 || response?.status === 403
-      throw failure
-    }
-    const body = String(response.body || '').replace(/^\uFEFF/, '')
-    if (/^\s*</.test(body)) {
-      const expired = /login_slogin|统一身份认证|authserver/i.test(body)
-      const failure = new Error(expired ? '登录会话已失效' : '成绩数据解析失败')
-      if (expired) failure.sessionExpired = true
-      else failure.parseError = true
-      throw failure
-    }
-    let payload
-    try {
-      payload = JSON.parse(body)
-    } catch (error) {
-      const failure = new Error('成绩数据解析失败')
-      failure.parseError = true
-      throw failure
-    }
+    const body = await this.requestText(GRADES_ENDPOINT, {
+      method: 'POST',
+      body: form,
+      label: '成绩'
+    })
+    const payload = this.parseJson(body, '成绩')
     if (!payload || !Array.isArray(payload.items)) {
       const failure = new Error('成绩数据解析失败')
       failure.parseError = true
@@ -857,42 +848,12 @@ export class ZfAcademicApi {
 
   async getEvaluations() {
     if (!this.term) throw new Error('尚未登录')
-    let response
-    try {
-      response = await authPost(EVALUATION_ENDPOINT, 'page=1&rows=10&sidx=&sord=asc')
-    } catch (error) {
-      const message = String(error?.message || '')
-      if (message.includes('仅允许 HTTPS 请求')) {
-        const failure = new Error('登录会话已失效')
-        failure.sessionExpired = true
-        throw failure
-      }
-      const failure = new Error('无法连接教务系统')
-      failure.network = true
-      throw failure
-    }
-    if (response?.status !== 200) {
-      const failure = new Error(`评教接口返回 ${response?.status ?? '未知状态'}`)
-      failure.status = response?.status
-      failure.sessionExpired = response?.status === 401 || response?.status === 403
-      throw failure
-    }
-    const body = String(response.body || '').replace(/^\uFEFF/, '')
-    if (/^\s*</.test(body)) {
-      const expired = /login_slogin|统一身份认证|authserver/i.test(body)
-      const failure = new Error(expired ? '登录会话已失效' : '评教数据解析失败')
-      if (expired) failure.sessionExpired = true
-      else failure.parseError = true
-      throw failure
-    }
-    let payload
-    try {
-      payload = JSON.parse(body)
-    } catch (error) {
-      const failure = new Error('评教数据解析失败')
-      failure.parseError = true
-      throw failure
-    }
+    const body = await this.requestText(EVALUATION_ENDPOINT, {
+      method: 'POST',
+      body: 'page=1&rows=10&sidx=&sord=asc',
+      label: '评教'
+    })
+    const payload = this.parseJson(body, '评教')
     if (!payload || !Array.isArray(payload.items)) {
       const failure = new Error('评教数据解析失败')
       failure.parseError = true
@@ -903,32 +864,10 @@ export class ZfAcademicApi {
 
   async getCourseSelectionStatus() {
     if (!this.term) throw new Error('尚未登录')
-    let response
-    try {
-      response = await authGet(COURSE_SELECTION_PAGE)
-    } catch (error) {
-      const message = String(error?.message || '')
-      if (message.includes('仅允许 HTTPS 请求')) {
-        const failure = new Error('登录会话已失效')
-        failure.sessionExpired = true
-        throw failure
-      }
-      const failure = new Error('无法连接教务系统')
-      failure.network = true
-      throw failure
-    }
-    if (response?.status !== 200) {
-      const failure = new Error(`选课状态返回 ${response?.status ?? '未知状态'}`)
-      failure.status = response?.status
-      failure.sessionExpired = response?.status === 401 || response?.status === 403
-      throw failure
-    }
-    const body = String(response.body || '').replace(/^\uFEFF/, '')
-    if (/^\s*</.test(body) && /login_slogin|统一身份认证|authserver/i.test(body)) {
-      const failure = new Error('登录会话已失效')
-      failure.sessionExpired = true
-      throw failure
-    }
+    const body = await this.requestText(COURSE_SELECTION_PAGE, {
+      label: '选课状态',
+      allowHtml: true
+    })
     return {
       ...parseCourseSelectionStatus(body),
       source: '教务系统（只读）',
@@ -938,32 +877,12 @@ export class ZfAcademicApi {
 
   async requestPortal(url, parser, options = {}) {
     const { method = 'GET', body = '' } = options
-    let response
-    try {
-      response = method === 'POST' ? await authPost(url, body) : await authGet(url)
-    } catch (error) {
-      const message = String(error?.message || '')
-      if (message.includes('仅允许 HTTPS 请求')) {
-        const failure = new Error('登录会话已失效')
-        failure.sessionExpired = true
-        throw failure
-      }
-      const failure = new Error('无法连接教务系统')
-      failure.network = true
-      throw failure
-    }
-    if (response?.status !== 200) {
-      const failure = new Error(`接口返回 ${response?.status ?? '未知状态'}`)
-      failure.status = response?.status
-      failure.sessionExpired = response?.status === 401 || response?.status === 403
-      throw failure
-    }
-    const raw = String(response.body || '').replace(/^\uFEFF/, '')
-    if (/^\s*</.test(raw) && /login_slogin|统一身份认证|authserver/i.test(raw)) {
-      const failure = new Error('登录会话已失效')
-      failure.sessionExpired = true
-      throw failure
-    }
+    const raw = await this.requestText(url, {
+      method,
+      body,
+      label: '门户',
+      allowHtml: true
+    })
     try {
       return parser(raw)
     } catch (error) {
@@ -999,17 +918,7 @@ export class ZfAcademicApi {
   }
 
   async getPortalNoticeList() {
-    const parser = (raw) => {
-      let payload
-      try {
-        payload = JSON.parse(raw)
-      } catch (error) {
-        const failure = new Error('通知数据解析失败')
-        failure.parseError = true
-        throw failure
-      }
-      return parsePortalNoticeList(payload)
-    }
+    const parser = (raw) => parsePortalNoticeList(this.parseJson(raw, '通知'))
     const result = await this.collectPortalPages(
       PORTAL_NOTICE_LIST,
       (page) => `queryModel.showCount=100&queryModel.currentPage=${page}`,
@@ -1028,17 +937,7 @@ export class ZfAcademicApi {
   }
 
   async getMessages() {
-    const parser = (raw) => {
-      let payload
-      try {
-        payload = JSON.parse(raw)
-      } catch (error) {
-        const failure = new Error('消息数据解析失败')
-        failure.parseError = true
-        throw failure
-      }
-      return parseMessages(payload)
-    }
+    const parser = (raw) => parseMessages(this.parseJson(raw, '消息'))
     const result = await this.collectPortalPages(
       PORTAL_MESSAGES,
       (page) => `flag=1&sfyy=1&queryModel.showCount=100&queryModel.currentPage=${page}`,

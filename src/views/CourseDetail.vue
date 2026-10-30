@@ -12,18 +12,30 @@
         </div>
       </section>
 
-      <h2 class="section-title">上课安排</h2>
+      <div class="section-head">
+        <h2 class="section-title">上课安排</h2>
+        <span v-if="selectedWeek" class="week-hint">第 {{ selectedWeek }} 周</span>
+      </div>
       <section class="card">
-        <div v-for="(item, index) in course.sessions" :key="index" class="session-row">
+        <div
+          v-for="(item, index) in sessionRows"
+          :key="index"
+          class="session-row"
+          :class="{ 'is-current': item.inWeek }"
+        >
           <span class="session-day">周{{ WEEKDAY_LABELS[item.weekday - 1] }}</span>
           <div class="session-main">
             <p class="session-time">
               第 {{ item.startSection }}-{{ item.endSection }} 节
               <span class="tiny">（{{ sectionRange(item.startSection, item.endSection) }}）</span>
+              <span v-if="item.inWeek" class="week-pill">本周</span>
             </p>
             <p class="tiny">{{ item.room }} · {{ formatWeeks(item.weeks) }}</p>
           </div>
         </div>
+        <p v-if="selectedWeek && !hasCurrentWeekSession" class="tiny week-empty">
+          第 {{ selectedWeek }} 周没有这门课的安排。
+        </p>
         <EmptyState v-if="!course.sessions?.length" title="暂无排课信息" />
       </section>
     </template>
@@ -33,7 +45,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
@@ -44,6 +56,26 @@ import EmptyState from '../components/EmptyState.vue'
 const route = useRoute()
 const academic = useAcademicStore()
 const { course } = storeToRefs(academic)
+
+const selectedWeek = computed(() => {
+  const value = Number(route.query.week)
+  return Number.isFinite(value) && value > 0 ? value : null
+})
+
+const sessionRows = computed(() =>
+  (course.value?.sessions || []).map((item) => ({
+    ...item,
+    inWeek: Boolean(
+      selectedWeek.value
+      && Array.isArray(item.weeks)
+      && item.weeks.includes(selectedWeek.value)
+    )
+  }))
+)
+
+const hasCurrentWeekSession = computed(() =>
+  sessionRows.value.some((item) => item.inWeek)
+)
 
 function formatWeeks(weeks) {
   if (!weeks || !weeks.length) return '周次待定'
@@ -88,6 +120,17 @@ onMounted(() => {
   color: var(--text-secondary);
 }
 
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.week-hint {
+  font-size: 12px;
+  color: var(--brand);
+}
+
 .session-row {
   display: flex;
   gap: 14px;
@@ -95,8 +138,28 @@ onMounted(() => {
   border-bottom: 1px solid var(--border);
 }
 
+.session-row.is-current {
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 10px;
+  background: var(--brand-soft);
+}
+
 .session-row:last-of-type {
   border-bottom: none;
+}
+
+.week-pill {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 10px;
+}
+
+.week-empty {
+  padding: 12px 0 4px;
 }
 
 .session-day {

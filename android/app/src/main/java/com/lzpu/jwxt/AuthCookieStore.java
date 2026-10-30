@@ -2,7 +2,6 @@ package com.lzpu.jwxt;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
@@ -30,7 +29,7 @@ public final class AuthCookieStore {
     }
 
     static void save(Context context, String value) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || value == null) return;
+        if (value == null) return;
         try {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, getKey());
@@ -47,7 +46,6 @@ public final class AuthCookieStore {
     }
 
     public static String load(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null;
         try {
             String stored = prefs(context).getString(KEY, null);
             if (stored == null) return null;

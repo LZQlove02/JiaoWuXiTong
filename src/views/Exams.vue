@@ -2,7 +2,7 @@
   <div class="page page--plain">
     <BackBar title="考试安排" />
 
-    <div v-if="loading && !exams.length" class="card loading">正在加载考试…</div>
+    <div v-if="examsLoading && !exams.length" class="card loading">正在加载考试…</div>
 
     <div v-else class="exam-list">
       <article v-for="item in examList" :key="item.id" class="card exam-item">
@@ -44,7 +44,7 @@ import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { exams, loading, errors } = storeToRefs(academic)
+const { exams, examsLoading, errors } = storeToRefs(academic)
 
 const examList = computed(() =>
   exams.value

@@ -2,7 +2,11 @@
   <div class="page page--plain">
     <BackBar title="选课" />
 
-    <div v-if="loading && !courseSelection" class="card loading">正在查询选课状态…</div>
+    <p v-if="courseSelectionOffline" class="cache-tip">
+      网络不可用，显示缓存<template v-if="courseSelectionCachedAt">（更新于 {{ formatDateTime(courseSelectionCachedAt) }}{{ courseSelectionExpired ? '，已过期' : '' }}）</template>
+    </p>
+
+    <div v-if="courseSelectionLoading && !courseSelection" class="card loading">正在查询选课状态…</div>
 
     <template v-else-if="courseSelection">
       <section class="card status-card">
@@ -39,12 +43,20 @@
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAcademicStore } from '../stores/academic'
+import { formatDateTime } from '../utils/date'
 import BackBar from '../components/BackBar.vue'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
-const { courseSelection, loading, errors } = storeToRefs(academic)
+const {
+  courseSelection,
+  courseSelectionLoading,
+  courseSelectionOffline,
+  courseSelectionCachedAt,
+  courseSelectionExpired,
+  errors
+} = storeToRefs(academic)
 
 const fetchedLabel = computed(() => {
   const value = courseSelection.value?.fetchedAt

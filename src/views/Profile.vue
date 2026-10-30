@@ -37,6 +37,8 @@ const router = useRouter()
 const avatarText = computed(() => (auth.user?.name || '我').slice(-1))
 
 async function onLogout() {
+  const confirmed = window.confirm('退出登录会清除本机会话、课表缓存与变更记录，确定退出吗？')
+  if (!confirmed) return
   await auth.logout()
   router.replace('/login')
 }

@@ -2,11 +2,15 @@
   <div class="page">
     <div class="title-row">
       <h1 class="page-title">成绩</h1>
-      <button class="term-pill" type="button" :disabled="loading" @click="openSheet">
+      <button class="term-pill" type="button" :disabled="gradesLoading" @click="openSheet">
         <span class="term-label">{{ selectedLabel }}</span>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </button>
     </div>
+
+    <p v-if="gradesOffline" class="cache-tip">
+      网络不可用，显示缓存<template v-if="gradesCachedAt">（更新于 {{ formatDateTime(gradesCachedAt) }}{{ gradesExpired ? '，已过期' : '' }}）</template>
+    </p>
 
     <section v-if="summary && summary.count" class="card summary">
       <div class="stat">
@@ -23,7 +27,7 @@
       </div>
     </section>
 
-    <div v-if="loading && !displayGroups.length" class="card loading">正在加载成绩…</div>
+    <div v-if="gradesLoading && !displayGroups.length" class="card loading">正在加载成绩…</div>
 
     <section v-else-if="!displayGroups.length" class="card">
       <EmptyState
@@ -98,11 +102,21 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAcademicStore } from '../stores/academic'
 import { useUiStore } from '../stores/ui'
+import { formatDateTime } from '../utils/date'
 import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
 const ui = useUiStore()
-const { terms, currentTerm, grades, loading, errors } = storeToRefs(academic)
+const {
+  terms,
+  currentTerm,
+  grades,
+  gradesLoading,
+  gradesOffline,
+  gradesCachedAt,
+  gradesExpired,
+  errors
+} = storeToRefs(academic)
 
 const selectedTerm = ref(null)
 const sheetOpen = ref(false)

@@ -82,14 +82,14 @@ public class ScheduleParserTest {
     }
 
     @Test
-    public void missingWeekdayFallsBackToOneAndEmptyWeeksToSixteen() throws Exception {
+    public void missingWeekdayFallsBackToOneAndEmptyWeeksToTwenty() throws Exception {
         List<ScheduleSession> sessions = ScheduleParser.parse(fixture());
         ScheduleSession physics = sessions.get(3);
         assertEquals("B005", physics.courseId);
         assertEquals(1, physics.weekday);
-        assertEquals(16, physics.weeks.length);
+        assertEquals(20, physics.weeks.length);
         assertEquals(1, physics.weeks[0]);
-        assertEquals(16, physics.weeks[15]);
+        assertEquals(20, physics.weeks[19]);
     }
 
     @Test
@@ -133,11 +133,11 @@ public class ScheduleParserTest {
         assertEquals(16, ScheduleParser.parseWeeks("1-16周").length);
         assertEquals(2, ScheduleParser.parseWeeks("2-4周(双)").length);
         assertEquals(8, ScheduleParser.parseWeeks("1-16周(单)").length);
-        assertEquals(16, ScheduleParser.parseWeeks("").length);
-        // 与 JS 一致：自相矛盾的「2周(单)」过滤后为空，不再兜底成 1-16 周
+        assertEquals(20, ScheduleParser.parseWeeks("").length);
+        // 与 JS 一致：自相矛盾的「2周(单)」过滤后为空，不再兜底成 1-20 周
         assertEquals(0, ScheduleParser.parseWeeks("2周(单)").length);
-        // 「单周」没有数字：先按 1-16 周兜底，再筛单周
-        assertEquals(8, ScheduleParser.parseWeeks("单周").length);
+        // 「单周」没有数字：先按 1-20 周兜底，再筛单周
+        assertEquals(10, ScheduleParser.parseWeeks("单周").length);
         // 与 JS 现有行为一致：逗号枚举只识别到最后一个「N周」
         assertEquals(1, ScheduleParser.parseWeeks("1,3,5周").length);
         assertEquals(5, ScheduleParser.parseWeeks("1,3,5周")[0]);

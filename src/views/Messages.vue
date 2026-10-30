@@ -7,6 +7,10 @@
       <p class="read-only-text">仅查看，不标记已读</p>
     </section>
 
+    <p v-if="messagesOffline || messagesCachedAt" class="cache-tip">
+      网络不可用，显示缓存<template v-if="messagesCachedAt">（更新于 {{ formatDateTime(messagesCachedAt) }}{{ messagesExpired ? '，已过期' : '' }}）</template>
+    </p>
+
     <LoadState
       :loading="loading && !messages"
       :error="error"
@@ -49,6 +53,7 @@ import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
+import { formatDateTime } from '../utils/date'
 import BackBar from '../components/BackBar.vue'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -56,7 +61,14 @@ import LoadState from '../components/LoadState.vue'
 
 const route = useRoute()
 const academic = useAcademicStore()
-const { messages, messagesLoading, errors } = storeToRefs(academic)
+const {
+  messages,
+  messagesLoading,
+  messagesOffline,
+  messagesCachedAt,
+  messagesExpired,
+  errors
+} = storeToRefs(academic)
 const loading = messagesLoading
 const error = computed(() => errors.value.messages)
 const expandedId = ref(route.query.id ? String(route.query.id) : '')
