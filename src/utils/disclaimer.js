@@ -1,7 +1,8 @@
 const STORAGE_KEY = 'lzpu.disclaimer.accepted'
 
 // 声明文案修订时同步 +1，老用户下次启动会重新看到声明
-export const DISCLAIMER_VERSION = '1'
+// v2（2026-10-30）：允许校内同学免费自行安装，明确不做商业用途与禁止二次打包
+export const DISCLAIMER_VERSION = '2'
 export const DISCLAIMER_DATE = '2026-10-30'
 
 export function acceptedDisclaimerVersion() {

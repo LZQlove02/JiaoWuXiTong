@@ -23,6 +23,8 @@ export default [
         window: 'readonly',
         document: 'readonly',
         localStorage: 'readonly',
+        fetch: 'readonly',
+        navigator: 'readonly',
         DOMParser: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

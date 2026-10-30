@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppThemePlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
         registerPlugin(ScheduleChangeBridge.class);
+        registerPlugin(SupportBridgePlugin.class);
         super.onCreate(savedInstanceState);
         // 用户强停 App 会清掉闹钟，每次打开 App 补排一次
         ScheduleChangeNotifier.ensureChannel(this);

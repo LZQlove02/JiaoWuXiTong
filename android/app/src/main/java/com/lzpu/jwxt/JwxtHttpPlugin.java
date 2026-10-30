@@ -367,55 +367,56 @@ public class JwxtHttpPlugin extends Plugin {
     /**
      * 手动跟随重定向：每一跳都校验协议、端口与允许主机，超过上限直接失败，
      * 不把请求转发到非白名单目标。keepCookies 为 true 时同步服务端下发的 Set-Cookie。
+     * 具体循环在 {@link HttpExecutor} 中，与更新检查共用。
      */
     private Response execute(OkHttpClient client, Request request, HttpPolicy policy,
                              boolean keepCookies) throws IOException {
-        boolean debug = isDebugBuild();
-        Request current = request;
-        for (int i = 0; i <= MAX_REDIRECTS; i++) {
-            policy.check(current.url());
-            if (debug) {
-                Log.d(DEBUG_TAG, "请求 " + current.method() + " " + debugUrl(current.url()));
+        return HttpExecutor.execute(client, request, policy, MAX_REDIRECTS,
+                cookieHandler(keepCookies), observer(), keepCookies);
+    }
+
+    private HttpExecutor.CookieHandler cookieHandler(final boolean keepCookies) {
+        return new HttpExecutor.CookieHandler() {
+            @Override
+            public String header() {
+                return authCookieHeader;
             }
-            Response response = client.newCall(current).execute();
-            if (debug) {
-                Log.d(DEBUG_TAG, "响应 " + response.code() + " " + current.method() + " "
-                        + debugUrl(current.url()) + " [" + response.header("Content-Type") + "]");
+
+            @Override
+            public void onResponseHeaders(List<String> setCookies) {
+                if (keepCookies) updateAuthCookies(setCookies);
             }
-            if (keepCookies) updateAuthCookies(response);
-            if (!isRedirect(response.code())) {
-                return response;
+        };
+    }
+
+    /** debug 包才打的请求日志，查询值按白名单脱敏。 */
+    private HttpExecutor.Observer observer() {
+        if (!isDebugBuild()) return null;
+        return new HttpExecutor.Observer() {
+            @Override
+            public void onRequest(Request request) {
+                Log.d(DEBUG_TAG, "请求 " + request.method() + " " + debugUrl(request.url()));
             }
-            HttpUrl next;
-            int code = response.code();
-            try {
-                next = policy.resolveRedirect(current.url(), response.header("Location"));
-            } finally {
-                response.close();
+
+            @Override
+            public void onResponse(Response response) {
+                Log.d(DEBUG_TAG, "响应 " + response.code() + " " + response.request().method() + " "
+                        + debugUrl(response.request().url())
+                        + " [" + response.header("Content-Type") + "]");
             }
-            if (debug) {
+
+            @Override
+            public void onRedirect(int code, HttpUrl next) {
                 Log.d(DEBUG_TAG, "重定向 " + code + " -> " + debugUrl(next));
             }
-            // 301/302/303 按 RFC 改为 GET 并丢弃请求体，避免把表单数据重放到新地址
-            Request.Builder nextBuilder = current.newBuilder().url(next);
-            if (code == 301 || code == 302 || code == 303) {
-                nextBuilder.get();
-            }
-            String cookie = authCookieHeader;
-            if (keepCookies && !cookie.isEmpty()) {
-                nextBuilder.header("Cookie", cookie);
-            }
-            current = nextBuilder.build();
-        }
-        throw new IOException("重定向次数过多");
+        };
     }
 
     /**
      * 用响应中的 Set-Cookie 更新会话：只保留 name=value，值为空视为删除；
      * 有变化才重新写入加密存储，避免每个请求都做一次 Keystore 加解密。
      */
-    private synchronized void updateAuthCookies(Response response) {
-        List<String> setCookies = response.headers("Set-Cookie");
+    private synchronized void updateAuthCookies(List<String> setCookies) {
         if (setCookies == null || setCookies.isEmpty()) return;
 
         Map<String, String> jar = new LinkedHashMap<>();
@@ -461,9 +462,5 @@ public class JwxtHttpPlugin extends Plugin {
             builder.append(entry.getKey()).append('=').append(entry.getValue());
         }
         return builder.toString();
-    }
-
-    private static boolean isRedirect(int code) {
-        return code == 301 || code == 302 || code == 303 || code == 307 || code == 308;
     }
 }

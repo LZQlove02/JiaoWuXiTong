@@ -3,7 +3,7 @@
 柳州职业技术大学教务系统的个人只读客户端。前端使用 Vue 3 + Vite，Android 壳使用 Capacitor 6，数据直连学校统一认证后的教务系统，不依赖自建服务器。
 
 > 非官方应用，未登录不可进入业务页面；仅支持学校统一认证登录，不保存账号密码。
-> 当前版本：v1.2.1 / versionCode 22；minSdk 23（Android 6.0），targetSdk 35。
+> 当前版本：v1.3.0 / versionCode 23；minSdk 23（Android 6.0），targetSdk 35。
 
 ## 功能
 
@@ -11,6 +11,7 @@
 - 课表、成绩（单学期 / 全部学期）、评教记录、选课状态、教务通知、消息、校历、办事指南
 - 课表变更提醒：停课 / 调课 / 新增 / 换教室，前台对账 + 每天两次后台检查 + 系统通知
 - 桌面小组件：今日课程、下一节课、本周课表
+- 更新检查（公开发布仓库，每天最多一次，可手动重查）与意见反馈（系统邮件 + 脱敏诊断信息）
 - 深浅主题、平板限宽布局、离线缓存与过期提示
 
 考试接口尚未接入，相关入口会显示「暂不可用」。
@@ -59,6 +60,7 @@ release 已开启 R8 混淆与资源裁剪；Capacitor 插件通过反射调用�
 - 统一认证 WebView 登录完成后立即销毁；统一认证证书使用内置 SHA-256 指纹固定（同时配置 network_security_config 的 SPKI pin），指纹不一致直接阻止登录。证书轮换时需同步更新两处指纹并重新发版。
 - 登录 Cookie 只回传 `zfjw.lzzy.net` 域；不保存密码，不向 WebView 暴露 JS 接口。
 - 个人数据缓存写入应用私有 localStorage，退出登录或会话失效时统一清空；锁屏通知只展示脱敏文案。
+- 更新检查只向 `api.github.com` 发匿名 GET（不带 Cookie、学号或查询参数），外链与反馈收件人写死；App 内不下载、不安装 APK。
 - 缓存过期规则：通知 / 办事指南列表 6 小时，详情 7 天；成绩、消息、评教、选课状态有独立 TTL，断网时保留缓存并标注更新时间与「已过期」。
 
 ## CI
@@ -69,4 +71,5 @@ release 已开启 R8 混淆与资源裁剪；Capacitor 插件通过反射调用�
 
 - 贡献流程与编码约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 私下上报。
 - 版本变更见 [CHANGELOG.md](CHANGELOG.md)，文档索引见 [docs/README.md](docs/README.md)。
+- 发版步骤见 [docs/发布流程.md](docs/发布流程.md)，APK 发布在公开仓库 [lzpu-jwxt-releases](https://github.com/LZQlove02/lzpu-jwxt-releases/releases)。
 - 本项目保留所有权利，详见 [LICENSE](LICENSE)。

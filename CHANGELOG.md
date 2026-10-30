@@ -4,13 +4,20 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-30
+
 ### 新增
 
-- CI 在 push / PR 时运行前端 lint、类型检查、单测、构建与 Android `testDebugUnitTest`
+- 更新检查：登录后每天一次自动检查公开发布仓库，新增「关于」页手动检查、更新弹窗与「去更新」跳转
+- 意见反馈：登录页与设置页入口，可拉起系统邮件 App 发送描述与脱敏诊断信息，或复制内容手动发送
+- 原生 `SupportBridge` 插件、`HttpPolicy.GITHUB` 与共享 `HttpExecutor`；Manifest 增加邮件 / 浏览器包可见性声明
+- 公开分发仓库 `lzpu-jwxt-releases`（仅 APK 与发布说明，源码保持私有）
 
 ### 变更
 
-- 方案、组件执行方案、验证报告归档到 `docs/plan`、`docs/reports`，新增文档索引与协作模板
+- 免责声明升到 v2：允许校内同学免费自行安装，禁止二次打包与商业使用；LICENSE 同步允许原样分发 APK
+- CI 在 push / PR 时运行前端 lint、类型检查、单测、构建与 Android `testDebugUnitTest`；修复时区与 Capacitor 同步导致的失败
+- 方案、组件执行方案、验证报告归档到 `docs/plan`、`docs/reports`，新增文档索引、发布流程与协作模板
 
 ## [1.2.1] - 2026-10-30
 

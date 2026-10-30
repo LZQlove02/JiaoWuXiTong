@@ -23,6 +23,13 @@ public final class HttpPolicy {
     public static final HttpPolicy AUTH = new HttpPolicy(
             Collections.singleton("zfjw.lzzy.net"));
 
+    /**
+     * 更新检查：只允许 GitHub API，供发布仓库的 /releases/latest 使用。
+     * 不携带 Cookie 与任何账号信息，仅匿名 GET。
+     */
+    static final HttpPolicy GITHUB = new HttpPolicy(
+            Collections.singleton("api.github.com"));
+
     private final Set<String> allowedHosts;
 
     private HttpPolicy(Set<String> allowedHosts) {

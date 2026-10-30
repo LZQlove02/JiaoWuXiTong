@@ -17,6 +17,8 @@ import Evaluation from '../views/Evaluation.vue'
 import CourseSelection from '../views/CourseSelection.vue'
 import Settings from '../views/Settings.vue'
 import Changes from '../views/Changes.vue'
+import About from '../views/About.vue'
+import Feedback from '../views/Feedback.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -35,6 +37,19 @@ const routes = [
     name: 'changes',
     component: Changes,
     meta: { title: '课表变更' }
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: About,
+    meta: { title: '关于' }
+  },
+  {
+    // 登录前后都能进入：登录页需要反馈入口
+    path: '/feedback',
+    name: 'feedback',
+    component: Feedback,
+    meta: { guest: true, title: '意见反馈' }
   },
   { path: '/exams', name: 'exams', component: Exams },
   { path: '/notices', name: 'notices', component: Notices },
@@ -80,6 +95,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (auth.restoring) await auth.bootstrap()
+  if (to.meta.guest) return true
   if (to.meta.public) {
     return auth.isLoggedIn ? '/' : true
   }

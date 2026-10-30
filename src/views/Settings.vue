@@ -55,6 +55,10 @@
         <span class="setting-left"><AppIcon name="info" />关于</span>
         <span v-if="version" class="tiny">v{{ version }}</span>
       </button>
+      <router-link class="setting-row" to="/feedback">
+        <span class="setting-left"><AppIcon name="mail" />意见反馈</span>
+        <AppIcon name="chevron-right" />
+      </router-link>
       <button class="setting-row" @click="openDisclaimer">
         <span class="setting-left"><AppIcon name="shield" />免责声明</span>
         <span class="tiny">v{{ disclaimerVersion }}</span>
@@ -73,6 +77,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
+import { useRouter } from 'vue-router'
 import { useUiStore } from '../stores/ui'
 import { useChangesStore } from '../stores/changes'
 import { DISCLAIMER_VERSION } from '../utils/disclaimer'
@@ -82,6 +87,7 @@ import DisclaimerGate from '../components/DisclaimerGate.vue'
 
 const ui = useUiStore()
 const changes = useChangesStore()
+const router = useRouter()
 
 const themeOptions = [
   { value: 'system', label: '跟随系统' },
@@ -130,7 +136,7 @@ function clearCache() {
 }
 
 function showAbout() {
-  showToast(version.value ? `柳职教务 v${version.value}` : '柳职教务')
+  router.push('/about')
 }
 
 async function toggleChanges() {

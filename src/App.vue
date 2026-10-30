@@ -12,6 +12,7 @@
   <div v-else class="app-shell">
     <router-view :key="$route.fullPath" />
     <TabBar v-if="showTabBar" />
+    <UpdateDialog v-if="update.dialogOpen" />
   </div>
 </template>
 
@@ -22,10 +23,12 @@ import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import TabBar from './components/TabBar.vue'
 import DisclaimerGate from './components/DisclaimerGate.vue'
+import UpdateDialog from './components/UpdateDialog.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
 import { useChangesStore } from './stores/changes'
 import { useUiStore } from './stores/ui'
+import { useUpdateStore } from './stores/update'
 import { acceptDisclaimer, isDisclaimerAccepted } from './utils/disclaimer'
 import { clearWidgetNow, resyncWidget, syncWidget, syncWidgetTheme } from './widget/sync'
 import { deepLinkPath } from './utils/deepLink'
@@ -36,6 +39,7 @@ const ui = useUiStore()
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const changes = useChangesStore()
+const update = useUpdateStore()
 const showTabBar = computed(() => route.meta.tab === true)
 
 const consented = ref(isDisclaimerAccepted())
@@ -163,6 +167,8 @@ async function setupNative() {
     changes.refresh()
     // 切回 App 也重新对一次账，不能只读原生旧状态
     if (auth.isLoggedIn) academic.loadSchedule(academic.currentTerm)
+    // 更新检查按 24h 节流，内部自行判断是否需要请求
+    update.autoCheck()
   })
   CapApp.getLaunchUrl()
     .then((result) => openDeepLink(result?.url))
@@ -189,6 +195,15 @@ async function setupNative() {
     router.back()
   })
 }
+
+// 登录态建立后（含冷启动会话恢复）检查一次更新；免责声明同意与 24h 节流在 store 内判断
+watch(
+  () => auth.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) update.autoCheck()
+  },
+  { immediate: true }
+)
 
 onMounted(() => {
   ui.initTheme()

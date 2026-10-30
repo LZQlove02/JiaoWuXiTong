@@ -13,6 +13,8 @@
       <p class="hint">登录后可查看实时课表。</p>
       <p v-if="error" class="error">{{ error }}</p>
     </section>
+
+    <router-link class="feedback-link" to="/feedback">遇到问题？意见反馈</router-link>
   </div>
 </template>
 
@@ -72,6 +74,14 @@ async function ssoLogin() {
 
 .login-card {
   padding: 20px;
+}
+
+.feedback-link {
+  display: block;
+  margin-top: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
 }
 
 .sso {
