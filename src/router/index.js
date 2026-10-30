@@ -15,6 +15,7 @@ import Guide from '../views/Guide.vue'
 import Calendar from '../views/Calendar.vue'
 import Evaluation from '../views/Evaluation.vue'
 import CourseSelection from '../views/CourseSelection.vue'
+import Settings from '../views/Settings.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -22,6 +23,12 @@ const routes = [
   { path: '/schedule', name: 'schedule', component: Schedule, meta: { tab: true } },
   { path: '/grades', name: 'grades', component: Grades, meta: { tab: true } },
   { path: '/profile', name: 'profile', component: Profile, meta: { tab: true } },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: Settings,
+    meta: { title: '设置' }
+  },
   { path: '/exams', name: 'exams', component: Exams },
   { path: '/notices', name: 'notices', component: Notices },
   {
