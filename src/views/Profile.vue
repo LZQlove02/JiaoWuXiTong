@@ -115,8 +115,15 @@ async function onLogout() {
   gap: 8px;
 }
 
+/* 页面撑满一屏，数据来源用 margin-top:auto 顶到最底部（TabBar 之上） */
+.page {
+  display: flex;
+  flex-direction: column;
+}
+
 .footer {
-  margin-top: 20px;
+  margin-top: auto;
+  padding-top: 20px;
   text-align: center;
 }
 </style>
