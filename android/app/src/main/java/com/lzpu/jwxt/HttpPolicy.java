@@ -18,8 +18,7 @@ public final class HttpPolicy {
             Collections.singleton("www.lzpu.edu.cn"));
 
     /**
-     * 教务认证与个人数据。
-     * 当前仅定义策略，登录与业务请求待方案 6.5 受控验证通过后才接入。
+     * 教务认证与个人数据。登录后的业务请求与课表变更后台检查都走这套策略。
      */
     public static final HttpPolicy AUTH = new HttpPolicy(
             Collections.singleton("zfjw.lzzy.net"));

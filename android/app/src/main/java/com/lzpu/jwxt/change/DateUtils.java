@@ -57,18 +57,25 @@ final class DateUtils {
     }
 
     /**
-     * 当前这一周、星期 weekday（1=周一）对应的真实日期。
-     * 不能按 startDate 偏移：学期起始日不一定是周一（2025-08-31 是周日、2027-02-23 是周二），
-     * 否则整学期错一天，周一的变更会在当天就被判成「已上完」。
+     * 当前周的「第 week 周、星期 weekday」对应日期。
+     * 以 startDate 起算的 7 天周块为锚（与 currentWeek / 课表网格同一口径），
+     * 不假设 startDate 一定是周一（2025-08-31 是周日、2027-02-23 是周二）。
+     * 若 weekday 已过该周块起点，则顺延到下一个同名星期。
      */
-    static Calendar occurrenceInCurrentWeek(Calendar now, int weekday) {
-        int dayOfWeek = now.get(Calendar.DAY_OF_WEEK); // 周日=1 … 周六=7
-        int mondayOffset = (dayOfWeek + 5) % 7; // 周一=0 … 周日=6
-        Calendar day = atMidnight(
-                now.get(Calendar.YEAR),
-                now.get(Calendar.MONTH),
-                now.get(Calendar.DAY_OF_MONTH));
-        day.add(Calendar.DAY_OF_MONTH, -mondayOffset + Math.max(weekday, 1) - 1);
+    static Calendar occurrenceInCurrentWeek(String startDate, int week, int weekday) {
+        int[] start = parseDate(startDate);
+        if (start == null) return null;
+        Calendar weekStart = atMidnight(start[0], start[1], start[2]);
+        weekStart.add(Calendar.DAY_OF_MONTH, (week - 1) * 7);
+
+        int startDayOfWeek = weekStart.get(Calendar.DAY_OF_WEEK); // 周日=1 … 周六=7
+        int startMondayOffset = (startDayOfWeek + 5) % 7; // 周一=0 … 周日=6
+        int targetOffset = Math.max(weekday, 1) - 1;
+        int delta = targetOffset - startMondayOffset;
+        if (delta < 0) delta += 7;
+
+        Calendar day = (Calendar) weekStart.clone();
+        day.add(Calendar.DAY_OF_MONTH, delta);
         return day;
     }
 

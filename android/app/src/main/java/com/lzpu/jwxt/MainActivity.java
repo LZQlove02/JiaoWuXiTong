@@ -28,6 +28,8 @@ public class MainActivity extends BridgeActivity {
     public void onStart() {
         super.onStart();
         AppVisibility.setForeground(true);
+        // 每次回到前台补排一次：退出登录会取消闹钟，弱网重新登录时也能恢复检查
+        ScheduleCheckScheduler.scheduleAll(this);
     }
 
     @Override

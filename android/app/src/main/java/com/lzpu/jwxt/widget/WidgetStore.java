@@ -14,6 +14,8 @@ public final class WidgetStore {
     private static final String PREFS_NAME = "lzpu_widget";
     private static final String KEY_PAYLOAD = "payload";
     private static final String KEY_THEME = "theme";
+    // JS 同步与原生变更引擎都会改写 payload，读改写必须串行
+    private static final Object PAYLOAD_LOCK = new Object();
 
     // 组件背景样式
     public static final String STYLE_GLASS = "glass";
@@ -29,15 +31,45 @@ public final class WidgetStore {
     }
 
     public static void writePayload(Context context, String json) {
-        prefs(context).edit().putString(KEY_PAYLOAD, json == null ? "" : json).apply();
+        synchronized (PAYLOAD_LOCK) {
+            prefs(context).edit().putString(KEY_PAYLOAD, json == null ? "" : json).apply();
+        }
     }
 
     public static String readPayload(Context context) {
-        return prefs(context).getString(KEY_PAYLOAD, "");
+        synchronized (PAYLOAD_LOCK) {
+            return prefs(context).getString(KEY_PAYLOAD, "");
+        }
     }
 
     public static void clearPayload(Context context) {
-        prefs(context).edit().remove(KEY_PAYLOAD).apply();
+        synchronized (PAYLOAD_LOCK) {
+            prefs(context).edit().remove(KEY_PAYLOAD).apply();
+        }
+    }
+
+    /**
+     * JS 同步专用：状态未加载完时 payload 不带 changeBadge，此时保留原生刚写入的角标。
+     * 读旧值 + 合并 + 写回在同一把锁内，避免与后台检查的 markChangeBadge 互相覆盖。
+     */
+    public static void writePayloadPreservingBadge(Context context, String json) {
+        synchronized (PAYLOAD_LOCK) {
+            String merged = json;
+            try {
+                JSONObject incoming = new JSONObject(json);
+                if (!incoming.has("changeBadge")) {
+                    String old = readPayload(context);
+                    if (old != null && !old.isEmpty()) {
+                        incoming.put("changeBadge",
+                                new JSONObject(old).optBoolean("changeBadge", false));
+                    }
+                    merged = incoming.toString();
+                }
+            } catch (Exception ignored) {
+                // payload 不是合法 JSON 时按原样写入，由组件兜底
+            }
+            writePayload(context, merged);
+        }
     }
 
     /**
@@ -45,17 +77,19 @@ public final class WidgetStore {
      * 后台检查发现变更、标记已读或关闭开关时由变更引擎调用。
      */
     public static boolean markChangeBadge(Context context, boolean visible) {
-        String raw = readPayload(context);
-        if (raw == null || raw.isEmpty()) return false;
-        try {
-            JSONObject json = new JSONObject(raw);
-            if (json.optBoolean("changeBadge", false) == visible) return false;
-            json.put("changeBadge", visible);
-            writePayload(context, json.toString());
-            return true;
-        } catch (Exception ignored) {
-            // payload 不是合法 JSON 时保持原样，等 JS 下次同步覆盖
-            return false;
+        synchronized (PAYLOAD_LOCK) {
+            String raw = readPayload(context);
+            if (raw == null || raw.isEmpty()) return false;
+            try {
+                JSONObject json = new JSONObject(raw);
+                if (json.optBoolean("changeBadge", false) == visible) return false;
+                json.put("changeBadge", visible);
+                writePayload(context, json.toString());
+                return true;
+            } catch (Exception ignored) {
+                // payload 不是合法 JSON 时保持原样，等 JS 下次同步覆盖
+                return false;
+            }
         }
     }
 

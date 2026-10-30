@@ -242,4 +242,21 @@ public class ScheduleChangeEngineTest {
         assertEquals(1, entries.size());
         assertFalse(entries.get(0).quiet);
     }
+
+    @Test
+    public void tuesdayTermStartKeepsMondayClassInAppWeekBlock() {
+        // 2027-02-23 是周二：第 3 周从 03-09 起算，周一的课应在 03-15，不能在 03-09 被判已上完
+        TermInfo term = new TermInfo("2026", "12", "2027-02-23");
+        java.util.Calendar tuesdayMorning = at(2027, 3, 9, 8, 0);
+        List<ScheduleSession> before = new ArrayList<>();
+        before.add(session("C1", "高等数学", 1, 3, 4, "1-16周", "A101"));
+        before.add(session("C2", "大学英语", 2, 1, 2, "1-16周", "B203"));
+        List<ScheduleSession> after = new ArrayList<>();
+        after.add(session("C2", "大学英语", 2, 1, 2, "1-16周", "B203"));
+
+        List<ChangeEntry> entries = ScheduleChangeEngine.diff(
+                before, after, term, times(), tuesdayMorning, "foreground");
+        assertEquals(1, entries.size());
+        assertFalse(entries.get(0).quiet);
+    }
 }

@@ -112,6 +112,7 @@ public final class ScheduleChangeService {
                     // 换账号时不展示上一个人的变更历史
                     if (baseline != null && !owner.equals(baseline.studentId)) {
                         ScheduleChangeStore.writeEntries(app, new ArrayList<>(), Calendar.getInstance());
+                        ScheduleChangeStore.clearLastSessionExpiredDate(app);
                         WidgetStore.markChangeBadge(app, false);
                         WidgetUpdater.refreshAll(app);
                     }
@@ -227,6 +228,7 @@ public final class ScheduleChangeService {
             ScheduleChangeNotifier.cancelAll(app);
             ScheduleChangeStore.clearBaseline(app);
             ScheduleChangeStore.writeEntries(app, new ArrayList<>(), Calendar.getInstance());
+            ScheduleChangeStore.clearLastSessionExpiredDate(app);
             ScheduleCheckScheduler.cancelAll(app);
             WidgetStore.markChangeBadge(app, false);
             WidgetUpdater.refreshAll(app);

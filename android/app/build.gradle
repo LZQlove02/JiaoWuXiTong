@@ -40,6 +40,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    // 与 JS 单测共用同一份课表 fixture（仓库根 tests/fixtures）
+    sourceSets {
+        test {
+            resources.srcDirs += '../../tests/fixtures'
+        }
+    }
 }
 
 if (!keystorePropertiesFile.exists()) {

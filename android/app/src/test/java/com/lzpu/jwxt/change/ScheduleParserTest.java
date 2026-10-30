@@ -2,27 +2,62 @@ package com.lzpu.jwxt.change;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/** 解析器必须与 src/api/zf.js 的 mapSchedule / parseWeeks / parseSections / cleanRoom 对齐。 */
+/**
+ * 解析器必须与 src/api/zf.js 的 mapSchedule / parseWeeks / parseSections / cleanRoom 对齐。
+ * fixture 与 JS 端 tests/scheduleParserParity.test.js 共用同一份文件。
+ */
 public class ScheduleParserTest {
 
-    private static final String KB_LIST = "{\"kbList\":["
-            + "{\"kch\":\"B001\",\"kcmc\":\"高等数学\",\"xqj\":\"1\",\"jcs\":\"3-4节\",\"zcd\":\"1-16周\",\"cdmc\":\"官塘校区A101(80人)\"},"
-            + "{\"kch\":\"B002\",\"kcmc\":\"大学英语\",\"xqj\":\"3\",\"jcs\":\"5\",\"zcd\":\"1-16周(单)\",\"cdmc\":\"B203\"},"
-            + "{\"kch\":\"B003\",\"kcmc\":\"体育\",\"xqj\":\"5\",\"jcs\":\"7-8\",\"zcd\":\"1-8周\",\"cdmc\":\"操场\"},"
-            + "{\"kch\":\"B003\",\"kcmc\":\"体育\",\"xqj\":\"5\",\"jcs\":\"7-8\",\"zcd\":\"1-8周\",\"cdmc\":\"操场\"},"
-            + "{\"kch\":\"B004\",\"kcmc\":\"\",\"xqj\":\"2\",\"jcs\":\"1-2\",\"zcd\":\"1-4周\",\"cdmc\":\"C1\"},"
-            + "{\"kch\":\"B005\",\"kcmc\":\"物理\",\"jcs\":\"1-2\",\"zcd\":\"\",\"cdmc\":\"C2\"}"
-            + "]}";
+    private static JSONObject fixture() throws Exception {
+        InputStream input = ScheduleParserTest.class.getResourceAsStream("/schedule-kbList.json");
+        assertNotNull("缺少共享 fixture：tests/fixtures/schedule-kbList.json", input);
+        StringBuilder builder = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(input, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) builder.append(line);
+        }
+        return new JSONObject(builder.toString());
+    }
+
+    @Test
+    public void matchesSharedFixture() throws Exception {
+        JSONObject root = fixture();
+        List<ScheduleSession> sessions = ScheduleParser.parse(root);
+        JSONArray expected = root.getJSONArray("expectedSessions");
+        assertEquals(expected.length(), sessions.size());
+        for (int i = 0; i < expected.length(); i += 1) {
+            JSONObject item = expected.getJSONObject(i);
+            ScheduleSession session = sessions.get(i);
+            assertEquals(item.getString("courseId"), session.courseId);
+            assertEquals(item.getString("courseName"), session.courseName);
+            assertEquals(item.getInt("weekday"), session.weekday);
+            assertEquals(item.getInt("startSection"), session.startSection);
+            assertEquals(item.getInt("endSection"), session.endSection);
+            assertEquals(item.getString("room"), session.room);
+            JSONArray weeks = item.getJSONArray("weeks");
+            assertEquals(weeks.length(), session.weeks.length);
+            for (int w = 0; w < weeks.length(); w += 1) {
+                assertEquals(weeks.getInt(w), session.weeks[w]);
+            }
+        }
+    }
 
     @Test
     public void parsesAndDedupesKbList() throws Exception {
-        List<ScheduleSession> sessions = ScheduleParser.parse(new JSONObject(KB_LIST));
+        List<ScheduleSession> sessions = ScheduleParser.parse(fixture());
         assertEquals(4, sessions.size());
 
         ScheduleSession math = sessions.get(0);
@@ -37,7 +72,7 @@ public class ScheduleParserTest {
 
     @Test
     public void oddWeeksAndSingleSection() throws Exception {
-        List<ScheduleSession> sessions = ScheduleParser.parse(new JSONObject(KB_LIST));
+        List<ScheduleSession> sessions = ScheduleParser.parse(fixture());
         ScheduleSession english = sessions.get(1);
         assertEquals(3, english.weekday);
         assertEquals(5, english.startSection);
@@ -48,13 +83,35 @@ public class ScheduleParserTest {
 
     @Test
     public void missingWeekdayFallsBackToOneAndEmptyWeeksToSixteen() throws Exception {
-        List<ScheduleSession> sessions = ScheduleParser.parse(new JSONObject(KB_LIST));
+        List<ScheduleSession> sessions = ScheduleParser.parse(fixture());
         ScheduleSession physics = sessions.get(3);
         assertEquals("B005", physics.courseId);
         assertEquals(1, physics.weekday);
         assertEquals(16, physics.weeks.length);
         assertEquals(1, physics.weeks[0]);
         assertEquals(16, physics.weeks[15]);
+    }
+
+    @Test
+    public void weeksLabelKeepsMixedSequencesHonest() {
+        ScheduleSession mixed = new ScheduleSession(
+                "C1", "高等数学", 1, 3, 4,
+                new int[]{1, 3, 5, 6, 7, 8}, "A101");
+        assertEquals("1,3,5-8周", mixed.weeksLabel());
+
+        ScheduleSession odd = new ScheduleSession(
+                "C2", "大学英语", 3, 5, 6,
+                new int[]{1, 3, 5, 7, 9, 11, 13, 15}, "B203");
+        assertEquals("1-15周(单)", odd.weeksLabel());
+
+        ScheduleSession even = new ScheduleSession(
+                "C3", "体育", 5, 7, 8,
+                new int[]{2, 4, 6}, "操场");
+        assertEquals("2-6周(双)", even.weeksLabel());
+
+        ScheduleSession none = new ScheduleSession("C4", "空周次", 1, 1, 2, new int[0], "");
+        assertEquals("", none.weeksLabel());
+        assertFalse(none.containsWeek(1));
     }
 
     @Test
@@ -84,28 +141,6 @@ public class ScheduleParserTest {
         // 与 JS 现有行为一致：逗号枚举只识别到最后一个「N周」
         assertEquals(1, ScheduleParser.parseWeeks("1,3,5周").length);
         assertEquals(5, ScheduleParser.parseWeeks("1,3,5周")[0]);
-    }
-
-    @Test
-    public void weeksLabelKeepsMixedSequencesHonest() {
-        ScheduleSession mixed = new ScheduleSession(
-                "C1", "高等数学", 1, 3, 4,
-                new int[]{1, 3, 5, 6, 7, 8}, "A101");
-        assertEquals("1,3,5-8周", mixed.weeksLabel());
-
-        ScheduleSession odd = new ScheduleSession(
-                "C2", "大学英语", 3, 5, 6,
-                new int[]{1, 3, 5, 7, 9, 11, 13, 15}, "B203");
-        assertEquals("1-15周(单)", odd.weeksLabel());
-
-        ScheduleSession even = new ScheduleSession(
-                "C3", "体育", 5, 7, 8,
-                new int[]{2, 4, 6}, "操场");
-        assertEquals("2-6周(双)", even.weeksLabel());
-
-        ScheduleSession none = new ScheduleSession("C4", "空周次", 1, 1, 2, new int[0], "");
-        assertEquals("", none.weeksLabel());
-        assertFalse(none.containsWeek(1));
     }
 
     @Test

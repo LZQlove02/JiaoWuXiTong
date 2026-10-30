@@ -54,7 +54,8 @@ function installWidgetSync() {
     messages: academic.messages,
     portalNotices: academic.portalNotices,
     changeUnread: changes.unread,
-    changeEnabled: changes.enabled
+    changeEnabled: changes.enabled,
+    changeKnown: changes.loaded && !changes.error
   })
   watch(
     [
@@ -112,12 +113,13 @@ watch(
   }
 )
 
-onMounted(() => {
+onMounted(async () => {
   ui.initTheme()
   if (!Capacitor.isNativePlatform()) return
 
+  // 先读出变更状态再首次写组件 payload，避免用未加载的 0 覆盖原生角标
+  await changes.init()
   installWidgetSync()
-  changes.init()
   changes.listen()
   CapApp.addListener('appStateChange', ({ isActive }) => {
     if (!isActive) return

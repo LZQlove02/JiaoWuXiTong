@@ -216,7 +216,10 @@ export function buildWidgetPayload(input = {}) {
   return {
     schema,
     loggedIn: true,
-    changeBadge: Boolean(input.changeUnread > 0) && input.changeEnabled !== false,
+    // JS 状态尚未加载完时不写这个字段，原生侧会保留刚写入的角标
+    ...(input.changeKnown === false
+      ? {}
+      : { changeBadge: Boolean(input.changeUnread > 0) && input.changeEnabled !== false }),
     updatedAt,
     updatedAtLabel,
     account: { name: input.user.name || '' },

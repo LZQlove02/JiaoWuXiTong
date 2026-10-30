@@ -27,11 +27,13 @@ final class ScheduleFetcher {
     private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    private static final int MAX_REDIRECTS = 3;
+    private static final int MAX_REDIRECTS = 5;
 
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(4, TimeUnit.SECONDS)
             .readTimeout(6, TimeUnit.SECONDS)
+            // 整次调用（含重定向/DNS）硬上限，配合 request() 的总时限保证不超过 goAsync 窗口
+            .callTimeout(8, TimeUnit.SECONDS)
             .followRedirects(false)
             .followSslRedirects(false)
             .build();
@@ -90,12 +92,15 @@ final class ScheduleFetcher {
 
     private static Result request(HttpUrl start, String cookie) throws IOException {
         HttpUrl current = start;
+        // 重定向最多 3 跳，但总耗时不能随跳数线性放大
+        long deadline = System.currentTimeMillis() + 9000;
         for (int hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+            if (System.currentTimeMillis() > deadline) return Result.failed();
             try {
                 HttpPolicy.AUTH.check(current);
             } catch (IOException blocked) {
-                // 被重定向到 http 登录页或非白名单主机：按会话失效处理
-                return Result.expired();
+                // 初始 URL 是写死的 zfjw，策略失败只能是配置或代码问题，按失败处理
+                return Result.failed();
             }
             Request request = new Request.Builder()
                     .url(current)
@@ -114,7 +119,9 @@ final class ScheduleFetcher {
                     try {
                         HttpPolicy.AUTH.check(next);
                     } catch (IOException blocked) {
-                        return Result.expired();
+                        // 跳到 http（登录页）= 会话失效；其余策略失败（跨主机 / 带凭据 / 非 443）= 接口异常
+                        if ("http".equals(next.scheme())) return Result.expired();
+                        return Result.failed();
                     }
                     current = next;
                     continue;

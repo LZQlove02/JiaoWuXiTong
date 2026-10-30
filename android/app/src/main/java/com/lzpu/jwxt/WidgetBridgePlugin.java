@@ -26,7 +26,7 @@ public class WidgetBridgePlugin extends Plugin {
             call.reject("payload 不能为空");
             return;
         }
-        WidgetStore.writePayload(getContext(), payload);
+        WidgetStore.writePayloadPreservingBadge(getContext(), payload);
         Log.i(TAG, "update " + payload.length() + "B");
         WidgetUpdater.refreshAll(getContext());
         call.resolve();

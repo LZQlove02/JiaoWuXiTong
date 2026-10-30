@@ -212,6 +212,10 @@ public final class ScheduleChangeStore {
         prefs(context).edit().putString(KEY_LAST_EXPIRED, dayKey == null ? "" : dayKey).apply();
     }
 
+    public static void clearLastSessionExpiredDate(Context context) {
+        prefs(context).edit().remove(KEY_LAST_EXPIRED).apply();
+    }
+
     public static void clearAll(Context context) {
         prefs(context).edit().clear().apply();
     }

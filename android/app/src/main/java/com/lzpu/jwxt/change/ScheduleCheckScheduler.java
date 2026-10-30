@@ -5,7 +5,6 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import android.util.Log;
 
 import java.util.Calendar;
 
@@ -20,7 +19,6 @@ public final class ScheduleCheckScheduler {
     private static final int[] HOURS = {7, 12};
     private static final int[] MINUTES = {10, 50};
     private static final int REQUEST_BASE = 2100;
-    private static final String TAG = "LzpuChange";
 
     private ScheduleCheckScheduler() {
     }
@@ -60,7 +58,8 @@ public final class ScheduleCheckScheduler {
                 manager.set(AlarmManager.RTC_WAKEUP, triggerAt, pending);
             }
         } catch (RuntimeException error) {
-            Log.w(TAG, "课表检查闹钟排程失败 slot=" + slot, error);
+            ChangeDebug.warn(app, "课表检查闹钟排程失败 slot=" + slot
+                    + " " + error.getClass().getSimpleName());
         }
     }
 

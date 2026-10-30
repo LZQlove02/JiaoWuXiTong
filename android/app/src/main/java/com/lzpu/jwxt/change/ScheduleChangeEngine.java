@@ -48,7 +48,8 @@ public final class ScheduleChangeEngine {
         for (Candidate candidate : candidates) {
             ScheduleSession reference = referenceOf(candidate, currentWeek);
             if (reference == null || !reference.containsWeek(currentWeek)) continue;
-            Calendar occurrence = DateUtils.occurrenceInCurrentWeek(now, reference.weekday);
+            Calendar occurrence = DateUtils.occurrenceInCurrentWeek(
+                    term == null ? "" : term.startDate, currentWeek, reference.weekday);
             String range = sectionTimes == null ? null : sectionTimes.get(reference.endSection);
             ChangeEntry entry = buildEntry(candidate, term, reference, occurrence, range, now, detectedBy);
             entries.add(entry);

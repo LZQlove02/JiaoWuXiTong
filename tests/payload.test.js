@@ -318,6 +318,7 @@ describe('小组件 payload：整体契约', () => {
     expect(build({ changeUnread: 2 }).changeBadge).toBe(true)
     expect(build({ changeUnread: 0 }).changeBadge).toBe(false)
     expect(build({ changeUnread: 2, changeEnabled: false }).changeBadge).toBe(false)
+    expect(build({ changeKnown: false })).not.toHaveProperty('changeBadge')
     expect(buildWidgetPayload({ user: null }).changeBadge).toBe(false)
   })
 })
