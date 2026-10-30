@@ -19,6 +19,10 @@ public final class WidgetPayload {
     public boolean scheduleLoaded;
     public String updatedLabel = "";
     public int termWeek;
+    /** week[] 代表的那一周的周一（yyyy-MM-dd），用于判断快照是否已经跨周。 */
+    public String weekAnchor = "";
+    /** true = 快照所属周次早于当前周，today/next 已不可信，只提示回 App 同步。 */
+    public boolean stale;
     public int remainingToday;
     public ClassItem next;
     public final List<ClassItem> today = new ArrayList<>();
@@ -68,6 +72,8 @@ public final class WidgetPayload {
             payload.loggedIn = root.optBoolean("loggedIn", false);
             payload.scheduleLoaded = root.optBoolean("scheduleLoaded", false);
             payload.updatedLabel = root.optString("updatedAtLabel", "");
+            payload.weekAnchor = root.optString("weekAnchor", "");
+            payload.stale = root.optBoolean("stale", false);
 
             JSONObject term = root.optJSONObject("term");
             if (term != null) {

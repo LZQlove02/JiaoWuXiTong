@@ -42,6 +42,18 @@ export function currentWeekOf(term, now = new Date()) {
   return Math.min(Math.max(week, 1), MAX_TERM_WEEK)
 }
 
+/**
+ * week[] 代表哪一周的锚点：该周周一（本地日期 YYYY-MM-DD）。
+ * 原生跨天重算拿「当天的本周一」和它比对，不一致说明已经跨周、
+ * 快照里的 week[] 是上一周的，必须提示回 App 重新同步而不是拿旧周顶上。
+ */
+export function weekAnchorOf(date = new Date()) {
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  // getDay()：周日 0、周一 1 … 周六 6；换算成「距本周一的天数」
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+  return `${monday.getFullYear()}-${pad2(monday.getMonth() + 1)}-${pad2(monday.getDate())}`
+}
+
 // session.weeks 是周次数组；为空数组表示周次未知，按「每周都有」处理，避免组件空白
 export function sessionsInWeek(sessions, week) {
   if (!Array.isArray(sessions)) return []
@@ -202,6 +214,7 @@ export function buildWidgetPayload(input = {}) {
     updatedAtLabel,
     account: { name: input.user.name || '' },
     term: { label: term?.label || '', week },
+    weekAnchor: weekAnchorOf(now),
     // 区分「课表还没加载」与「本周确实没课」
     scheduleLoaded: Boolean(schedule && Array.isArray(schedule.sessions)),
     today,

@@ -5,6 +5,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 原生侧「今天有哪些课 / 下一节是哪节 / 今天还剩几节」的推导，口径与
@@ -34,6 +35,34 @@ final class WidgetScheduleDeriver {
     }
 
     private WidgetScheduleDeriver() {
+    }
+
+    /**
+     * 快照是否已经跨周：payload 的 week[] 只代表同步时的那一周，周一 00:05 重算时
+     * 若「当天的本周一」与 weekAnchor 不一致，说明 week[] 还是上一周的课，
+     * 拿去推 today/next 会把上周的课当成今天上，必须降级成「打开 App 同步」。
+     *
+     * 老版本 payload 没有 weekAnchor 时按「不陈旧」处理，保持原有行为。
+     */
+    static boolean isStale(WidgetPayload payload, Calendar now) {
+        if (payload == null || payload.weekAnchor == null || payload.weekAnchor.isEmpty()) {
+            return false;
+        }
+        return !payload.weekAnchor.equals(mondayOf(now));
+    }
+
+    // 当天所在周的周一，格式与 JS 侧 weekAnchorOf 一致：yyyy-MM-dd（本地日期）
+    static String mondayOf(Calendar now) {
+        Calendar day = (Calendar) now.clone();
+        day.set(Calendar.HOUR_OF_DAY, 0);
+        day.set(Calendar.MINUTE, 0);
+        day.set(Calendar.SECOND, 0);
+        day.set(Calendar.MILLISECOND, 0);
+        // Calendar.DAY_OF_WEEK：周日 1、周一 2 … 周六 7；换算成「距本周一几天」
+        int shift = (day.get(Calendar.DAY_OF_WEEK) + 5) % 7;
+        day.add(Calendar.DAY_OF_MONTH, -shift);
+        return String.format(Locale.US, "%04d-%02d-%02d",
+            day.get(Calendar.YEAR), day.get(Calendar.MONTH) + 1, day.get(Calendar.DAY_OF_MONTH));
     }
 
     static Result derive(WidgetPayload payload, Calendar now) {

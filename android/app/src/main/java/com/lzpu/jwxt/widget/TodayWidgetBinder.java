@@ -64,6 +64,19 @@ final class TodayWidgetBinder {
             return views;
         }
 
+        // 跨周：今日课程来自上一周的 week[]，不再展示，统一提示回 App 同步
+        if (payload.stale) {
+            hideRows(views, 0);
+            views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
+            views.setTextViewText(R.id.widget_empty, context.getString(R.string.widget_open_app_sync));
+            views.setTextViewText(R.id.widget_updated,
+                payload.updatedLabel.isEmpty()
+                    ? ""
+                    : context.getString(R.string.widget_updated_at, payload.updatedLabel));
+            views.setTextViewText(R.id.widget_footer, "");
+            return views;
+        }
+
         List<WidgetPayload.ClassItem> today = payload.today;
         int shown = Math.min(today.size(), MAX_ROWS);
         hideRows(views, shown);

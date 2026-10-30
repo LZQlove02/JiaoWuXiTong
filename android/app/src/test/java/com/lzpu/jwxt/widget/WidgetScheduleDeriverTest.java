@@ -1,6 +1,7 @@
 package com.lzpu.jwxt.widget;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -110,5 +111,52 @@ public class WidgetScheduleDeriverTest {
         assertTrue(result.today.isEmpty());
         assertNull(result.next);
         assertEquals(0, result.remainingToday);
+    }
+
+    // ---- 跨周陈旧检测：week[] 只代表同步时的那一周 ----
+
+    // 固定日期，避免依赖「今天是星期几」
+    private static Calendar date(int year, int month, int day, int hour, int minute) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.clear();
+        calendar.set(year, month - 1, day, hour, minute, 0);
+        return calendar;
+    }
+
+    private static WidgetPayload anchored(String anchor) {
+        WidgetPayload payload = payload(item(Calendar.MONDAY, 1, 2, "08:00", "09:40", "高等数学"));
+        payload.weekAnchor = anchor;
+        return payload;
+    }
+
+    @Test
+    public void mondayOfReturnsWeekStart() {
+        // 2026-10-29 是周四，本周一 2026-10-26
+        assertEquals("2026-10-26", WidgetScheduleDeriver.mondayOf(date(2026, 10, 29, 9, 0)));
+        // 周日仍是同一个周一
+        assertEquals("2026-10-26", WidgetScheduleDeriver.mondayOf(date(2026, 11, 1, 23, 59)));
+        // 周一 00:05 已经翻到新的一周
+        assertEquals("2026-11-02", WidgetScheduleDeriver.mondayOf(date(2026, 11, 2, 0, 5)));
+    }
+
+    @Test
+    public void sameWeekIsNotStale() {
+        WidgetPayload payload = anchored("2026-10-26");
+        assertFalse(WidgetScheduleDeriver.isStale(payload, date(2026, 10, 29, 0, 5)));
+        assertFalse(WidgetScheduleDeriver.isStale(payload, date(2026, 11, 1, 23, 59)));
+    }
+
+    @Test
+    public void nextWeekIsStale() {
+        // 周日 23:59 同步的快照，周一 00:05 重算时已经是第 10 周
+        WidgetPayload payload = anchored("2026-10-26");
+        assertTrue(WidgetScheduleDeriver.isStale(payload, date(2026, 11, 2, 0, 5)));
+    }
+
+    @Test
+    public void missingAnchorKeepsLegacyBehavior() {
+        WidgetPayload payload = anchored("");
+        assertFalse(WidgetScheduleDeriver.isStale(payload, date(2026, 11, 2, 0, 5)));
+        assertFalse(WidgetScheduleDeriver.isStale(null, date(2026, 11, 2, 0, 5)));
     }
 }

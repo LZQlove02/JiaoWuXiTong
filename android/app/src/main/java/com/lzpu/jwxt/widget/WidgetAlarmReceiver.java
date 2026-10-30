@@ -85,6 +85,12 @@ public class WidgetAlarmReceiver extends BroadcastReceiver {
         WidgetPayload payload = WidgetPayload.parse(raw);
         if (!payload.loggedIn || !payload.scheduleLoaded || payload.week.isEmpty()) return;
 
+        // 跨周：week[] 还是上一周的课，重算只会把上周的课当成今天上，直接降级
+        if (WidgetScheduleDeriver.isStale(payload, Calendar.getInstance())) {
+            markStale(app, raw);
+            return;
+        }
+
         WidgetScheduleDeriver.Result result =
             WidgetScheduleDeriver.derive(payload, Calendar.getInstance());
         try {
@@ -92,12 +98,32 @@ public class WidgetAlarmReceiver extends BroadcastReceiver {
             root.put("today", toArray(result.today));
             root.put("next", result.next == null ? JSONObject.NULL : toObject(result.next));
             root.put("remainingToday", result.remainingToday);
+            // 同一周内的重算，陈旧标记归零
+            root.put("stale", false);
             WidgetStore.writePayload(app, root.toString());
         } catch (Exception error) {
             Log.w(TAG, "跨天重算写回失败", error);
             return;
         }
         Log.i(TAG, "跨天重算 today=" + result.today.size() + " remaining=" + result.remainingToday);
+        WidgetUpdater.refreshAll(app);
+    }
+
+    // 跨周降级：清空 today / next（否则 2x2 还会显示上周的「下一节」），
+    // 只置 stale 标记，由三个组件统一显示「打开 App 同步」。
+    private static void markStale(Context app, String raw) {
+        try {
+            JSONObject root = new JSONObject(raw);
+            root.put("today", new JSONArray());
+            root.put("next", JSONObject.NULL);
+            root.put("remainingToday", 0);
+            root.put("stale", true);
+            WidgetStore.writePayload(app, root.toString());
+        } catch (Exception error) {
+            Log.w(TAG, "跨周降级写回失败", error);
+            return;
+        }
+        Log.i(TAG, "快照已跨周，组件改为提示同步");
         WidgetUpdater.refreshAll(app);
     }
 

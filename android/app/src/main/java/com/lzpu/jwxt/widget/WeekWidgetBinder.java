@@ -54,6 +54,13 @@ final class WeekWidgetBinder {
             showState(views, context.getString(R.string.widget_need_sync));
             return views;
         }
+        // 跨周：week[] 与 termWeek 都是上一周的，网格和「第 N 周」都不能再信，
+        // 整块降级成提示，等 App 打开后重新同步覆盖
+        if (payload.stale) {
+            views.setTextViewText(R.id.widget_week_title, context.getString(R.string.widget_title_week));
+            showState(views, context.getString(R.string.widget_open_app_sync));
+            return views;
+        }
 
         int[] size = gridSize(context, appWidgetId);
         android.graphics.Bitmap bitmap = WidgetBitmapRenderer.render(

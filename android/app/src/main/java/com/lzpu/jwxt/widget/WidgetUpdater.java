@@ -25,6 +25,7 @@ public final class WidgetUpdater {
         // 只记状态，不记成绩、未读数等个人数据（日志脱敏）
         Log.i("LzpuWidget", "payload loggedIn=" + payload.loggedIn
             + " loaded=" + payload.scheduleLoaded
+            + " stale=" + payload.stale
             + " week=" + payload.week.size());
 
         pushNext(app, manager, payload, themeName);

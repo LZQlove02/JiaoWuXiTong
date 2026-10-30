@@ -35,6 +35,17 @@ final class NextClassWidgetBinder {
             return views;
         }
 
+        // 跨周后 week[] 还是上一周的，next 已不可信：宁可不显示，也不显示上周的课
+        if (payload.stale) {
+            views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title_next));
+            views.setTextViewText(R.id.widget_course, context.getString(R.string.widget_need_sync));
+            views.setTextViewText(R.id.widget_time, "");
+            views.setTextViewText(R.id.widget_room, "");
+            views.setTextViewText(R.id.widget_updated, updatedText(context, payload));
+            views.setTextViewText(R.id.widget_footer, "");
+            return views;
+        }
+
         String updated = updatedText(context, payload);
         WidgetPayload.ClassItem next = payload.next;
         if (next == null) {

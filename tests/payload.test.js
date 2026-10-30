@@ -4,7 +4,8 @@ import {
   currentWeekOf,
   gradeView,
   sessionsInWeek,
-  shortRoom
+  shortRoom,
+  weekAnchorOf
 } from '../src/widget/payload'
 
 const term = {
@@ -103,6 +104,25 @@ describe('小组件 payload：课表', () => {
     expect(payload.week.map((item) => item.weekday)).toEqual([4, 4, 6])
     expect(payload.week.some((item) => item.weekday === 5)).toBe(false)
     expect(payload.week.every((item) => item.name)).toBe(true)
+  })
+
+  it('weekAnchor 记的是 week[] 所属那一周的周一', () => {
+    // 2026-10-29 是周四，本周一是 2026-10-26
+    expect(build().weekAnchor).toBe('2026-10-26')
+    // 同一周的周日仍然指向同一个周一
+    expect(build({ now: new Date(2026, 10, 1, 23, 30) }).weekAnchor).toBe('2026-10-26')
+  })
+
+  it('跨周后 weekAnchor 变化，原生据此判断快照过期', () => {
+    // 2026-11-01 是周日 → 周一仍是 10-26；11-02 周一 → 11-02
+    expect(weekAnchorOf(new Date(2026, 10, 1, 20, 0))).toBe('2026-10-26')
+    expect(weekAnchorOf(new Date(2026, 10, 2, 0, 5))).toBe('2026-11-02')
+    expect(weekAnchorOf(new Date(2026, 11, 31, 8, 0))).toBe('2026-12-28')
+  })
+
+  it('未登录时没有 weekAnchor', () => {
+    const payload = buildWidgetPayload({ user: null, now: morning })
+    expect(payload).not.toHaveProperty('weekAnchor')
   })
 
   it('周次不在 weeks 数组里的课被过滤', () => {
@@ -255,7 +275,8 @@ describe('小组件 payload：整体契约', () => {
       'today',
       'updatedAt',
       'updatedAtLabel',
-      'week'
+      'week',
+      'weekAnchor'
     ])
     expect(payload.account).toEqual({ name: '卢再发' })
     expect(payload.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
