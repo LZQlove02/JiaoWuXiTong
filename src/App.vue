@@ -52,7 +52,9 @@ function installWidgetSync() {
     schedule: academic.schedule,
     grades: academic.grades,
     messages: academic.messages,
-    portalNotices: academic.portalNotices
+    portalNotices: academic.portalNotices,
+    changeUnread: changes.unread,
+    changeEnabled: changes.enabled
   })
   watch(
     [
@@ -61,7 +63,9 @@ function installWidgetSync() {
       () => academic.schedule,
       () => academic.grades,
       () => academic.messages,
-      () => academic.portalNotices
+      () => academic.portalNotices,
+      () => changes.unread,
+      () => changes.enabled
     ],
     // 会话恢复期间先不写盘，否则冷启动会把「请登录」闪一下再改回来
     () => {
@@ -90,8 +94,12 @@ function installWidgetSync() {
   watch(
     () => auth.isLoggedIn,
     (loggedIn) => {
-      if (!loggedIn) clearWidgetNow()
-      else changes.init()
+      if (!loggedIn) {
+        clearWidgetNow()
+        changes.refresh()
+      } else {
+        changes.init()
+      }
     }
   )
 }
@@ -112,7 +120,10 @@ onMounted(() => {
   changes.init()
   changes.listen()
   CapApp.addListener('appStateChange', ({ isActive }) => {
-    if (isActive) changes.refresh()
+    if (!isActive) return
+    changes.refresh()
+    // 切回 App 也重新对一次账，不能只读原生旧状态
+    if (auth.isLoggedIn) academic.loadSchedule(academic.currentTerm)
   })
   CapApp.getLaunchUrl()
     .then((result) => openDeepLink(result?.url))

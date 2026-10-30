@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { resetAcademicApi, setAcademicApi } from '../api'
 import { ZfAcademicApi, clearScheduleSnapshot } from '../api/zf'
 import { clearAuthCookies, loadAuthCookies } from '../api/nativeHttp'
+import { clearScheduleChange } from '../native/scheduleChangeBridge'
 
 const RESTORE_TIMEOUT_MS = 15000
 
@@ -120,6 +121,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    await clearScheduleChange()
     await clearAuthCookies()
     clearScheduleSnapshot()
     resetAcademicApi()

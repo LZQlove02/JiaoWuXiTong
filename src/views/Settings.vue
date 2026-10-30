@@ -32,7 +32,9 @@
           <span class="switch-dot"></span>
         </button>
       </div>
-      <p class="setting-note">每天 07:10、12:50 自动检查；只提醒本周的停课、调课与新增。</p>
+      <p class="setting-note">
+        每天 07:10、12:50 自动检查；只提醒本周的停课、调课与新增。系统清理后台后，重新打开 App 会自动恢复检查。
+      </p>
       <button class="setting-row" @click="openNotificationSettings">
         <span class="setting-left">通知权限</span>
         <span class="tiny">{{ changes.notificationsEnabled ? '已开启' : '系统已关闭' }}</span>

@@ -188,7 +188,8 @@ public final class ScheduleChangeStore {
         if (!isEnabled(context)) return 0;
         int count = 0;
         for (ChangeEntry entry : readEntries(context)) {
-            if (!entry.read && !entry.quiet) count += 1;
+            // 换教室只进历史，不参与提醒条 / 红点 / 组件角标
+            if (!entry.read && entry.isRemindable()) count += 1;
         }
         return count;
     }

@@ -42,6 +42,11 @@ export function openScheduleChangeNotificationSettings() {
   return call('openNotificationSettings')
 }
 
+// 退出登录：清掉基线与变更历史，避免下一个账号看到上一个人的课表信息
+export function clearScheduleChange() {
+  return call('clear')
+}
+
 export function addScheduleChangeListener(handler) {
   if (!scheduleChangeAvailable()) return () => {}
   const pending = ScheduleChange.addListener('changed', handler)

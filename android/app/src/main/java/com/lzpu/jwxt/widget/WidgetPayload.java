@@ -17,6 +17,8 @@ public final class WidgetPayload {
 
     public boolean loggedIn;
     public boolean scheduleLoaded;
+    /** 课表变更未读：由 JS 与原生变更引擎写入，组件只读。 */
+    public boolean changeBadge;
     public String updatedLabel = "";
     public int termWeek;
     /** week[] 代表的那一周的周一（yyyy-MM-dd），用于判断快照是否已经跨周。 */
@@ -73,6 +75,7 @@ public final class WidgetPayload {
             WidgetPayload payload = new WidgetPayload();
             payload.loggedIn = root.optBoolean("loggedIn", false);
             payload.scheduleLoaded = root.optBoolean("scheduleLoaded", false);
+            payload.changeBadge = root.optBoolean("changeBadge", false);
             payload.updatedLabel = root.optString("updatedAtLabel", "");
             payload.weekAnchor = root.optString("weekAnchor", "");
             payload.stale = root.optBoolean("stale", false);

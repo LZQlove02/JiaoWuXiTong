@@ -1,6 +1,7 @@
 package com.lzpu.jwxt.change;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 import org.json.JSONObject;
 import org.junit.Test;
@@ -76,9 +77,35 @@ public class ScheduleParserTest {
         assertEquals(2, ScheduleParser.parseWeeks("2-4周(双)").length);
         assertEquals(8, ScheduleParser.parseWeeks("1-16周(单)").length);
         assertEquals(16, ScheduleParser.parseWeeks("").length);
+        // 与 JS 一致：自相矛盾的「2周(单)」过滤后为空，不再兜底成 1-16 周
+        assertEquals(0, ScheduleParser.parseWeeks("2周(单)").length);
+        // 「单周」没有数字：先按 1-16 周兜底，再筛单周
+        assertEquals(8, ScheduleParser.parseWeeks("单周").length);
         // 与 JS 现有行为一致：逗号枚举只识别到最后一个「N周」
         assertEquals(1, ScheduleParser.parseWeeks("1,3,5周").length);
         assertEquals(5, ScheduleParser.parseWeeks("1,3,5周")[0]);
+    }
+
+    @Test
+    public void weeksLabelKeepsMixedSequencesHonest() {
+        ScheduleSession mixed = new ScheduleSession(
+                "C1", "高等数学", 1, 3, 4,
+                new int[]{1, 3, 5, 6, 7, 8}, "A101");
+        assertEquals("1,3,5-8周", mixed.weeksLabel());
+
+        ScheduleSession odd = new ScheduleSession(
+                "C2", "大学英语", 3, 5, 6,
+                new int[]{1, 3, 5, 7, 9, 11, 13, 15}, "B203");
+        assertEquals("1-15周(单)", odd.weeksLabel());
+
+        ScheduleSession even = new ScheduleSession(
+                "C3", "体育", 5, 7, 8,
+                new int[]{2, 4, 6}, "操场");
+        assertEquals("2-6周(双)", even.weeksLabel());
+
+        ScheduleSession none = new ScheduleSession("C4", "空周次", 1, 1, 2, new int[0], "");
+        assertEquals("", none.weeksLabel());
+        assertFalse(none.containsWeek(1));
     }
 
     @Test

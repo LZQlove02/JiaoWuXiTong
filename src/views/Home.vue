@@ -165,7 +165,7 @@ const {
   messages,
   messagesLoading
 } = storeToRefs(academic)
-const isOffline = computed(() => Boolean(schedule.value?.source?.includes('离线')))
+const isOffline = computed(() => Boolean(schedule.value?.offline))
 const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
 
 const noticesError = computed(() => errors.value.portalNotices)

@@ -1,8 +1,8 @@
 package com.lzpu.jwxt.change;
 
 import android.content.Context;
-import android.util.Log;
 
+import com.lzpu.jwxt.widget.WidgetStore;
 import com.lzpu.jwxt.widget.WidgetUpdater;
 
 import org.json.JSONArray;
@@ -22,10 +22,16 @@ import java.util.Set;
  */
 public final class ScheduleChangeService {
 
-    private static final String TAG = "LzpuChange";
     private static final Object LOCK = new Object();
 
     private ScheduleChangeService() {
+    }
+
+    /** 基线决策：与 Android 依赖分离，便于单测。 */
+    enum BaselineAction {
+        RESET,
+        SKIP_EMPTY,
+        DIFF
     }
 
     public static final class Result {
@@ -48,6 +54,20 @@ public final class ScheduleChangeService {
         static Result success(List<ChangeEntry> entries, int unread, boolean enabled) {
             return new Result(true, entries, unread, enabled);
         }
+    }
+
+    static BaselineAction decide(ScheduleChangeStore.Baseline baseline, TermInfo term,
+                                 String studentId, int newSessionCount) {
+        String owner = studentId == null ? "" : studentId;
+        if (baseline == null || baseline.term == null || !baseline.term.sameAs(term)
+                || !owner.equals(baseline.studentId)) {
+            return BaselineAction.RESET;
+        }
+        // 接口异常（新课表为空）：保留旧基线，避免误报「全部停课」
+        if (newSessionCount == 0 && !baseline.sessions.isEmpty()) {
+            return BaselineAction.SKIP_EMPTY;
+        }
+        return BaselineAction.DIFF;
     }
 
     /** 前台对账：raw 是实时课表接口的原始 JSON，term 来自 JS 当前学期。 */
@@ -82,20 +102,17 @@ public final class ScheduleChangeService {
                     return Result.failed();
                 }
 
-                // 接口异常（新课表为空）：保留旧基线，避免误报「全部停课」
-                if (sessions.isEmpty() && baseline != null
-                        && !baseline.sessions.isEmpty() && baseline.term.sameAs(term)) {
-                    Log.w(TAG, "新课表为空，跳过本轮对账");
+                BaselineAction action = decide(baseline, term, owner, sessions.size());
+                if (action == BaselineAction.SKIP_EMPTY) {
+                    ChangeDebug.warn(app, "新课表为空，跳过本轮对账");
                     return Result.success(new ArrayList<>(),
-                            ScheduleChangeStore.unreadCount(app), baseline.term != null);
+                            ScheduleChangeStore.unreadCount(app), ScheduleChangeStore.isEnabled(app));
                 }
-
-                // 首次使用 / 换学期 / 换账号：只建基线，不报变更
-                if (baseline == null || !baseline.term.sameAs(term)
-                        || !owner.equals(baseline.studentId)) {
+                if (action == BaselineAction.RESET) {
                     // 换账号时不展示上一个人的变更历史
                     if (baseline != null && !owner.equals(baseline.studentId)) {
                         ScheduleChangeStore.writeEntries(app, new ArrayList<>(), Calendar.getInstance());
+                        WidgetStore.markChangeBadge(app, false);
                         WidgetUpdater.refreshAll(app);
                     }
                     writeBaseline(app, term, owner, sessions, times);
@@ -120,13 +137,14 @@ public final class ScheduleChangeService {
                 writeBaseline(app, term, owner, sessions, times);
 
                 int unread = ScheduleChangeStore.unreadCount(app);
-                if (!fresh.isEmpty()) {
+                boolean badgeChanged = WidgetStore.markChangeBadge(app, unread > 0);
+                if (!fresh.isEmpty() || badgeChanged) {
                     WidgetUpdater.refreshAll(app);
                 }
                 return Result.success(fresh, unread, ScheduleChangeStore.isEnabled(app));
             } catch (Exception error) {
-                // 解析失败不能影响课表展示，静默跳过本轮
-                Log.w(TAG, "课表对账失败: " + error.getMessage());
+                // 解析失败不能影响课表展示，静默跳过本轮；异常类名足够定位，不记录响应内容
+                ChangeDebug.warn(app, "课表对账失败: " + error.getClass().getSimpleName());
                 return Result.failed();
             }
         }
@@ -161,6 +179,7 @@ public final class ScheduleChangeService {
         }
         if (!fetched.ok) return;
 
+        // 后台不掌握当前登录态，沿用基线归属；换账号会在下次前台对账时重置。
         boolean foreground = AppVisibility.isForeground();
         Result applied = apply(app, fetched.body, baseline.term, baseline.studentId,
                 baseline.sectionTimes, "background", expectedSavedAt);
@@ -179,6 +198,7 @@ public final class ScheduleChangeService {
         Context app = context.getApplicationContext();
         synchronized (LOCK) {
             ScheduleChangeStore.markAllRead(app);
+            WidgetStore.markChangeBadge(app, false);
             ScheduleChangeNotifier.cancelAll(app);
             WidgetUpdater.refreshAll(app);
         }
@@ -193,7 +213,22 @@ public final class ScheduleChangeService {
             } else {
                 ScheduleCheckScheduler.cancelAll(app);
                 ScheduleChangeNotifier.cancelAll(app);
+                WidgetStore.markChangeBadge(app, false);
             }
+            WidgetUpdater.refreshAll(app);
+        }
+    }
+
+    /** 退出登录：清空基线与历史，避免下一个账号看到上一个人的课表信息。 */
+    public static void clearForLogout(Context context) {
+        Context app = context.getApplicationContext();
+        synchronized (LOCK) {
+            // 先按现有条目取消通知，再清日志，否则通知栏会留下旧提醒
+            ScheduleChangeNotifier.cancelAll(app);
+            ScheduleChangeStore.clearBaseline(app);
+            ScheduleChangeStore.writeEntries(app, new ArrayList<>(), Calendar.getInstance());
+            ScheduleCheckScheduler.cancelAll(app);
+            WidgetStore.markChangeBadge(app, false);
             WidgetUpdater.refreshAll(app);
         }
     }
@@ -214,7 +249,7 @@ public final class ScheduleChangeService {
             }
             state.put("entries", entries);
         } catch (JSONException error) {
-            Log.w(TAG, "状态序列化失败: " + error.getMessage());
+            ChangeDebug.warn(app, "状态序列化失败");
         }
         return state;
     }

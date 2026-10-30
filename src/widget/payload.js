@@ -177,6 +177,8 @@ function noticeView(notices) {
  * @param {object|null} input.grades  academic.grades
  * @param {object|null} input.messages  academic.messages
  * @param {object|null} input.portalNotices  academic.portalNotices
+ * @param {number} [input.changeUnread]  课表变更未读数
+ * @param {boolean} [input.changeEnabled] 课表变更提醒开关
  * @param {Date} [input.now]
  */
 export function buildWidgetPayload(input = {}) {
@@ -186,7 +188,7 @@ export function buildWidgetPayload(input = {}) {
   const schema = WIDGET_SCHEMA
 
   if (!input.user) {
-    return { schema, loggedIn: false, updatedAt, updatedAtLabel }
+    return { schema, loggedIn: false, changeBadge: false, updatedAt, updatedAtLabel }
   }
 
   const term = input.currentTerm || null
@@ -214,6 +216,7 @@ export function buildWidgetPayload(input = {}) {
   return {
     schema,
     loggedIn: true,
+    changeBadge: Boolean(input.changeUnread > 0) && input.changeEnabled !== false,
     updatedAt,
     updatedAtLabel,
     account: { name: input.user.name || '' },

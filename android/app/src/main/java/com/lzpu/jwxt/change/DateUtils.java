@@ -56,13 +56,19 @@ final class DateUtils {
         return Math.min(Math.max(week, 1), 20);
     }
 
-    /** 第 week 周、星期 weekday（1=周一）对应的日期。 */
-    static Calendar occurrence(String startDate, int week, int weekday) {
-        int[] start = parseDate(startDate);
-        if (start == null) return null;
-        int offset = (week - 1) * 7 + (weekday - 1);
-        Calendar day = atMidnight(start[0], start[1], start[2]);
-        day.add(Calendar.DAY_OF_MONTH, offset);
+    /**
+     * 当前这一周、星期 weekday（1=周一）对应的真实日期。
+     * 不能按 startDate 偏移：学期起始日不一定是周一（2025-08-31 是周日、2027-02-23 是周二），
+     * 否则整学期错一天，周一的变更会在当天就被判成「已上完」。
+     */
+    static Calendar occurrenceInCurrentWeek(Calendar now, int weekday) {
+        int dayOfWeek = now.get(Calendar.DAY_OF_WEEK); // 周日=1 … 周六=7
+        int mondayOffset = (dayOfWeek + 5) % 7; // 周一=0 … 周日=6
+        Calendar day = atMidnight(
+                now.get(Calendar.YEAR),
+                now.get(Calendar.MONTH),
+                now.get(Calendar.DAY_OF_MONTH));
+        day.add(Calendar.DAY_OF_MONTH, -mondayOffset + Math.max(weekday, 1) - 1);
         return day;
     }
 

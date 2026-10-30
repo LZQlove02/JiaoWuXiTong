@@ -102,6 +102,12 @@ public class ScheduleChangeBridge extends Plugin {
     }
 
     @PluginMethod
+    public void clear(PluginCall call) {
+        ScheduleChangeService.clearForLogout(getContext());
+        call.resolve(state());
+    }
+
+    @PluginMethod
     public void setEnabled(PluginCall call) {
         Boolean enabled = call.getBoolean("enabled");
         ScheduleChangeService.setEnabled(getContext(), enabled != null && enabled);

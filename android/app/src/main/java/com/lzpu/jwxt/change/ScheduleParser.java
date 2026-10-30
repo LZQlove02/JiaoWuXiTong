@@ -122,7 +122,11 @@ public final class ScheduleParser {
         while (single.find()) {
             weeks.add(Integer.parseInt(single.group(1)));
         }
-        if (weeks.isEmpty()) return defaultWeeks();
+        // 与 JS 一致：先把空结果补成 1–16 周，再按单双周过滤；
+        // 过滤后为空就保持为空（例如「2周(单)」这种自相矛盾的写法）。
+        if (weeks.isEmpty()) {
+            for (int week = 1; week <= 16; week += 1) weeks.add(week);
+        }
 
         boolean odd = text.contains("单");
         boolean even = text.contains("双");
@@ -132,7 +136,6 @@ public final class ScheduleParser {
             if (even && !odd && week % 2 == 1) continue;
             result.add(week);
         }
-        if (result.isEmpty()) return defaultWeeks();
         int[] array = new int[result.size()];
         for (int i = 0; i < result.size(); i += 1) array[i] = result.get(i);
         return array;

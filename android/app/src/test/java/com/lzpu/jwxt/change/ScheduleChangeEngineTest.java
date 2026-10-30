@@ -225,4 +225,21 @@ public class ScheduleChangeEngineTest {
         // 超出 20 周钳制
         assertEquals(20, DateUtils.currentWeek("2026-01-05", NOW));
     }
+
+    @Test
+    public void nonMondayTermStartStillUsesRealWeekdayForQuiet() {
+        // 2025-08-31 是周日：不能把开学日当成周一，否则周一的变更当天就被判已上完
+        TermInfo term = new TermInfo("2025", "3", "2025-08-31");
+        java.util.Calendar mondayMorning = at(2025, 9, 1, 8, 0);
+        List<ScheduleSession> before = new ArrayList<>();
+        before.add(session("C1", "高等数学", 1, 3, 4, "1-16周", "A101"));
+        before.add(session("C2", "大学英语", 5, 12, 12, "1-16周", "B203"));
+        List<ScheduleSession> after = new ArrayList<>();
+        after.add(session("C2", "大学英语", 5, 12, 12, "1-16周", "B203"));
+
+        List<ChangeEntry> entries = ScheduleChangeEngine.diff(
+                before, after, term, times(), mondayMorning, "foreground");
+        assertEquals(1, entries.size());
+        assertFalse(entries.get(0).quiet);
+    }
 }

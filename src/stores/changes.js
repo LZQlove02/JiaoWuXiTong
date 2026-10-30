@@ -22,6 +22,7 @@ export const useChangesStore = defineStore('changes', () => {
   const notificationsEnabled = ref(true)
   const loaded = ref(false)
   const applying = ref(false)
+  const error = ref('')
 
   let listening = false
   let stopListening = null
@@ -44,11 +45,14 @@ export const useChangesStore = defineStore('changes', () => {
 
   function applyState(state) {
     if (!state) return
+    error.value = ''
     if (Array.isArray(state.entries)) entries.value = state.entries.map(normalizeEntry)
     if (Number.isFinite(state.unread)) {
       unread.value = state.unread
     } else {
-      unread.value = entries.value.filter((entry) => !entry.read && !entry.quiet).length
+      unread.value = entries.value.filter(
+        (entry) => !entry.read && !entry.quiet && entry.type !== 'room'
+      ).length
     }
     if (typeof state.enabled === 'boolean') enabled.value = state.enabled
     if (typeof state.notificationsEnabled === 'boolean') {
@@ -58,19 +62,28 @@ export const useChangesStore = defineStore('changes', () => {
   }
 
   async function init() {
+    error.value = ''
     if (!scheduleChangeAvailable()) {
       loaded.value = true
       return
     }
     const state = await getScheduleChangeState()
+    if (!state) {
+      // 原生桥失败：给出错误态，不能伪装成「最近 30 天没有变更」
+      error.value = '变更记录加载失败'
+      loaded.value = true
+      return
+    }
     applyState(state)
-    // 原生桥失败时也要结束加载态，页面不能一直停在「正在加载」
-    if (!state) loaded.value = true
   }
 
   async function refresh() {
     if (!scheduleChangeAvailable()) return
-    applyState(await getScheduleChangeState())
+    const state = await getScheduleChangeState()
+    if (state) {
+      applyState(state)
+      error.value = ''
+    }
   }
 
   /**
@@ -78,7 +91,7 @@ export const useChangesStore = defineStore('changes', () => {
    */
   async function applyFromSchedule(schedule) {
     if (!schedule || !schedule.rawPayload) return
-    if (typeof schedule.source === 'string' && schedule.source.includes('离线')) return
+    if (schedule.offline) return
     const term = schedule.term
     if (!term || !term.xnm || !term.xqm || !term.startDate) return
     if (!scheduleChangeAvailable() || applying.value) return
@@ -155,6 +168,7 @@ export const useChangesStore = defineStore('changes', () => {
     notificationsEnabled,
     loaded,
     applying,
+    error,
     bannerCount,
     bannerVisible,
     badgeText,

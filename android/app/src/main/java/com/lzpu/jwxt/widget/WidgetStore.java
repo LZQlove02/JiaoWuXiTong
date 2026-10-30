@@ -3,6 +3,8 @@ package com.lzpu.jwxt.widget;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONObject;
+
 /**
  * 组件数据存储：App 私有 SharedPreferences，不导出、不参与备份。
  * JS 侧通过 WidgetBridge 写入，组件进程只读。
@@ -36,6 +38,25 @@ public final class WidgetStore {
 
     public static void clearPayload(Context context) {
         prefs(context).edit().remove(KEY_PAYLOAD).apply();
+    }
+
+    /**
+     * 只改 payload 里的变更角标，不引入第二份组件数据源。
+     * 后台检查发现变更、标记已读或关闭开关时由变更引擎调用。
+     */
+    public static boolean markChangeBadge(Context context, boolean visible) {
+        String raw = readPayload(context);
+        if (raw == null || raw.isEmpty()) return false;
+        try {
+            JSONObject json = new JSONObject(raw);
+            if (json.optBoolean("changeBadge", false) == visible) return false;
+            json.put("changeBadge", visible);
+            writePayload(context, json.toString());
+            return true;
+        } catch (Exception ignored) {
+            // payload 不是合法 JSON 时保持原样，等 JS 下次同步覆盖
+            return false;
+        }
     }
 
     public static void writeTheme(Context context, String theme) {

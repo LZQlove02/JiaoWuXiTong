@@ -32,11 +32,12 @@ public final class ScheduleSession {
     }
 
     private static int[] normalizeWeeks(int[] source) {
-        if (source == null || source.length == 0) {
+        if (source == null) {
             int[] fallback = new int[16];
             for (int i = 0; i < fallback.length; i += 1) fallback[i] = i + 1;
             return fallback;
         }
+        if (source.length == 0) return new int[0];
         int[] copy = Arrays.copyOf(source, source.length);
         Arrays.sort(copy);
         int unique = 0;
@@ -69,38 +70,45 @@ public final class ScheduleSession {
     }
 
     public boolean containsWeek(int week) {
+        if (weeks.length == 0) return false;
         for (int item : weeks) {
             if (item == week) return true;
         }
         return false;
     }
 
-    /** 周次展示文案：连续区间压缩，全单/全双追加 (单)/(双)。 */
+    /** 周次展示文案：纯单双周压成区间并标注，其余只压缩连续周次。 */
     public String weeksLabel() {
         if (weeks.length == 0) return "";
         StringBuilder builder = new StringBuilder();
+        if (isArithmeticDoubleStep()) {
+            builder.append(weeks[0]).append('-').append(weeks[weeks.length - 1]).append('周');
+            builder.append(weeks[0] % 2 == 1 ? "(单)" : "(双)");
+            return builder.toString();
+        }
         int index = 0;
         while (index < weeks.length) {
             int start = weeks[index];
             int end = start;
-            // 连续周（差 1）或单双周（差 2）都压成区间，其余保持离散
-            int step = index + 1 < weeks.length ? weeks[index + 1] - weeks[index] : 0;
-            if (step == 1 || step == 2) {
-                while (index + 1 < weeks.length && weeks[index + 1] - weeks[index] == step) {
-                    end = weeks[index + 1];
-                    index += 1;
-                }
+            while (index + 1 < weeks.length && weeks[index + 1] == end + 1) {
+                end = weeks[index + 1];
+                index += 1;
             }
             if (builder.length() > 0) builder.append(',');
             builder.append(start == end ? String.valueOf(start) : start + "-" + end);
             index += 1;
         }
         builder.append("周");
-        if (weeks.length >= 2 && weeks[weeks.length - 1] - weeks[0] == 2 * (weeks.length - 1)) {
-            if (weeks[0] % 2 == 1) builder.append("(单)");
-            else builder.append("(双)");
-        }
         return builder.toString();
+    }
+
+    // 整段都是隔一周：1,3,5 / 2,4,6
+    private boolean isArithmeticDoubleStep() {
+        if (weeks.length < 2) return false;
+        for (int i = 1; i < weeks.length; i += 1) {
+            if (weeks[i] - weeks[i - 1] != 2) return false;
+        }
+        return true;
     }
 
     public JSONObject toJson() throws JSONException {

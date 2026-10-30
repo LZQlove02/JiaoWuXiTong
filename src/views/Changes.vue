@@ -15,6 +15,10 @@
     </div>
 
     <div v-if="!changes.loaded" class="card loading">正在加载变更记录…</div>
+    <div v-else-if="changes.error && !changes.entries.length" class="card error-card">
+      <p class="error-text">{{ changes.error }}</p>
+      <button class="error-retry" @click="retry">重试</button>
+    </div>
     <div v-else-if="!groups.length" class="card">
       <EmptyState icon="calendar" :title="emptyTitle" :description="emptyDescription" />
     </div>
@@ -90,6 +94,11 @@ function summaryOf(entry) {
   return changeSummary(entry)
 }
 
+async function retry() {
+  await changes.init()
+  if (!changes.error) await changes.markAllRead()
+}
+
 onMounted(async () => {
   await changes.init()
   // 进入列表即视为看过，清掉提醒条与红点
@@ -125,6 +134,28 @@ onMounted(async () => {
   text-align: center;
   color: var(--text-secondary);
   padding: 32px 0;
+}
+
+.error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 16px;
+}
+
+.error-text {
+  font-size: 14px;
+  color: var(--danger);
+}
+
+.error-retry {
+  padding: 7px 18px;
+  border-radius: 18px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .group {

@@ -56,17 +56,28 @@ export const useAcademicStore = defineStore('academic', () => {
       terms.value.find((item) => item.isCurrent) || terms.value[0] || null
   }
 
+  let scheduleRequest = null
+
   async function loadSchedule(term = currentTerm.value, options = {}) {
-    loading.value = true
-    setError('schedule', '')
+    // 首页与课表可能同时挂载：合并成一次请求，避免重复打接口
+    if (scheduleRequest) return scheduleRequest
+    scheduleRequest = (async () => {
+      loading.value = true
+      setError('schedule', '')
+      try {
+        // 默认强制刷新：打开 / 切回 App、进入课表时对一次账
+        schedule.value = await api.getSchedule(term, { force: options.force !== false })
+        changes.applyFromSchedule(schedule.value)
+      } catch (err) {
+        setError('schedule', err.message || '课表加载失败')
+      } finally {
+        loading.value = false
+      }
+    })()
     try {
-      // 默认强制刷新：打开 App / 进入课表时对一次账，60 秒内不重复请求
-      schedule.value = await api.getSchedule(term, { force: options.force !== false })
-      changes.applyFromSchedule(schedule.value)
-    } catch (err) {
-      setError('schedule', err.message || '课表加载失败')
+      return await scheduleRequest
     } finally {
-      loading.value = false
+      scheduleRequest = null
     }
   }
 

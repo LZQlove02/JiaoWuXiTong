@@ -9,6 +9,7 @@ vi.mock('../src/native/scheduleChangeBridge', () => ({
   setScheduleChangeEnabled: vi.fn(),
   requestChangeNotificationPermission: vi.fn(),
   openScheduleChangeNotificationSettings: vi.fn(),
+  clearScheduleChange: vi.fn(),
   addScheduleChangeListener: vi.fn(() => () => {})
 }))
 
@@ -70,10 +71,11 @@ describe('changes store', () => {
     expect(changes.latest.id).toBe('c_1')
   })
 
-  it('原生返回 null 时也结束加载态，页面不卡在加载中', async () => {
+  it('原生返回 null 时结束加载态并给出错误态', async () => {
     getScheduleChangeState.mockResolvedValue(null)
     await changes.init()
     expect(changes.loaded).toBe(true)
+    expect(changes.error).toBe('变更记录加载失败')
     expect(changes.bannerVisible).toBe(false)
   })
 
@@ -95,11 +97,13 @@ describe('changes store', () => {
 
   it('离线快照或缺少原文时不参与对账', async () => {
     await changes.applyFromSchedule({
+      offline: true,
       source: '教务系统（离线缓存）',
       rawPayload: '{"kbList":[]}',
       term: { xnm: '2026', xqm: '3', startDate: '2026-08-31' }
     })
     await changes.applyFromSchedule({
+      offline: false,
       source: '教务系统（实时）',
       rawPayload: '',
       term: { xnm: '2026', xqm: '3', startDate: '2026-08-31' }

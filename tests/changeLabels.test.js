@@ -74,7 +74,7 @@ describe('changeLabels', () => {
     const now = new Date('2026-10-30T12:00:00+08:00')
     expect(dateGroupLabel('2026-10-30T07:10:12+08:00', now)).toBe('今天')
     expect(dateGroupLabel('2026-10-29T07:10:12+08:00', now)).toBe('昨天')
-    expect(dateGroupLabel('2026-10-20T07:10:12+08:00', now)).toBe('10 月 20 日')
+    expect(dateGroupLabel('2026-10-20T07:10:12+08:00', now)).toBe('更早')
     expect(dateGroupLabel('bad-value', now)).toBe('更早')
   })
 

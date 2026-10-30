@@ -75,7 +75,7 @@
           <span class="block-room">{{ item.room }}</span>
         </button>
 
-        <div
+        <button
           v-for="entry in changeGhosts"
           :key="'ghost-' + entry.id"
           class="course-block ghost"
@@ -83,11 +83,12 @@
             gridColumn: entry.from.weekday + 1,
             gridRow: `${entry.from.startSection + 1} / span ${entry.from.endSection - entry.from.startSection + 1}`
           }"
+          @click="openCourse(entry.courseId)"
         >
           <span class="change-badge change-badge--cancel">停</span>
           <span class="block-name">{{ entry.courseName }}</span>
           <span class="block-room">{{ entry.from.room }}</span>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -403,6 +404,15 @@ onUnmounted(() => {
 
 .change-badge--add {
   background: rgba(30, 142, 90, 0.95);
+}
+
+/* 深色主题压暗一档，白字对比度更高 */
+[data-theme='dark'] .change-badge--move {
+  background: rgba(146, 96, 24, 0.95);
+}
+
+[data-theme='dark'] .change-badge--add {
+  background: rgba(22, 110, 70, 0.95);
 }
 
 .course-block.ghost {

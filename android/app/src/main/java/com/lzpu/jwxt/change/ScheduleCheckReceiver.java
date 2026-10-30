@@ -3,7 +3,6 @@ package com.lzpu.jwxt.change;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.util.Log;
 
 /**
  * 后台检查闹钟。onReceive 里先排下一天，再起后台线程联网对账；
@@ -13,7 +12,6 @@ public class ScheduleCheckReceiver extends BroadcastReceiver {
 
     public static final String ACTION_CHECK = "com.lzpu.jwxt.change.CHECK";
     public static final String EXTRA_SLOT = "slot";
-    private static final String TAG = "LzpuChange";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -29,7 +27,7 @@ public class ScheduleCheckReceiver extends BroadcastReceiver {
                 try {
                     ScheduleChangeService.checkNow(app);
                 } catch (RuntimeException error) {
-                    Log.w(TAG, "后台检查失败", error);
+                    ChangeDebug.warn(app, "后台检查失败: " + error.getClass().getSimpleName());
                 } finally {
                     pending.finish();
                 }

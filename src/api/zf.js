@@ -567,7 +567,6 @@ export class ZfAcademicApi {
     this.terms = null
     // 课表接口原文：交给原生变更引擎对账，避免前后两端各解析一遍
     this.lastRawPayload = ''
-    this.lastFetchedAtMs = 0
   }
 
   // 冷启动先用本地快照渲染，随后由后台刷新替换为实时数据
@@ -669,7 +668,6 @@ export class ZfAcademicApi {
     }
     try {
       this.lastRawPayload = body
-      this.lastFetchedAtMs = Date.now()
       return JSON.parse(body)
     } catch (error) {
       const failure = new Error('课表数据解析失败')
@@ -740,16 +738,13 @@ export class ZfAcademicApi {
     const force = Boolean(options.force)
     const target = term || this.term
     const sameTerm = `${target.xnm}_${target.xqm}` === `${this.term.xnm}_${this.term.xqm}`
-    // 60 秒内刚拉过就不再重复请求：首页与课表连续挂载时只打一次接口
-    const fresh = this.lastFetchedAtMs > 0 && Date.now() - this.lastFetchedAtMs < 60000
-    if (!sameTerm || (force && !fresh)) {
+    if (!sameTerm || force) {
       try {
         const payload = await this.fetchSchedule(target)
         const nextTerm = mapTerm(payload.xsxx || {}, target)
         this.term = nextTerm
         this.schedule = mapSchedule(payload, nextTerm)
         this.fetchedAt = new Date().toISOString()
-        this.lastFetchedAtMs = Date.now()
         this.offline = false
         writeSnapshot(this)
       } catch (error) {
@@ -763,6 +758,7 @@ export class ZfAcademicApi {
     }
     return {
       ...this.schedule,
+      offline: this.offline,
       source: this.offline ? '教务系统（离线缓存）' : '教务系统（实时）',
       fetchedAt: this.fetchedAt,
       rawPayload: this.offline ? '' : this.lastRawPayload,

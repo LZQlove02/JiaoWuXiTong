@@ -293,6 +293,7 @@ describe('小组件 payload：整体契约', () => {
     const payload = build()
     expect(Object.keys(payload).sort()).toEqual([
       'account',
+      'changeBadge',
       'grades',
       'loggedIn',
       'messages',
@@ -311,5 +312,12 @@ describe('小组件 payload：整体契约', () => {
     expect(payload.account).toEqual({ name: '卢再发' })
     expect(payload.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
     expect(payload.updatedAtLabel).toBe('09:00')
+  })
+
+  it('课表变更未读时置 changeBadge，关闭开关或已读后取消', () => {
+    expect(build({ changeUnread: 2 }).changeBadge).toBe(true)
+    expect(build({ changeUnread: 0 }).changeBadge).toBe(false)
+    expect(build({ changeUnread: 2, changeEnabled: false }).changeBadge).toBe(false)
+    expect(buildWidgetPayload({ user: null }).changeBadge).toBe(false)
   })
 })

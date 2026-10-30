@@ -11,7 +11,7 @@ import okhttp3.HttpUrl;
  * 网络访问策略。公开官网内容与教务认证使用各自独立的允许主机集合，
  * 所有请求强制 HTTPS，重定向逐跳校验，避免策略混用。
  */
-final class HttpPolicy {
+public final class HttpPolicy {
 
     /** 公开官网内容。 */
     static final HttpPolicy PUBLIC = new HttpPolicy(
@@ -21,7 +21,7 @@ final class HttpPolicy {
      * 教务认证与个人数据。
      * 当前仅定义策略，登录与业务请求待方案 6.5 受控验证通过后才接入。
      */
-    static final HttpPolicy AUTH = new HttpPolicy(
+    public static final HttpPolicy AUTH = new HttpPolicy(
             Collections.singleton("zfjw.lzzy.net"));
 
     private final Set<String> allowedHosts;
@@ -30,7 +30,7 @@ final class HttpPolicy {
         this.allowedHosts = new HashSet<>(allowedHosts);
     }
 
-    void check(HttpUrl url) throws IOException {
+    public void check(HttpUrl url) throws IOException {
         if (!"https".equals(url.scheme())) {
             throw new IOException("仅允许 HTTPS 请求");
         }

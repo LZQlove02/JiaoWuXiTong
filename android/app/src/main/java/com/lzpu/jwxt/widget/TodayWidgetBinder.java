@@ -5,7 +5,6 @@ import android.view.View;
 import android.widget.RemoteViews;
 
 import com.lzpu.jwxt.R;
-import com.lzpu.jwxt.change.ScheduleChangeStore;
 
 import java.util.Calendar;
 import java.util.List;
@@ -42,10 +41,9 @@ final class TodayWidgetBinder {
         views.setTextColor(R.id.widget_updated, theme.tertiary);
         views.setTextColor(R.id.widget_empty, theme.tertiary);
         views.setTextColor(R.id.widget_footer, theme.secondary);
-        // 「有变」角标：未读数来自变更引擎，RemoteViews 复用视图，必须每次都显式设置
-        // 未登录或跨周降级时不显示，避免「请登录」组件上挂一个变更角标
+        // 「有变」角标：只读 payload，不碰第二份存储；RemoteViews 复用视图，每次显式设置
         views.setViewVisibility(R.id.widget_today_change,
-            payload.loggedIn && !payload.stale && ScheduleChangeStore.unreadCount(context) > 0
+            payload.loggedIn && !payload.stale && payload.changeBadge
                 ? View.VISIBLE : View.GONE);
         // 齿轮图标跟随主体文字色，不额外加深色底
         views.setInt(R.id.widget_style_chip, "setColorFilter", theme.secondary);

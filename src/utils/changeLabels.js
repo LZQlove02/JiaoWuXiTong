@@ -77,7 +77,7 @@ export function dateGroupLabel(iso, now = new Date()) {
   const days = diffDays(toDateOnly(date), toDateOnly(now))
   if (days === 0) return '今天'
   if (days === 1) return '昨天'
-  return `${date.getMonth() + 1} 月 ${date.getDate()} 日`
+  return '更早'
 }
 
 export function detectedText(iso) {

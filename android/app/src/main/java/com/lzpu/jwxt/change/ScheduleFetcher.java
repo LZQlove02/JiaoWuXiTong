@@ -1,9 +1,9 @@
 package com.lzpu.jwxt.change;
 
 import android.content.Context;
-import android.util.Log;
 
 import com.lzpu.jwxt.AuthCookieStore;
+import com.lzpu.jwxt.HttpPolicy;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -16,12 +16,12 @@ import okhttp3.ResponseBody;
 
 /**
  * 后台检查用的课表请求：复用登录后的加密 Cookie，只 GET zfjw HTTPS。
- * 与 JwxtHttpPlugin.authGet 同一套请求头；不更新 Cookie、不写任何业务数据。
+ * 与 JwxtHttpPlugin.authGet 同一套请求头与 HttpPolicy；不更新 Cookie、不写业务数据。
+ *
+ * 超时按广播 goAsync 的 10 秒窗口收紧，且只尝试一次：失败静默，等下一个时段。
  */
 final class ScheduleFetcher {
 
-    private static final String TAG = "LzpuChange";
-    private static final String HOST = "zfjw.lzzy.net";
     private static final String SCHEDULE_ENDPOINT =
             "https://zfjw.lzzy.net/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151";
     private static final String USER_AGENT =
@@ -30,8 +30,8 @@ final class ScheduleFetcher {
     private static final int MAX_REDIRECTS = 3;
 
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(6, TimeUnit.SECONDS)
             .followRedirects(false)
             .followSslRedirects(false)
             .build();
@@ -80,30 +80,23 @@ final class ScheduleFetcher {
                 .addQueryParameter("xqm", term.xqm)
                 .build();
 
-        IOException lastError = null;
-        for (int attempt = 0; attempt < 2; attempt += 1) {
-            try {
-                return request(url, cookie);
-            } catch (IOException error) {
-                lastError = error;
-                if (attempt == 0) {
-                    try {
-                        Thread.sleep(400);
-                    } catch (InterruptedException interrupted) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-            }
+        try {
+            return request(url, cookie);
+        } catch (IOException error) {
+            ChangeDebug.warn(context, "课表后台检查网络失败: " + error.getClass().getSimpleName());
+            return Result.network();
         }
-        Log.w(TAG, "课表后台检查网络失败: " + (lastError == null ? "unknown" : lastError.getMessage()));
-        return Result.network();
     }
 
     private static Result request(HttpUrl start, String cookie) throws IOException {
         HttpUrl current = start;
         for (int hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-            if (!isAllowed(current)) return Result.expired();
+            try {
+                HttpPolicy.AUTH.check(current);
+            } catch (IOException blocked) {
+                // 被重定向到 http 登录页或非白名单主机：按会话失效处理
+                return Result.expired();
+            }
             Request request = new Request.Builder()
                     .url(current)
                     .header("User-Agent", USER_AGENT)
@@ -118,8 +111,9 @@ final class ScheduleFetcher {
                     if (location == null) return Result.failed();
                     HttpUrl next = current.resolve(location);
                     if (next == null) return Result.failed();
-                    // 被踢回 http 登录页 = 会话失效；其余跳转按失败处理，不追到别的站
-                    if (!"https".equals(next.scheme()) || !HOST.equals(next.host())) {
+                    try {
+                        HttpPolicy.AUTH.check(next);
+                    } catch (IOException blocked) {
                         return Result.expired();
                     }
                     current = next;
@@ -132,10 +126,7 @@ final class ScheduleFetcher {
                 if (text.startsWith("\uFEFF")) text = text.substring(1);
                 String trimmed = text.trim();
                 if (trimmed.startsWith("<")) {
-                    boolean expired = trimmed.contains("login_slogin")
-                            || trimmed.contains("统一身份认证")
-                            || trimmed.contains("authserver");
-                    return expired ? Result.expired() : Result.failed();
+                    return looksLikeLoginPage(trimmed) ? Result.expired() : Result.failed();
                 }
                 return Result.success(text);
             }
@@ -143,13 +134,27 @@ final class ScheduleFetcher {
         return Result.failed();
     }
 
+    /** 会话失效时教务系统会返回 200 + 登录页 HTML，不能只按状态码判定成功。 */
+    static boolean looksLikeLoginPage(String body) {
+        if (body == null) return false;
+        return body.contains("login_slogin")
+                || body.contains("统一身份认证")
+                || body.contains("authserver");
+    }
+
     private static boolean isRedirect(int code) {
         return code == 301 || code == 302 || code == 303 || code == 307 || code == 308;
     }
 
-    private static boolean isAllowed(HttpUrl url) {
-        return "https".equals(url.scheme())
-                && url.port() == 443
-                && HOST.equals(url.host());
+    /** 单测用：确认与 HttpPolicy 使用同一套主机 / 协议 / 凭据校验。 */
+    static boolean canRequest(String url) {
+        HttpUrl parsed = HttpUrl.parse(url);
+        if (parsed == null) return false;
+        try {
+            HttpPolicy.AUTH.check(parsed);
+            return true;
+        } catch (IOException error) {
+            return false;
+        }
     }
 }
