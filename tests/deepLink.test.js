@@ -7,6 +7,8 @@ describe('deepLinkPath', () => {
     expect(deepLinkPath('lzpu://messages')).toBe('/messages')
     expect(deepLinkPath('lzpu://grades')).toBe('/grades')
     expect(deepLinkPath('lzpu://notices')).toBe('/notices')
+    expect(deepLinkPath('lzpu://changes')).toBe('/changes')
+    expect(deepLinkPath('lzpu://login')).toBe('/login')
   })
 
   it('容忍查询串、锚点与缺斜杠写法', () => {
