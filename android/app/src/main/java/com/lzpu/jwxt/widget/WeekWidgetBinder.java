@@ -40,11 +40,12 @@ final class WeekWidgetBinder {
 
         views.setTextViewText(R.id.widget_week_updated,
             payload.updatedLabel.isEmpty() ? "" : context.getString(R.string.widget_updated_at, payload.updatedLabel));
-        // 标题带上周次，让「本周」有具体指向；周次未知时保持 XML 里的原标题
-        if (payload.termWeek > 0) {
-            views.setTextViewText(R.id.widget_week_title,
-                context.getString(R.string.widget_title_week_no, payload.termWeek));
-        }
+        // 标题必须每次都显式设置：RemoteViews 在布局不变时只 apply 动作，
+        // 没设置的字会沿用上一次的值（退出登录后会残留「第 9 周」）
+        views.setTextViewText(R.id.widget_week_title,
+            payload.termWeek > 0
+                ? context.getString(R.string.widget_title_week_no, payload.termWeek)
+                : context.getString(R.string.widget_title_week));
 
         if (!payload.loggedIn) {
             showState(views, context.getString(R.string.widget_state_login));
