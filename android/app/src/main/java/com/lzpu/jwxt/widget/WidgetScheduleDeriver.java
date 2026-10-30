@@ -51,6 +51,24 @@ final class WidgetScheduleDeriver {
         return !payload.weekAnchor.equals(mondayOf(now));
     }
 
+    /**
+     * 2x2 时间行的日期前缀：下一节课不在今天时返回「周X」，今天返回空串。
+     * payload 里的 dayLabel 只会是「今天 / 明天 / 周X」，周X 直接透传；
+     * 「明天」按当天推算成星期，避免 2x2 上出现「明天 14:30」这种和星期不一致的写法。
+     */
+    static String dayPrefix(WidgetPayload.ClassItem item, Calendar now) {
+        if (item == null || item.isToday()) return "";
+        String label = item.dayLabel == null ? "" : item.dayLabel.trim();
+        if (label.isEmpty()) return "";
+        if (label.startsWith("周")) return label;
+        if ("明天".equals(label)) {
+            // Calendar.DAY_OF_WEEK 周日=1…周六=7 → 换算成周一=0…周日=6
+            int todayIndex = (now.get(Calendar.DAY_OF_WEEK) + 5) % 7;
+            return "周" + WEEKDAY_LABELS[(todayIndex + 1) % 7];
+        }
+        return label;
+    }
+
     // 当天所在周的周一，格式与 JS 侧 weekAnchorOf 一致：yyyy-MM-dd（本地日期）
     static String mondayOf(Calendar now) {
         Calendar day = (Calendar) now.clone();

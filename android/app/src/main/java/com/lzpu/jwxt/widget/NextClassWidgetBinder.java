@@ -58,14 +58,13 @@ final class NextClassWidgetBinder {
             return views;
         }
 
-        String title = context.getString(R.string.widget_title_next);
-        if (!next.isToday()) {
-            title = title + " · " + next.dayLabel;
-        }
-        views.setTextViewText(R.id.widget_title, title);
+        // 标题只放「下一节课」：2x2 内容区约 82dp，再挂「· 周X」会被省略号吃掉
+        views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title_next));
         views.setTextViewText(R.id.widget_course,
             next.name.isEmpty() ? context.getString(R.string.widget_no_next) : next.name);
-        views.setTextViewText(R.id.widget_time, next.timeRange());
+        // 不在今天时把「周X」放进时间行：周二 14:30（放不下结束时间，只给开始时间）
+        views.setTextViewText(R.id.widget_time,
+            timeLine(next, WidgetScheduleDeriver.dayPrefix(next, java.util.Calendar.getInstance())));
         views.setTextViewText(R.id.widget_room, next.room);
         views.setTextViewText(R.id.widget_updated, updated);
         views.setTextViewText(R.id.widget_footer, remainingText(context, payload));
@@ -78,6 +77,12 @@ final class NextClassWidgetBinder {
         views.setInt(R.id.widget_style_chip, "setColorFilter", theme.secondary);
         views.setOnClickPendingIntent(R.id.widget_style_chip,
             WidgetDeepLink.cycleStyle(context, appWidgetId));
+    }
+
+    // 时间行：今天给完整区间；不在今天时前面挂「周X」，只给开始时间（2x2 放不下区间）
+    static String timeLine(WidgetPayload.ClassItem item, String dayPrefix) {
+        if (dayPrefix == null || dayPrefix.isEmpty()) return item.timeRange();
+        return item.startTime.isEmpty() ? dayPrefix : dayPrefix + " " + item.startTime;
     }
 
     static String updatedText(Context context, WidgetPayload payload) {

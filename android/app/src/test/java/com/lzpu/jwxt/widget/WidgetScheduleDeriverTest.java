@@ -159,4 +159,35 @@ public class WidgetScheduleDeriverTest {
         assertFalse(WidgetScheduleDeriver.isStale(payload, date(2026, 11, 2, 0, 5)));
         assertFalse(WidgetScheduleDeriver.isStale(null, date(2026, 11, 2, 0, 5)));
     }
+
+    // ---- 2x2 时间行的星期前缀 ----
+
+    private static WidgetPayload.ClassItem cls(String dayLabel) {
+        WidgetPayload.ClassItem item = new WidgetPayload.ClassItem();
+        item.dayLabel = dayLabel;
+        item.startTime = "14:30";
+        item.endTime = "15:55";
+        return item;
+    }
+
+    @Test
+    public void dayPrefixEmptyForToday() {
+        assertEquals("", WidgetScheduleDeriver.dayPrefix(cls("今天"), date(2026, 10, 30, 9, 0)));
+        assertEquals("", WidgetScheduleDeriver.dayPrefix(cls(""), date(2026, 10, 30, 9, 0)));
+        assertEquals("", WidgetScheduleDeriver.dayPrefix(null, date(2026, 10, 30, 9, 0)));
+    }
+
+    @Test
+    public void dayPrefixPassesWeekdayThrough() {
+        assertEquals("周日", WidgetScheduleDeriver.dayPrefix(cls("周日"), date(2026, 10, 30, 9, 0)));
+        assertEquals("周一", WidgetScheduleDeriver.dayPrefix(cls("周一"), date(2026, 10, 30, 9, 0)));
+    }
+
+    @Test
+    public void dayPrefixTurnsTomorrowIntoWeekday() {
+        // 2026-10-30 是周五 → 明天周六
+        assertEquals("周六", WidgetScheduleDeriver.dayPrefix(cls("明天"), date(2026, 10, 30, 9, 0)));
+        // 2026-11-01 是周日 → 明天周一（跨周）
+        assertEquals("周一", WidgetScheduleDeriver.dayPrefix(cls("明天"), date(2026, 11, 1, 20, 0)));
+    }
 }
