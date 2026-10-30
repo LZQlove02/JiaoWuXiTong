@@ -843,7 +843,9 @@ export class ZfAcademicApi {
   }
 
   async getExams() {
-    throw new Error('考试接口尚未接入，暂不可用')
+    const error = new Error('考试接口尚未接入，暂不可用')
+    error.unsupported = true
+    throw error
   }
 
   async getEvaluations() {

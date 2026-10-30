@@ -629,4 +629,10 @@ describe('学生门户请求与分页', () => {
       sessionExpired: true
     })
   })
+
+  it('考试接口未接入时带 unsupported 标记', async () => {
+    await expect(new ZfAcademicApi().getExams()).rejects.toMatchObject({
+      unsupported: true
+    })
+  })
 })

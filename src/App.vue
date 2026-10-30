@@ -10,14 +10,16 @@
     <p class="boot-text">正在恢复登录状态…</p>
   </div>
   <div v-else class="app-shell">
-    <router-view :key="$route.fullPath" />
+    <main ref="mainRef" class="app-main">
+      <router-view :key="$route.fullPath" />
+    </main>
     <TabBar v-if="showTabBar" />
     <UpdateDialog v-if="update.dialogOpen" />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
@@ -41,10 +43,32 @@ const academic = useAcademicStore()
 const changes = useChangesStore()
 const update = useUpdateStore()
 const showTabBar = computed(() => route.meta.tab === true)
+const mainRef = ref(null)
 
 const consented = ref(isDisclaimerAccepted())
 const declined = ref(false)
 let nativeReady = false
+
+// 内容区独立滚动：记下离开页面的位置，返回时恢复；新页面从顶部开始
+const scrollPositions = new Map()
+watch(
+  () => route.fullPath,
+  (to, from) => {
+    const main = mainRef.value
+    if (main && from) scrollPositions.set(from, main.scrollTop)
+    nextTick(() => {
+      if (mainRef.value) mainRef.value.scrollTop = scrollPositions.get(to) || 0
+    })
+  },
+  { flush: 'pre' }
+)
+
+// 系统底部导航栏颜色跟随是否有 TabBar（白色/深色卡片底色）
+watch(
+  () => route.meta.tab,
+  (tab) => ui.setTabBarVisible(tab === true),
+  { immediate: true }
+)
 
 // 同意免责声明后才恢复会话：未同意前不读 Cookie、不发请求
 async function onAccept() {

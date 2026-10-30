@@ -8,6 +8,7 @@ const STORAGE_KEY = 'lzpu.theme'
 
 export const useUiStore = defineStore('ui', () => {
   const theme = ref('system')
+  const tabBarVisible = ref(false)
   const overlayCloser = ref(null)
   const hasOverlay = computed(() => Boolean(overlayCloser.value))
 
@@ -46,11 +47,21 @@ export const useUiStore = defineStore('ui', () => {
       // 状态栏在部分设备上不可控，忽略即可
     }
     try {
-      // 系统导航栏不归 StatusBar 插件管理，需单独同步主题色
-      await AppTheme.setNavigationBar({ dark: resolved === 'dark' })
+      await AppTheme.setNavigationBar({
+        dark: resolved === 'dark',
+        color: navBarColor(resolved)
+      })
     } catch (error) {
       // 导航栏在部分设备上不可控，忽略即可
     }
+  }
+
+  // 系统导航栏不归 StatusBar 插件管理：TabBar 通栏时用其卡片底色，
+  // 其余情况与页面背景一致，避免底部出现色差条
+  function navBarColor(resolved) {
+    const fullWidthTab = tabBarVisible.value && window.innerWidth < 768
+    if (fullWidthTab) return resolved === 'dark' ? '#171b20' : '#ffffff'
+    return resolved === 'dark' ? '#0f1216' : '#f5f6f8'
   }
 
   function applyTheme() {
@@ -70,6 +81,18 @@ export const useUiStore = defineStore('ui', () => {
       .addEventListener('change', () => {
         if (theme.value === 'system') applyTheme()
       })
+    // 横屏/平板时 TabBar 不再通栏，导航栏颜色需要重新判定
+    window.addEventListener('resize', refreshNavBar)
+    window
+      .matchMedia('(min-width: 768px)')
+      .addEventListener('change', refreshNavBar)
+    window.addEventListener('orientationchange', () => {
+      setTimeout(refreshNavBar, 200)
+    })
+  }
+
+  function refreshNavBar() {
+    if (tabBarVisible.value) syncStatusBar(resolveTheme(theme.value))
   }
 
   function setTheme(value) {
@@ -78,8 +101,17 @@ export const useUiStore = defineStore('ui', () => {
     applyTheme()
   }
 
+  function setTabBarVisible(value) {
+    const next = Boolean(value)
+    if (tabBarVisible.value === next) return
+    tabBarVisible.value = next
+    syncStatusBar(resolveTheme(theme.value))
+  }
+
   return {
     theme,
+    tabBarVisible,
+    setTabBarVisible,
     hasOverlay,
     setOverlayCloser,
     clearOverlayCloser,

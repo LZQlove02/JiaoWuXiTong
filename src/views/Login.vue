@@ -41,7 +41,7 @@ async function ssoLogin() {
 
 <style scoped>
 .login-page {
-  min-height: 100vh;
+  min-height: 100%;
   padding: calc(env(safe-area-inset-top) + 48px) 24px
     calc(env(safe-area-inset-bottom) + 24px);
   background: var(--bg);

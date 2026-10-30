@@ -57,6 +57,7 @@ export const useAcademicStore = defineStore('academic', () => {
   const scheduleLoading = ref(false)
   const gradesLoading = ref(false)
   const examsLoading = ref(false)
+  const examsUnsupported = ref(false)
   const evaluationsLoading = ref(false)
   const courseSelectionLoading = ref(false)
   const portalNoticesLoading = ref(false)
@@ -94,20 +95,23 @@ export const useAcademicStore = defineStore('academic', () => {
     errors.value = { ...errors.value, [key]: message }
   }
 
-  async function initTerms() {
-    if (terms.value.length) return
+  async function loadTerms() {
     setError('terms', '')
     termsLoading.value = true
     try {
-      terms.value = await api.getTerms()
+      const list = await api.getTerms()
+      terms.value = list
+      currentTerm.value = list.find((item) => item.isCurrent) || list[0] || null
     } catch (err) {
       setError('terms', err.message || '学期信息加载失败')
-      return
     } finally {
       termsLoading.value = false
     }
-    currentTerm.value =
-      terms.value.find((item) => item.isCurrent) || terms.value[0] || null
+  }
+
+  async function initTerms() {
+    if (terms.value.length) return
+    await loadTerms()
   }
 
   async function loadSchedule(term = currentTerm.value, options = {}) {
@@ -235,7 +239,10 @@ export const useAcademicStore = defineStore('academic', () => {
     setError('exams', '')
     try {
       exams.value = await api.getExams(term)
+      examsUnsupported.value = false
     } catch (err) {
+      // 接口未接入与真实请求失败要区分，前者不应影响首页刷新结果
+      examsUnsupported.value = Boolean(err?.unsupported)
       setError('exams', err.message || '考试加载失败')
     } finally {
       examsLoading.value = false
@@ -408,6 +415,7 @@ export const useAcademicStore = defineStore('academic', () => {
     scheduleLoading.value = false
     gradesLoading.value = false
     examsLoading.value = false
+    examsUnsupported.value = false
     evaluationsLoading.value = false
     courseSelectionLoading.value = false
     portalNoticesLoading.value = false
@@ -454,6 +462,7 @@ export const useAcademicStore = defineStore('academic', () => {
     scheduleLoading,
     gradesLoading,
     examsLoading,
+    examsUnsupported,
     evaluationsLoading,
     courseSelectionLoading,
     portalNoticesLoading,
@@ -480,6 +489,7 @@ export const useAcademicStore = defineStore('academic', () => {
     course,
     errors,
     initTerms,
+    loadTerms,
     loadSchedule,
     loadGrades,
     loadAllGrades,

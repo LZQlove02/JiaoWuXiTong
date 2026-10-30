@@ -51,11 +51,8 @@ const items = [
 
 <style scoped>
 .tab-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 20;
+  flex: none;
+  width: 100%;
   display: flex;
   height: calc(var(--tab-height) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
@@ -102,11 +99,8 @@ const items = [
 
 @media (min-width: 768px) {
   .tab-bar {
-    left: 50%;
-    right: auto;
-    width: 100%;
     max-width: 760px;
-    transform: translateX(-50%);
+    margin: 0 auto;
     border-radius: 16px 16px 0 0;
   }
 }

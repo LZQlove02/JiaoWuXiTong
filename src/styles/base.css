@@ -12,6 +12,7 @@ body,
 }
 
 body {
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
@@ -34,14 +35,25 @@ a {
   text-decoration: none;
 }
 
+/* 外壳固定满屏，内容区独立滚动，底部导航不参与页面滚动 */
 .app-shell {
-  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .page {
-  min-height: 100vh;
+  min-height: 100%;
   padding: calc(env(safe-area-inset-top) + 16px) 16px
-    calc(var(--tab-height) + env(safe-area-inset-bottom) + 16px);
+    calc(env(safe-area-inset-bottom) + 16px);
 }
 
 .page--plain {

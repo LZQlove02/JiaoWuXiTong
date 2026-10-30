@@ -1,5 +1,29 @@
 <template>
-  <div class="page">
+  <div
+    class="page"
+    @touchstart.passive="onPullStart"
+    @touchmove="onPullMove"
+    @touchend="onPullEnd"
+    @touchcancel="onPullCancel"
+  >
+    <div
+      class="pull-refresh"
+      :class="`is-${pull.state}`"
+      :style="indicatorStyle"
+      role="status"
+      aria-live="polite"
+      :aria-hidden="pull.state === 'idle'"
+    >
+      <span
+        class="pull-refresh-icon"
+        :class="{ 'is-spinning': pull.state === 'refreshing' }"
+        :style="iconStyle"
+      >
+        <AppIcon name="refresh" />
+      </span>
+      <span>{{ pullLabel }}</span>
+    </div>
+
     <header class="row header">
       <div>
         <p class="tiny">{{ greetingText }}，{{ auth.user?.name || '同学' }}</p>
@@ -163,6 +187,7 @@ const {
   schedule,
   scheduleLoading,
   exams,
+  examsUnsupported,
   currentTerm,
   errors,
   portalNotices,
@@ -181,6 +206,35 @@ const hasSchedule = computed(() => Boolean(schedule.value?.sessions?.length))
 
 const noticesError = computed(() => errors.value.portalNotices)
 const messagesError = computed(() => errors.value.messages)
+
+const PULL_THRESHOLD = 56
+const PULL_MAX = 88
+const PULL_HOLD = 56
+const PULL_SLOP = 6
+
+const pull = reactive({ state: 'idle', distance: 0 })
+const pullLabels = {
+  pulling: '下拉刷新',
+  ready: '松开刷新',
+  refreshing: '正在刷新…',
+  done: '刷新完成',
+  offline: '网络不可用，显示缓存',
+  failed: '刷新失败'
+}
+const pullLabel = computed(() => pullLabels[pull.state] || '下拉刷新')
+const indicatorStyle = computed(() => ({
+  transform: `translate(-50%, ${pull.distance - 44}px)`,
+  opacity: pull.state === 'idle' ? 0 : 1
+}))
+const iconStyle = computed(() => {
+  if (pull.state === 'refreshing' || pull.distance === 0) return {}
+  return { transform: `rotate(${Math.min(180, pull.distance * 2.4)}deg)` }
+})
+
+let pullStartY = 0
+let pullTracking = false
+let pullDoneTimer = null
+let pageUnmounted = false
 
 const now = ref(new Date())
 let clockTimer = null
@@ -257,19 +311,19 @@ let longPressTimer = null
 let suppressPath = ''
 let suppressClickTimer = null
 let dragStartOrder = []
-let savedHtmlOverflow = ''
-let savedBodyOverflow = ''
+let savedMainOverflow = ''
 
 function lockPageScroll() {
-  savedHtmlOverflow = document.documentElement.style.overflow
-  savedBodyOverflow = document.body.style.overflow
-  document.documentElement.style.overflow = 'hidden'
-  document.body.style.overflow = 'hidden'
+  const container = scrollContainer()
+  if (!container) return
+  savedMainOverflow = container.style.overflow
+  container.style.overflow = 'hidden'
 }
 
 function unlockPageScroll() {
-  document.documentElement.style.overflow = savedHtmlOverflow
-  document.body.style.overflow = savedBodyOverflow
+  const container = scrollContainer()
+  if (!container) return
+  container.style.overflow = savedMainOverflow
 }
 
 function clearLongPress() {
@@ -456,6 +510,105 @@ function shortTime(value) {
   return text.length >= 16 ? text.slice(5, 16) : text
 }
 
+function scrollContainer() {
+  return document.querySelector('.app-main')
+}
+
+function atPageTop() {
+  const container = scrollContainer()
+  return container ? container.scrollTop <= 0 : true
+}
+
+function onPullStart(event) {
+  if (event.touches.length !== 1) {
+    pullTracking = false
+    return
+  }
+  if (drag.active || pull.state === 'refreshing' || !atPageTop()) {
+    pullTracking = false
+    return
+  }
+  pullTracking = true
+  pullStartY = event.touches[0].clientY
+  if (pullDoneTimer) {
+    clearTimeout(pullDoneTimer)
+    pullDoneTimer = null
+  }
+  if (pull.state !== 'idle') resetPull()
+}
+
+function onPullMove(event) {
+  if (!pullTracking) return
+  if (event.touches.length !== 1 || drag.active) {
+    pullTracking = false
+    resetPull()
+    return
+  }
+  const dy = event.touches[0].clientY - pullStartY
+  if (dy <= 0) {
+    // 向上滑动交还给页面正常滚动
+    pullTracking = false
+    resetPull()
+    return
+  }
+  if (dy < PULL_SLOP) return
+  if (event.cancelable) event.preventDefault()
+  pull.distance = Math.min(PULL_MAX, (dy - PULL_SLOP) * 0.55)
+  pull.state = pull.distance >= PULL_THRESHOLD ? 'ready' : 'pulling'
+}
+
+function onPullEnd() {
+  if (!pullTracking) return
+  pullTracking = false
+  if (pull.state === 'ready') {
+    refreshHome()
+    return
+  }
+  resetPull()
+}
+
+function onPullCancel() {
+  pullTracking = false
+  resetPull()
+}
+
+function resetPull() {
+  pull.state = 'idle'
+  pull.distance = 0
+}
+
+async function refreshHome() {
+  if (pull.state === 'refreshing') return
+  pull.state = 'refreshing'
+  pull.distance = PULL_HOLD
+  now.value = new Date()
+  try {
+    // 强制刷新学期列表，跨学期后无需重启 App
+    await academic.loadTerms()
+    await Promise.all([
+      academic.loadSchedule(academic.currentTerm),
+      academic.loadExams(),
+      academic.loadPortalNotices(),
+      academic.loadMessages()
+    ])
+    // 考试接口未接入时的错误不算失败；真实请求失败仍计入
+    const failed = Boolean(
+      errors.value.schedule ||
+        errors.value.portalNotices ||
+        errors.value.messages ||
+        (errors.value.exams && !examsUnsupported.value)
+    )
+    const offline =
+      isOffline.value || portalNoticesOffline.value || messagesOffline.value
+    pull.state = failed ? 'failed' : offline ? 'offline' : 'done'
+  } catch (error) {
+    pull.state = 'failed'
+  } finally {
+    // 请求可能在离开首页后才结束，卸载后不再创建定时器
+    if (!pageUnmounted) pullDoneTimer = setTimeout(resetPull, 1400)
+  }
+}
+
 onMounted(async () => {
   clockTimer = setInterval(() => {
     now.value = new Date()
@@ -467,7 +620,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  pageUnmounted = true
   if (clockTimer) clearInterval(clockTimer)
+  if (pullDoneTimer) clearTimeout(pullDoneTimer)
   if (drag.active) savedOrder.value = dragStartOrder.slice()
   drag.active = false
   drag.path = ''
@@ -478,6 +633,76 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.pull-refresh {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.pull-refresh.is-pulling,
+.pull-refresh.is-ready {
+  transition: none;
+}
+
+.pull-refresh.is-refreshing {
+  color: var(--brand);
+}
+
+.pull-refresh.is-done {
+  color: var(--text);
+}
+
+.pull-refresh.is-offline {
+  color: var(--warning);
+}
+
+.pull-refresh.is-failed {
+  color: var(--danger);
+}
+
+.pull-refresh-icon {
+  display: inline-flex;
+  color: var(--brand);
+  transition: transform 0.22s ease;
+}
+
+.pull-refresh.is-pulling .pull-refresh-icon,
+.pull-refresh.is-ready .pull-refresh-icon {
+  transition: none;
+}
+
+.pull-refresh.is-offline .pull-refresh-icon {
+  color: var(--warning);
+}
+
+.pull-refresh.is-failed .pull-refresh-icon {
+  color: var(--danger);
+}
+
+.pull-refresh-icon.is-spinning {
+  animation: pull-refresh-spin 0.9s linear infinite;
+  transition: none;
+}
+
+@keyframes pull-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .header {
   margin-bottom: 16px;
 }
