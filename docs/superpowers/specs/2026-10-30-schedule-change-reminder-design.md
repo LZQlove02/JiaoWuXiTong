@@ -122,7 +122,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 
 - 当前周 = `floor((今天 - 学期 startDate) / 7) + 1`，钳制在 `[1, 20]`；`startDate` 之前一律按第 1 周。与 `currentWeekOf` 一致。
 - `startDate` 来自 `utils/term.js` 的 `buildTerm`（第一学期 08-31，第二学期次年 02-23）。
-- **已过时段判定**：把变更对应会话换算到本周具体日期与节次起止时间（节次时间表见 5.4）。本周日期按**当前真实周的周一**推算，不能从学期 `startDate` 偏移（`startDate` 可能是周日或周二，偏移会整学期错一天）。对应会话取法：`cancel` 用旧会话，`add` 用新会话，`move` 优先用新会话（新会话不在本周时用旧会话），`room` 用旧会话。若对应上课时间已经结束：
+- **已过时段判定**：把变更对应会话换算到本周具体日期与节次起止时间（节次时间表见 5.4）。本周日期以**当前周的起始日**（`startDate + (currentWeek-1)*7`）为锚，取该 7 天周块内下一个同名星期；不假设 `startDate` 一定是周一（2025-08-31 是周日、2027-02-23 是周二）。对应会话取法：`cancel` 用旧会话，`add` 用新会话，`move` 优先用新会话（新会话不在本周时用旧会话），`room` 用旧会话。若对应上课时间已经结束：
   - 写入历史，`quiet = true`
   - 不进入提醒条计数、不发通知
 - 周日 23:59 之后算下一周，纯下周变化不会被记录。
@@ -134,7 +134,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 | 首次使用 / 重装 / 无基线 | 只写基线，不报变更 |
 | 学期切换（xnm 或 xqm 变化） | 重置基线，不报变更 |
 | 换账号（学号变化） | 重置基线并清空旧日志，不报变更 |
-| 离线快照（`source` 非实时） | 不上交、不对比 |
+| 离线快照（`offline = true`） | 不上交、不对比 |
 | 新解析结果为空且旧基线非空 | 判定为接口异常，跳过本轮，保留旧基线（防「全部停课」误报） |
 | 新解析抛错 | 跳过本轮，静默；debug 包记录原始响应摘要 |
 | 同一轮多次触发 | 前台由 `academic.loadSchedule` 单飞合并并发请求；后台一次唤醒只跑一次 |
@@ -264,7 +264,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ### 6.2 前台流程
 
-1. `academic.loadSchedule` 拉取成功，且 `source` 为实时（非离线）。
+1. `academic.loadSchedule` 拉取成功，且 `offline` 为 `false`。
 2. `api/zf.js` 在返回值中附带 `rawPayload`（原始 JSON）与 `term`（xnm / xqm / startDate）。
 3. `stores/changes.js` 调用 `ScheduleChangeBridge.applySchedule({ raw, term })`。
 4. 原生加锁执行：解析 → 与基线对比 → 写日志 → 更新基线 → 返回 `{ newEntries, unread, entries }`。
@@ -277,7 +277,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 `ScheduleCheckReceiver`（AlarmManager `setAndAllowWhileIdle`）触发后：
 
 1. 读设置、基线、加密 Cookie；任一缺失即退出（不报错）。
-2. `ScheduleFetcher` 用 OkHttp GET `SCHEDULE_ENDPOINT`（同一学期参数，与 JS 相同的 `gnmkdm`），连接 4s / 读取 6s，**单次尝试**；失败静默，等下一时段。不放宽到前台 15s/20s，避免超过广播 `goAsync` 的 10 秒窗口。
+2. `ScheduleFetcher` 用 OkHttp GET `SCHEDULE_ENDPOINT`（同一学期参数，与 JS 相同的 `gnmkdm`），连接 4s / 读取 6s / 单次调用 8s，**只尝试一次**；重定向最多 5 跳但总时限 9s，保证不超过广播 `goAsync` 的 10 秒窗口；跳到 http 登录页才判会话失效，跨主机重定向按接口异常处理。失败静默，等下一时段。不放宽到前台 15s/20s。
 3. 若被 302 到登录页或返回 401/403 → 判定会话失效：
    - 当天未提示过 → 发一条「登录已失效，点此重新登录」
    - 点击只打开 App，由路由守卫落到登录页
@@ -454,9 +454,10 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ## 10. 测试计划
 
-### 10.1 Java 单测（30 项：解析 7 + 引擎 14 + 基线决策 7 + 请求判定 2，合计 46 项）
+### 10.1 Java 单测（32 项：解析 8 + 引擎 15 + 基线决策 7 + 请求判定 2，合计 48 项）
 
 - `ScheduleParser`
+  - 与 JS 共用 `tests/fixtures/schedule-kbList.json`，断言同一会话集合
   - 常规 kbList → 会话集合正确
   - 周次：`1-16周`、`1-16周(单)`、`1,3,5周`（断言与 JS 现有行为一致）、空串、脏文本
   - 节次：`3-4节`、`5`、缺字段
@@ -479,7 +480,7 @@ ScheduleChangeBridge (Capacitor Plugin)
   - 登录页三种特征识别
   - HttpPolicy：http、非 443、非白名单、带凭据、非法 URL 均拒绝
 
-### 10.2 JS 单测（20 项：文案 6 + 课表标记 5 + store 8 + payload 角标 1，合计 104 项）
+### 10.2 JS 单测（21 项：文案 6 + 课表标记 5 + store 8 + payload 角标 1 + 共享 fixture 1，合计 105 项）
 
 - `changeLabels`：周一/3-4 节、周次标签、类型文案与颜色、相对日期
 - `stores/changes`：未读数、筛选、已读、开关持久化（mock bridge）
@@ -503,8 +504,8 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ### 10.4 回归命令
 
-- `npm test`（84 项存量 + 20 项新增，共 104）
-- `cd android && ./gradlew test`（15 项存量 + 30 项新增，共 46）
+- `npm test`（84 项存量 + 21 项新增，共 105）
+- `cd android && ./gradlew test`（16 项存量：小组件 15 + 示例 1；+ 32 项新增，共 48）
 - `npm run build`
 
 ## 11. 验收标准
@@ -515,7 +516,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 4. 首次使用、换学期、离线快照、空课表均不产生误报
 5. 解析失败不影响课表显示与现有功能
 6. 通知权限被拒时功能降级为应用内提醒，不崩溃
-7. 现有 84 项 JS + 15 项 Android 单测与本次新增（JS 20、Java 30）全部通过
+7. 现有 84 项 JS + 16 项 Android 单测（小组件 15 + 示例 1）与本次新增（JS 21、Java 32）全部通过，共 105 / 48
 8. 真机 12 项清单逐条通过并记录进《真机验证报告》
 
 ## 12. 风险与已知限制
