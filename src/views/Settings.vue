@@ -51,9 +51,13 @@
         <span class="setting-left"><AppIcon name="trash" />清除缓存</span>
         <AppIcon name="chevron-right" />
       </button>
+      <button class="setting-row" :disabled="update.checking" @click="checkUpdate">
+        <span class="setting-left"><AppIcon name="refresh" />检查更新</span>
+        <span class="tiny">{{ updateLabel }}</span>
+      </button>
       <button class="setting-row" @click="showAbout">
         <span class="setting-left"><AppIcon name="info" />关于</span>
-        <span v-if="version" class="tiny">v{{ version }}</span>
+        <span v-if="update.currentVersion" class="tiny">v{{ update.currentVersion }}</span>
       </button>
       <router-link class="setting-row" to="/feedback">
         <span class="setting-left"><AppIcon name="mail" />意见反馈</span>
@@ -74,12 +78,11 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { Capacitor } from '@capacitor/core'
-import { App as CapApp } from '@capacitor/app'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '../stores/ui'
 import { useChangesStore } from '../stores/changes'
+import { useUpdateStore } from '../stores/update'
 import { DISCLAIMER_VERSION } from '../utils/disclaimer'
 import AppIcon from '../components/AppIcon.vue'
 import BackBar from '../components/BackBar.vue'
@@ -87,6 +90,7 @@ import DisclaimerGate from '../components/DisclaimerGate.vue'
 
 const ui = useUiStore()
 const changes = useChangesStore()
+const update = useUpdateStore()
 const router = useRouter()
 
 const themeOptions = [
@@ -96,9 +100,14 @@ const themeOptions = [
 ]
 
 const toast = ref('')
-const version = ref('')
 const disclaimerOpen = ref(false)
 const disclaimerVersion = DISCLAIMER_VERSION
+
+const updateLabel = computed(() => {
+  if (update.checking) return '检查中…'
+  if (update.latest?.tag) return `最新 ${update.latest.tag}`
+  return ''
+})
 
 function showToast(message) {
   toast.value = message
@@ -139,6 +148,18 @@ function showAbout() {
   router.push('/about')
 }
 
+async function checkUpdate() {
+  const status = await update.checkNow()
+  const messages = {
+    latest: '已是最新版本',
+    empty: '发布仓库暂未发布版本',
+    error: update.error || '检查更新失败',
+    busy: '正在检查，请稍候'
+  }
+  if (status === 'update') return
+  showToast(messages[status] || '')
+}
+
 async function toggleChanges() {
   const next = !changes.enabled
   if (next) {
@@ -157,13 +178,7 @@ function openNotificationSettings() {
 
 onMounted(async () => {
   changes.init()
-  if (!Capacitor.isNativePlatform()) return
-  try {
-    const info = await CapApp.getInfo()
-    version.value = info.version || ''
-  } catch (error) {
-    // 读取不到版本信息时不显示版本号
-  }
+  await update.loadVersion()
 })
 </script>
 
