@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-10-31
+
+### 修复
+
+- 修复 release 包首次登录成功后闪退：R8 混淆把 Capacitor 的权限别名反射链优化掉，`requestPermissionForAliases` 被替换为恒抛 NPE，申请通知权限时直接崩溃；混淆规则改为整体保留 Capacitor 核心类
+- 顺带修复同源的 `getPermissionStates` / `checkPermissions` 在 release 包中同样不可用的问题
+
 ## [1.3.4] - 2026-10-30
 
 ### 优化

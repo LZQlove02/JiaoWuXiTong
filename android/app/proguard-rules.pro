@@ -11,6 +11,12 @@
     @com.getcapacitor.PluginMethod <methods>;
 }
 
+# Capacitor 核心类内部依赖 PluginHandle.pluginAnnotation 反射读取权限别名。
+# 只保留插件子类时，R8 会把该字段与 getPluginAnnotation() 内联后判定为恒空，
+# 将 requestPermissionForAliases / getPermissionStates 整段替换成恒抛 NPE 的代码，
+# 表现为 release 包首次登录后申请通知权限立刻闪退。核心类必须整体保留。
+-keep class com.getcapacitor.** { *; }
+
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:
