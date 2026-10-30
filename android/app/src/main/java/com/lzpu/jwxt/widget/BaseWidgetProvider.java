@@ -11,13 +11,21 @@ public abstract class BaseWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+        WidgetAlarmReceiver.schedule(context);
         WidgetUpdater.refreshAll(context);
     }
 
     @Override
     public void onEnabled(Context context) {
         // 首次添加时 onUpdate 未必立刻到达，主动渲染一次占位内容
+        WidgetAlarmReceiver.schedule(context);
         WidgetUpdater.refreshAll(context);
+    }
+
+    @Override
+    public void onDisabled(Context context) {
+        // 最后一个组件被移除：不再需要每天唤醒
+        WidgetAlarmReceiver.cancel(context);
     }
 
     @Override

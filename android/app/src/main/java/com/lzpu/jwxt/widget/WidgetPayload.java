@@ -48,6 +48,8 @@ public final class WidgetPayload {
         public int weekday;
         public int start;
         public int end;
+        public String startTime = "";
+        public String endTime = "";
         public String name = "";
         public String room = "";
     }
@@ -96,6 +98,8 @@ public final class WidgetPayload {
                     entry.weekday = item.optInt("weekday", 0);
                     entry.start = item.optInt("start", 0);
                     entry.end = item.optInt("end", 0);
+                    entry.startTime = item.optString("startTime", "");
+                    entry.endTime = item.optString("endTime", "");
                     entry.name = item.optString("name", "");
                     entry.room = item.optString("room", "");
                     payload.week.add(entry);
