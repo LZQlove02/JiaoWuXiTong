@@ -35,18 +35,6 @@
 
         </activity>
 
-
-
-
-
-
-
-
-
-
-
-
-
         <!-- 桌面小组件：跨天重算 + 开机补排闹钟 -->
         <receiver
             android:name=".widget.WidgetAlarmReceiver"
