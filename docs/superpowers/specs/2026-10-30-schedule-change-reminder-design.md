@@ -81,6 +81,8 @@ courseId + weekday + startSection + endSection + weeksSignature
 - `weeksSignature` = 周次升序后以逗号连接，用于比较与配对。
 
 > 解析器必须与 `src/api/zf.js` 的 `parseWeeks` / `parseSections` / `cleanRoom` / 去重键**逐字节一致**。实现时用同一份 JSON fixture 在 JS 与 Java 两侧断言相同的会话集合。
+>
+> 单双周过滤后可能得到空周次（如自相矛盾的 `2周(单)`）：按「周次未知」处理，不参与本周判定，**不要**兜底成 1–16 周，否则会与课表显示不一致。
 
 ### 4.2 分类矩阵
 
@@ -120,7 +122,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 
 - 当前周 = `floor((今天 - 学期 startDate) / 7) + 1`，钳制在 `[1, 20]`；`startDate` 之前一律按第 1 周。与 `currentWeekOf` 一致。
 - `startDate` 来自 `utils/term.js` 的 `buildTerm`（第一学期 08-31，第二学期次年 02-23）。
-- **已过时段判定**：把变更对应会话换算到本周具体日期与节次起止时间（节次时间表见 5.4）。对应会话取法：`cancel` 用旧会话，`add` 用新会话，`move` 优先用新会话（新会话不在本周时用旧会话），`room` 用旧会话。若对应上课时间已经结束：
+- **已过时段判定**：把变更对应会话换算到本周具体日期与节次起止时间（节次时间表见 5.4）。本周日期按**当前真实周的周一**推算，不能从学期 `startDate` 偏移（`startDate` 可能是周日或周二，偏移会整学期错一天）。对应会话取法：`cancel` 用旧会话，`add` 用新会话，`move` 优先用新会话（新会话不在本周时用旧会话），`room` 用旧会话。若对应上课时间已经结束：
   - 写入历史，`quiet = true`
   - 不进入提醒条计数、不发通知
 - 周日 23:59 之后算下一周，纯下周变化不会被记录。
@@ -135,7 +137,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 | 离线快照（`source` 非实时） | 不上交、不对比 |
 | 新解析结果为空且旧基线非空 | 判定为接口异常，跳过本轮，保留旧基线（防「全部停课」误报） |
 | 新解析抛错 | 跳过本轮，静默；debug 包记录原始响应摘要 |
-| 同一轮多次触发 | 抖动合并（前台 300ms；后台一次唤醒只跑一次） |
+| 同一轮多次触发 | 前台由 `academic.loadSchedule` 单飞合并并发请求；后台一次唤醒只跑一次 |
 
 ### 4.6 变更 id 与去重
 
@@ -145,7 +147,7 @@ courseId + weekday + startSection + endSection + weeksSignature
 
 ## 5. 数据契约
 
-### 5.1 基线（原生 `SharedPreferences`，键 `schedule_change_baseline`）
+### 5.1 基线（原生 SharedPreferences `lzpu_schedule_change`，键 `baseline`）
 
 ```json
 {
@@ -183,8 +185,9 @@ courseId + weekday + startSection + endSection + weeksSignature
 - 每次实时拉取成功后整体覆盖。
 - `sessions` 由原生解析原始 kbList 生成；JS 不上交已解析的会话，避免前后端解析差异。
 - `sectionTimes` 由 JS 在调用时附带（取 `SECTION_TIMES`），原生并入基线。
+- 同一 prefs 文件还保存：`entries`（变更日志）、`enabled`（开关）、`last_session_expired`（登录失效提示日期）。
 
-### 5.2 变更日志（键 `schedule_change_log`）
+### 5.2 变更日志（同一 prefs，键 `entries`）
 
 ```json
 {
@@ -217,17 +220,15 @@ courseId + weekday + startSection + endSection + weeksSignature
 - `notified`：是否已发过系统通知
 - 淘汰：超过 30 天或超过 200 条时按 `detectedAt` 从旧到新删除
 
-### 5.3 设置（键 `schedule_change_settings`）
+### 5.3 设置（同一 prefs 文件）
 
-```json
-{
-  "enabled": true,
-  "lastSessionExpiredNotice": "2026-10-30"
-}
-```
+| 键 | 类型 | 说明 |
+|---|---|---|
+| `enabled` | boolean | 课表变更提醒开关，默认 `true`；关闭后取消闹钟、清空通知栏，不删历史 |
+| `last_session_expired` | string | 登录失效提示去重日期（`yyyy-MM-dd`） |
 
-- `enabled` 默认 `true`；关闭后取消闹钟、清空通知栏、隐藏提醒条与红点（未读数按 0 返回），不删历史
 - 通知权限状态不落盘，实时读系统
+- 退出登录时清空 `baseline` 与 `entries`，保留 `enabled`
 
 ### 5.4 节次时间表
 
@@ -276,7 +277,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 `ScheduleCheckReceiver`（AlarmManager `setAndAllowWhileIdle`）触发后：
 
 1. 读设置、基线、加密 Cookie；任一缺失即退出（不报错）。
-2. `ScheduleFetcher` 用 OkHttp GET `SCHEDULE_ENDPOINT`（同一学期参数，与 JS 相同的 `gnmkdm`），超时 15s / 20s，失败重试 1 次。
+2. `ScheduleFetcher` 用 OkHttp GET `SCHEDULE_ENDPOINT`（同一学期参数，与 JS 相同的 `gnmkdm`），连接 4s / 读取 6s，**单次尝试**；失败静默，等下一时段。不放宽到前台 15s/20s，避免超过广播 `goAsync` 的 10 秒窗口。
 3. 若被 302 到登录页或返回 401/403 → 判定会话失效：
    - 当天未提示过 → 发一条「登录已失效，点此重新登录」
    - 点击只打开 App，由路由守卫落到登录页
@@ -298,7 +299,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ### 6.5 已读与未读
 
-- 未读数 = `!read && !quiet` 的条目数，用于首页提醒条与 Tab 红点
+- 未读数 = `!read && isRemindable()` 的条目数（排除 `quiet` 与换教室），用于首页提醒条与 Tab 红点
 - 进入变更列表页或点击提醒条 → `markAllRead` → 红点消失、提醒条隐藏
 - 通知被点击 → 进列表 → 同样已读
 - 历史页始终保留 30 天记录，不受已读影响
@@ -323,7 +324,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 └────────────────────────────────────────┘
 ```
 
-- 仅在有未读且非 `quiet` 的条目时出现，否则整块不占位
+- 仅在有未读且可提醒（非 `quiet`、非换教室）的条目时出现，否则整块不占位
 - 副文案取 `detectedAt` 最新的一条
 - 点击 → 标记已读 → 进 `/changes`
 
@@ -383,7 +384,8 @@ ScheduleChangeBridge (Capacitor Plugin)
 - 4x4（本周课表）标题行右侧加「有变」小角标：`有变` 文案 + 主题色胶囊背景，`visibility` 由未读数控制
 - 4x2（今日课程）标题行同样位置加角标
 - 2x2（下一节）空间不足，不加
-- 角标数据由原生 `ScheduleChangeStore` 提供，`WeekWidgetBinder` / `TodayWidgetBinder` 渲染时读取，不塞进 JS 同步的 payload（避免被 JS 覆盖）
+- 角标写入 widget payload 的 `changeBadge` 字段：JS 同步时按未读数写入，原生变更引擎发现变更新增 / 标记已读 / 关闭开关时直接改 payload 再刷新
+- 组件只读 payload，不访问第二份存储
 - 写日志、标记已读时触发 `WidgetUpdater.refreshAll`
 
 ## 8. 代码落点
@@ -417,11 +419,12 @@ ScheduleChangeBridge (Capacitor Plugin)
 | `ScheduleChangeService.java` | 业务编排：解析、对账、落盘、通知、闹钟、组件刷新 |
 | `ScheduleFetcher.java` | OkHttp + `AuthCookieStore` 拉 kbList，区分会话失效 / 网络 / 其它 |
 | `ScheduleChangeNotifier.java` | 渠道、权限、逐条通知、去重、深链、前台抑制 |
-| `ScheduleChangeBridge.java` | Capacitor 插件：`applySchedule` / `list` / `markAllRead` / `setEnabled` / `getState` / `requestNotificationPermission` / `openNotificationSettings` |
+| `ScheduleChangeBridge.java` | Capacitor 插件：`applySchedule` / `list` / `markAllRead` / `setEnabled` / `clear` / `getState` / `requestNotificationPermission` / `openNotificationSettings` |
 | `ScheduleCheckReceiver.java` | 闹钟触发 → 后台线程执行检查 |
 | `ScheduleCheckScheduler.java` | 排 / 取消 07:10、12:50 两个单次闹钟 |
 | `ScheduleBootReceiver.java` | `BOOT_COMPLETED` 补排闹钟 |
 | `AppVisibility.java` | 前台可见标志（MainActivity 调用） |
+| `ChangeDebug.java` | debug 包才输出的诊断日志，release 不写网络/响应内容 |
 
 小改：
 
@@ -443,6 +446,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 | 学期切换 | 重置基线，首轮只建基线 |
 | 跨周 | 周一 00:00 后按新周过滤；旧变更仍在历史 |
 | 设备重启 | 开机补排两个闹钟，不清历史 |
+| 退出登录 | 清空基线与历史、取消闹钟与通知、组件角标归零 |
 | 用户强制停止 App | 闹钟被系统清除，需用户再次打开 App 恢复（写入设置页提示文案） |
 | 教室名含全角括号人数标注 | 与 JS 保持一致，仅清洗 ASCII 括号（已知差异，列入已知限制） |
 | 变更发生在周日、针对下一周 | 当天判定为「下周变化」不记录，基线已更新；跨周后不会补报（按决策 4 的有意行为） |
@@ -450,7 +454,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ## 10. 测试计划
 
-### 10.1 Java 单测（19 项：解析 6 + 引擎 13）
+### 10.1 Java 单测（30 项：解析 7 + 引擎 14 + 基线决策 7 + 请求判定 2，合计 46 项）
 
 - `ScheduleParser`
   - 常规 kbList → 会话集合正确
@@ -463,11 +467,19 @@ ScheduleChangeBridge (Capacitor Plugin)
   - 同课程多节的配对歧义
   - 本周过滤：旧周次含本周、新周次不含本周
   - 已过时段 → `quiet = true`
+  - 非周一开学的学期，周一变更当天不算已过
   - 首次基线为空 → 无变更
   - 学期切换 → 无变更
   - 空新课表 → 不产生「全部停课」
+- `ScheduleChangeService.decide`
+  - 无基线 / 换学期 / 换账号 → 重置
+  - 空新课表 → 保留基线
+  - 首次空基线、正常对账 → DIFF
+- `ScheduleFetcher`
+  - 登录页三种特征识别
+  - HttpPolicy：http、非 443、非白名单、带凭据、非法 URL 均拒绝
 
-### 10.2 JS 单测（19 项：文案 6 + 课表标记 5 + store 8）
+### 10.2 JS 单测（20 项：文案 6 + 课表标记 5 + store 8 + payload 角标 1，合计 104 项）
 
 - `changeLabels`：周一/3-4 节、周次标签、类型文案与颜色、相对日期
 - `stores/changes`：未读数、筛选、已读、开关持久化（mock bridge）
@@ -491,8 +503,8 @@ ScheduleChangeBridge (Capacitor Plugin)
 
 ### 10.4 回归命令
 
-- `npm test`（84 项存量 + 19 项新增）
-- `cd android && ./gradlew test`（15 项存量 + 19 项新增）
+- `npm test`（84 项存量 + 20 项新增，共 104）
+- `cd android && ./gradlew test`（15 项存量 + 30 项新增，共 46）
 - `npm run build`
 
 ## 11. 验收标准
@@ -503,7 +515,7 @@ ScheduleChangeBridge (Capacitor Plugin)
 4. 首次使用、换学期、离线快照、空课表均不产生误报
 5. 解析失败不影响课表显示与现有功能
 6. 通知权限被拒时功能降级为应用内提醒，不崩溃
-7. 现有 84 项 JS + 15 项 Android 单测与本次新增（JS 19、Java 19）全部通过
+7. 现有 84 项 JS + 15 项 Android 单测与本次新增（JS 20、Java 30）全部通过
 8. 真机 12 项清单逐条通过并记录进《真机验证报告》
 
 ## 12. 风险与已知限制
