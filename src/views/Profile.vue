@@ -1,7 +1,5 @@
 <template>
   <div class="page">
-    <h1 class="page-title">我的</h1>
-
     <section class="card user-card">
       <div class="avatar">{{ avatarText }}</div>
       <div class="user-main">
@@ -45,8 +43,8 @@ async function onLogout() {
 </script>
 
 <style scoped>
+/* 页面没有标题了，名片直接置顶，间距交给 .page 的安全区内边距 */
 .user-card {
-  margin-top: 16px;
   display: flex;
   align-items: center;
   gap: 14px;
