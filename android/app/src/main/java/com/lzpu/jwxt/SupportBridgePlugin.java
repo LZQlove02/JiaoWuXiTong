@@ -140,13 +140,22 @@ public class SupportBridgePlugin extends Plugin {
             return;
         }
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(RELEASE_PAGE_BASE + tag));
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
-            getContext().startActivity(intent);
+            launch(intent);
             call.resolve();
         } catch (ActivityNotFoundException e) {
             call.reject("NO_BROWSER");
         }
+    }
+
+    /** 邮件 App 与浏览器都可能在应用上下文里启动，统一补 NEW_TASK。 */
+    private void launch(Intent intent) {
+        if (getActivity() != null) {
+            getActivity().startActivity(intent);
+            return;
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
     }
 
     /** 拉起系统邮件 App，收件人写死；正文为空或超长直接拒绝。 */
@@ -178,7 +187,7 @@ public class SupportBridgePlugin extends Plugin {
             return;
         }
         try {
-            getContext().startActivity(intent);
+            launch(intent);
             call.resolve();
         } catch (ActivityNotFoundException e) {
             call.reject("NO_EMAIL_APP");
