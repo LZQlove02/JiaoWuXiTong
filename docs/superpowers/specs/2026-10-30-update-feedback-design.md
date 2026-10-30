@@ -56,7 +56,7 @@
   │         └─ tag 比当前版本新 → 未提示过则弹 UpdateDialog
   │              ├─ 去更新 → 系统浏览器打开发布页 → 关闭弹窗并记 promptedTag
   │              └─ 以后再说 → 记 promptedTag，不再自动弹
-  └─ 关于页「检查更新」→ checkNow()（跳过节流与 promptedTag，失败有提示）
+  └─ 设置页「检查更新」→ checkNow()（跳过节流与 promptedTag，失败有提示；v1.3.2 起由关于页移入）
 ```
 
 反馈：
@@ -98,10 +98,10 @@
 | `src/utils/feedback.js` | 主题 / 正文拼装与长度限制、`mailto` 编码 |
 | `src/stores/update.js` | 状态、24h 节流、`promptedTag`、失败静默、手动检查 |
 | `src/components/UpdateDialog.vue` | 更新弹窗（返回键关闭，`ui.setOverlayCloser`） |
-| `src/views/About.vue` | 版本、检查更新、反馈入口 |
+| `src/views/About.vue` | 仅展示版本与非官方说明（v1.3.2 起不再承载检查更新） |
 | `src/views/Feedback.vue` | 反馈表单、诊断预览、发送 / 复制 |
 | `src/App.vue` | 登录态建立与回前台触发自动检查；渲染弹窗 |
-| `src/views/Settings.vue` / `Login.vue` | 关于与反馈入口 |
+| `src/views/Settings.vue` / `Login.vue` | 设置页的检查更新 / 关于 / 反馈入口，登录页的反馈链接 |
 | `src/router/index.js` | `/about`、`/feedback`（`meta.guest`，登录前后都可进） |
 
 本地键：`lzpu.update.lastCheckAt`、`lzpu.update.promptedTag`。退出登录、清除缓存不清除，避免每次登录重复弹窗。
