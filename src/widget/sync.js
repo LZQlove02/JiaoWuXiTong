@@ -53,6 +53,15 @@ export function clearWidgetNow() {
   clearWidget()
 }
 
+// 回到前台时强制写一次。原生侧跨周会把 payload 改写成 stale=true（today/next 清空），
+// 而 JS 这边 lastPayload 还是旧值，普通 syncWidget 会因「内容相同」跳过，
+// 热启动就会一直停在「打开 App 同步课表」。清掉缓存强制重写即可恢复。
+export function resyncWidget(getContext) {
+  if (!widgetAvailable()) return
+  lastPayload = ''
+  syncWidget(getContext)
+}
+
 // 仅供测试或调试使用
 export function resetWidgetSync() {
   if (timer) clearTimeout(timer)

@@ -9,7 +9,7 @@ vi.mock('../src/native/widgetBridge', () => ({
 }))
 
 import { clearWidget, setWidgetTheme, updateWidget, widgetAvailable } from '../src/native/widgetBridge'
-import { clearWidgetNow, resetWidgetSync, syncWidget, syncWidgetTheme } from '../src/widget/sync'
+import { clearWidgetNow, resetWidgetSync, resyncWidget, syncWidget, syncWidgetTheme } from '../src/widget/sync'
 
 // 固定时间：payload 里带 updatedAt，时间一变 JSON 就不同，会绕过「同内容不重复写」的判断
 const NOW = new Date('2026-10-29T10:00:00+08:00')
@@ -67,6 +67,22 @@ describe('组件同步', () => {
     vi.advanceTimersByTime(300)
 
     expect(updateWidget).toHaveBeenCalledTimes(2)
+  })
+
+  it('回到前台强制重写，内容没变也写（跨周 stale 靠这一步恢复）', () => {
+    syncWidget(context())
+    vi.advanceTimersByTime(300)
+    expect(updateWidget).toHaveBeenCalledTimes(1)
+
+    // 同样的数据，普通同步会跳过
+    syncWidget(context())
+    vi.advanceTimersByTime(300)
+    expect(updateWidget).toHaveBeenCalledTimes(1)
+
+    resyncWidget(context())
+    vi.advanceTimersByTime(300)
+    expect(updateWidget).toHaveBeenCalledTimes(2)
+    expect(updateWidget.mock.calls[1][0]).not.toHaveProperty('stale')
   })
 
   it('退出登录立即清空，并取消排队中的写入', () => {

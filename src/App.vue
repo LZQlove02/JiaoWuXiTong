@@ -18,7 +18,7 @@ import TabBar from './components/TabBar.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
 import { useUiStore } from './stores/ui'
-import { clearWidgetNow, syncWidget, syncWidgetTheme } from './widget/sync'
+import { clearWidgetNow, resyncWidget, syncWidget, syncWidgetTheme } from './widget/sync'
 import { deepLinkPath } from './utils/deepLink'
 
 const route = useRoute()
@@ -69,6 +69,11 @@ function installWidgetSync() {
   )
   // 恢复结束后无论登录与否都写一次，保证组件状态和 App 一致
   auth.bootstrap().finally(() => syncWidget(context))
+  // 热启动回到前台：原生可能已把 payload 写成 stale（跨周降级），此时 store 没变、
+  // 普通同步会跳过，这里强制重写一次，组件才会从「打开 App 同步课表」恢复
+  CapApp.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) resyncWidget(context)
+  })
   watch(() => ui.theme, (theme) => syncWidgetTheme(theme))
   // 4x4 的 GPA 摘要要用成绩；成绩页只在进入时才拉，这里登录后静默补一次
   watch(
