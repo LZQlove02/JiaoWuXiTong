@@ -42,6 +42,16 @@ describe('diagnostics', () => {
     expect(formatStamp(new Date('2026-01-02T03:04:00'))).toBe('2026-01-02 03:04')
     expect(formatStamp(new Date('bad'))).toBe('')
   })
+
+  it('有本地崩溃摘要时追加到诊断信息', () => {
+    const crash = '时间：2026-10-31 23:00\n异常：java.lang.RuntimeException: boom'
+    const text = buildDiagnostics({ version: '1.3.5', device, crash })
+    expect(text).toContain('【最近崩溃】')
+    expect(text).toContain('异常：java.lang.RuntimeException: boom')
+
+    const without = buildDiagnostics({ version: '1.3.5', device, crash: '  ' })
+    expect(without).not.toContain('【最近崩溃】')
+  })
 })
 
 describe('feedback', () => {

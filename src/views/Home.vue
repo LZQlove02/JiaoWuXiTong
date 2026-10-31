@@ -64,20 +64,6 @@
 
     <ChangeBanner />
 
-    <section v-if="nextExam" class="card exam-card">
-      <div class="row">
-        <div>
-          <p class="tiny">最近考试</p>
-          <p class="exam-name">{{ nextExam.courseName }}</p>
-          <p class="tiny">{{ nextExam.date }} {{ nextExam.startTime }} · {{ nextExam.room }}</p>
-        </div>
-        <div class="countdown">
-          <span class="countdown-num">{{ nextExam.days }}</span>
-          <span class="tiny">天后</span>
-        </div>
-      </div>
-    </section>
-
     <div class="section-head">
       <h2 class="section-title">快捷入口</h2>
       <span class="tiny sort-hint">长按拖动排序 · Alt+方向键</span>
@@ -174,7 +160,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
-import { daysUntil, formatDate, formatDateTime, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
+import { formatDate, formatDateTime, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
 import { mergeEntryOrder, movePath } from '../utils/entryOrder'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -186,8 +172,6 @@ const router = useRouter()
 const {
   schedule,
   scheduleLoading,
-  exams,
-  examsUnsupported,
   currentTerm,
   errors,
   portalNotices,
@@ -244,7 +228,6 @@ const weekday = computed(() => getWeekday(now.value))
 const ORDER_KEY = 'lzpu.home.entryOrder.v1'
 
 const baseEntries = [
-  { path: '/exams', label: '考试', desc: '考试安排', icon: 'exam', color: '#C0392B' },
   { path: '/notices', label: '通知', desc: '教务公告', icon: 'notice', color: '#1B5FAA' },
   { path: '/messages', label: '消息', desc: '教务消息', icon: 'message', color: '#0E7490' },
   { path: '/courses', label: '选课', desc: '课程选择', icon: 'select', color: '#B7791F' },
@@ -486,14 +469,6 @@ function courseName(courseId) {
   return course ? course.name : '课程'
 }
 
-const nextExam = computed(() => {
-  const list = (exams.value || [])
-    .map((item) => ({ ...item, days: daysUntil(item.date) }))
-    .filter((item) => item.days >= 0)
-    .sort((a, b) => a.days - b.days)
-  return list[0] || null
-})
-
 const latestNotices = computed(() => (portalNotices.value?.items || []).slice(0, 3))
 const latestMessages = computed(() => (messages.value?.items || []).slice(0, 3))
 
@@ -587,16 +562,11 @@ async function refreshHome() {
     await academic.loadTerms()
     await Promise.all([
       academic.loadSchedule(academic.currentTerm),
-      academic.loadExams(),
       academic.loadPortalNotices(),
       academic.loadMessages()
     ])
-    // 考试接口未接入时的错误不算失败；真实请求失败仍计入
     const failed = Boolean(
-      errors.value.schedule ||
-        errors.value.portalNotices ||
-        errors.value.messages ||
-        (errors.value.exams && !examsUnsupported.value)
+      errors.value.schedule || errors.value.portalNotices || errors.value.messages
     )
     const offline =
       isOffline.value || portalNoticesOffline.value || messagesOffline.value
@@ -615,7 +585,6 @@ onMounted(async () => {
   }, 60 * 1000)
   await academic.initTerms()
   academic.loadSchedule()
-  academic.loadExams()
   await Promise.all([academic.loadPortalNotices(), academic.loadMessages()])
 })
 
@@ -770,31 +739,6 @@ onUnmounted(() => {
 .course-name {
   font-size: 15px;
   font-weight: 500;
-}
-
-.exam-card {
-  margin-bottom: 4px;
-}
-
-.exam-name {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 2px 0;
-}
-
-.countdown {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: var(--danger);
-}
-
-.countdown-num {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
 }
 
 .section-head {

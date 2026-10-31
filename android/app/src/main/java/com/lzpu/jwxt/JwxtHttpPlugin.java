@@ -12,11 +12,15 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +40,11 @@ public class JwxtHttpPlugin extends Plugin {
                     + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     private static final int MAX_REDIRECTS = 5;
+    private static final long MAX_ATTACHMENT_BYTES = 20L * 1024 * 1024;
+    private static final long MAX_ATTACHMENT_DIR_BYTES = 50L * 1024 * 1024;
+    private static final Set<String> ATTACHMENT_EXTENSIONS = new HashSet<>(Arrays.asList(
+            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+            "zip", "rar", "7z", "txt", "jpg", "jpeg", "png"));
 
     private static final String DEBUG_TAG = "JwxtHttp";
     /** debug 日志只保留能定位接口的参数值，其余查询值一律脱敏。 */
@@ -191,6 +200,187 @@ public class JwxtHttpPlugin extends Plugin {
         });
     }
 
+    /**
+     * 带登录态下载通知附件/正文图片。只允许 zfjw HTTPS，文件存到私有 cache，
+     * 限制 20 MB 与扩展名白名单，避免把任意 URL 变成文件写入接口。
+     */
+    @PluginMethod
+    public void authDownload(PluginCall call) {
+        String url = call.getString("url");
+        String rawName = call.getString("filename");
+        String filename = safeFileName(rawName);
+        if (url == null || url.isEmpty() || !isAllowedAttachment(filename)) {
+            call.reject("附件地址或文件名不合法");
+            return;
+        }
+
+        String cookie = authCookieHeader;
+        if (cookie.isEmpty()) {
+            // 冷启动后插件字段可能还没被 JS 恢复，直接读加密存储兜底
+            String saved = AuthCookieStore.load(getContext());
+            cookie = saved == null ? "" : saved;
+        }
+        final Request request;
+        try {
+            Request.Builder builder = new Request.Builder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "*/*")
+                    .header("Cookie", cookie);
+            request = builder.get().build();
+        } catch (IllegalArgumentException e) {
+            call.reject("url 无效");
+            return;
+        }
+
+        try {
+            HttpPolicy.AUTH.check(request.url());
+        } catch (IOException e) {
+            call.reject(e.getMessage());
+            return;
+        }
+
+        final String targetName = filename;
+        authClient.dispatcher().executorService().execute(new Runnable() {
+            @Override
+            public void run() {
+                try (Response response = execute(authClient, request, HttpPolicy.AUTH, true)) {
+                    if (!response.isSuccessful() || response.body() == null) {
+                        call.reject("下载失败：" + response.code());
+                        return;
+                    }
+                    String contentType = response.header("Content-Type");
+                    if (contentType != null
+                            && contentType.toLowerCase(Locale.US).contains("text/html")) {
+                        call.reject("返回的是登录页或错误页，不是文件");
+                        return;
+                    }
+                    long declared = response.body().contentLength();
+                    if (declared > MAX_ATTACHMENT_BYTES) {
+                        call.reject("文件超过 20 MB");
+                        return;
+                    }
+                    byte[] data = response.body().bytes();
+                    if (data.length > MAX_ATTACHMENT_BYTES) {
+                        call.reject("文件超过 20 MB");
+                        return;
+                    }
+                    File dir = new File(getContext().getCacheDir(), "attachments");
+                    if (!dir.isDirectory() && !dir.mkdirs()) {
+                        call.reject("无法创建附件目录");
+                        return;
+                    }
+                    File target = new File(dir, hashOf(request.url().toString()) + "_" + targetName);
+                    // 同 URL 重新下载时先移除旧文件，再按 50 MB 上限淘汰最久未使用的附件
+                    if (target.isFile()) {
+                        //noinspection ResultOfMethodCallIgnored
+                        target.delete();
+                    }
+                    pruneAttachments(dir, data.length);
+                    try (FileOutputStream output = new FileOutputStream(target)) {
+                        output.write(data);
+                    }
+                    JSObject result = new JSObject();
+                    result.put("path", target.getAbsolutePath());
+                    result.put("name", targetName);
+                    result.put("bytes", target.length());
+                    call.resolve(result);
+                } catch (IOException e) {
+                    call.reject(e.getMessage() == null ? "下载失败" : e.getMessage(), e);
+                }
+            }
+        });
+    }
+
+    /** 清除通知附件缓存；不影响登录态与其它数据。 */
+    @PluginMethod
+    public void clearAuthDownloads(PluginCall call) {
+        File dir = new File(getContext().getCacheDir(), "attachments");
+        deleteTree(dir);
+        call.resolve();
+    }
+
+    /** 清除校历与办事指南图片缓存（公开下载统一落在 files 目录）。 */
+    @PluginMethod
+    public void clearPublicDownloads(PluginCall call) {
+        File dir = getContext().getFilesDir();
+        File[] files = dir == null ? null : dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                String name = file.getName();
+                if (name.startsWith("guide-") || name.equals("calendar.jpg")) {
+                    //noinspection ResultOfMethodCallIgnored
+                    file.delete();
+                }
+            }
+        }
+        call.resolve();
+    }
+
+    /** 附件目录超过 50 MB 时按最后修改时间从旧到新删除，给新文件腾空间。 */
+    private static void pruneAttachments(File dir, long incoming) {
+        File[] files = dir == null ? null : dir.listFiles();
+        if (files == null || files.length == 0) return;
+        long total = 0;
+        for (File file : files) total += file.length();
+        if (total + incoming <= MAX_ATTACHMENT_DIR_BYTES) return;
+        java.util.Arrays.sort(files, new java.util.Comparator<File>() {
+            @Override
+            public int compare(File left, File right) {
+                return Long.compare(left.lastModified(), right.lastModified());
+            }
+        });
+        for (File file : files) {
+            if (total + incoming <= MAX_ATTACHMENT_DIR_BYTES) break;
+            long length = file.length();
+            //noinspection ResultOfMethodCallIgnored
+            if (file.delete()) total -= length;
+        }
+    }
+
+    private static void deleteTree(File file) {
+        if (file == null || !file.exists()) return;
+        File[] children = file.listFiles();
+        if (children != null) {
+            for (File child : children) deleteTree(child);
+        }
+        //noinspection ResultOfMethodCallIgnored
+        file.delete();
+    }
+
+    private static String safeFileName(String input) {
+        String name = input == null ? "" : input.trim();
+        name = name.replaceAll("[\\\\/:*?\"<>|\\r\\n]", "_");
+        name = name.replaceAll("[^\\p{L}\\p{N}._-]", "_");
+        name = name.replaceAll("_+", "_");
+        if (name.length() > 80) {
+            int dot = name.lastIndexOf('.');
+            String ext = dot >= 0 && name.length() - dot <= 8 ? name.substring(dot) : "";
+            String base = dot >= 0 ? name.substring(0, dot) : name;
+            name = base.substring(0, Math.min(base.length(), 80 - ext.length())) + ext;
+        }
+        return name.isEmpty() ? "attachment" : name;
+    }
+
+    private static boolean isAllowedAttachment(String filename) {
+        int dot = filename.lastIndexOf('.');
+        if (dot < 0) return false;
+        String ext = filename.substring(dot + 1).toLowerCase(Locale.US);
+        return ATTACHMENT_EXTENSIONS.contains(ext);
+    }
+
+    private static String hashOf(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < 8; i += 1) builder.append(String.format(Locale.US, "%02x", bytes[i]));
+            return builder.toString();
+        } catch (NoSuchAlgorithmException error) {
+            return String.valueOf(value.hashCode());
+        }
+    }
+
     @PluginMethod
     public void fileExists(PluginCall call) {
         String path = call.getString("path");
@@ -199,22 +389,32 @@ public class JwxtHttpPlugin extends Plugin {
             return;
         }
         final File file;
-        final File root;
         try {
             file = new File(path).getCanonicalFile();
-            root = getContext().getFilesDir().getCanonicalFile();
         } catch (IOException e) {
             call.reject("path 无效");
             return;
         }
-        // 只允许查询应用私有目录内的文件，避免被当作任意路径探测接口
-        if (!file.getPath().startsWith(root.getPath() + File.separator)) {
+        // 只允许查询应用私有 files / cache 目录，避免被当作任意路径探测接口
+        if (!isInsidePrivateDir(file)) {
             call.reject("path 超出应用私有目录");
             return;
         }
         JSObject result = new JSObject();
         result.put("exists", file.isFile() && file.length() > 0);
         call.resolve(result);
+    }
+
+    private boolean isInsidePrivateDir(File file) {
+        try {
+            File files = getContext().getFilesDir().getCanonicalFile();
+            File cache = getContext().getCacheDir().getCanonicalFile();
+            String path = file.getCanonicalPath();
+            return path.startsWith(files.getPath() + File.separator)
+                    || path.startsWith(cache.getPath() + File.separator);
+        } catch (IOException error) {
+            return false;
+        }
     }
 
     /** 供前端判断是否 debug 构建，仅在 debug 包中开启接口探测。 */

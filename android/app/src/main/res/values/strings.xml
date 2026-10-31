@@ -37,4 +37,12 @@
     <!-- 桌面小组件：3 尺寸 × 3 样式 -->
     <!-- 组件内「样式」按钮 -->
     <string name="widget_style_action">切换小组件样式</string>
+
+    <!-- 应用快捷方式 -->
+    <string name="shortcut_schedule">课表</string>
+    <string name="shortcut_schedule_long">查看本周课表</string>
+    <string name="shortcut_grades">成绩</string>
+    <string name="shortcut_grades_long">查看本学期成绩</string>
+    <string name="shortcut_notices">通知</string>
+    <string name="shortcut_notices_long">查看教务通知</string>
 </resources>

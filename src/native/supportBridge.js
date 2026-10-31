@@ -63,11 +63,45 @@ export async function composeFeedback(subject, body) {
   window.location.href = buildFeedbackMailto(subject, body)
 }
 
+// 打开已下载到应用私有目录的附件；原生侧校验路径与扩展名
+export async function openLocalFile(path) {
+  if (!supportAvailable()) throw new Error('原生文件打开仅在 App 内可用')
+  return SupportBridge.openLocalFile({ path })
+}
+
+// 打开公开官网链接；原生侧只允许 https://www.lzpu.edu.cn
+export async function openExternal(url) {
+  if (!supportAvailable()) {
+    window.open(url, '_blank', 'noopener')
+    return
+  }
+  return SupportBridge.openExternal({ url })
+}
+
+export async function getStorageInfo() {
+  if (!supportAvailable()) return { cacheBytes: 0, filesBytes: 0, totalBytes: 0 }
+  return SupportBridge.getStorageInfo()
+}
+
 export async function getDeviceInfo() {
   if (supportAvailable()) {
     return SupportBridge.getDeviceInfo()
   }
   return { manufacturer: 'Web', model: '', android: '', sdk: 0 }
+}
+
+// 读取本地崩溃摘要；只在用户勾选「附上诊断信息」时进入邮件正文
+export async function getLastCrash() {
+  if (supportAvailable()) {
+    return SupportBridge.getLastCrash()
+  }
+  return { found: false, summary: '' }
+}
+
+export async function clearCrashLog() {
+  if (supportAvailable()) {
+    return SupportBridge.clearCrashLog()
+  }
 }
 
 export async function copyText(text) {

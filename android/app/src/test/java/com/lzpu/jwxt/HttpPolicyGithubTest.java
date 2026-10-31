@@ -40,6 +40,27 @@ public class HttpPolicyGithubTest {
     }
 
     @Test
+    public void authPolicyAllowsZfjwAttachment() throws Exception {
+        HttpPolicy.AUTH.check(HttpUrl.parse(
+                "https://zfjw.lzzy.net/ftp/x.pdf?filename=%E9%99%84%E4%BB%B61.pdf"));
+    }
+
+    @Test(expected = IOException.class)
+    public void authPolicyRejectsOtherSchoolHost() throws Exception {
+        HttpPolicy.AUTH.check(HttpUrl.parse("https://ftp.lzzy.net/x.pdf"));
+    }
+
+    @Test(expected = IOException.class)
+    public void authPolicyRejectsLookalikeHost() throws Exception {
+        HttpPolicy.AUTH.check(HttpUrl.parse("https://zfjw.lzzy.net.evil.com/x.pdf"));
+    }
+
+    @Test(expected = IOException.class)
+    public void authPolicyRejectsPlainHttpAttachment() throws Exception {
+        HttpPolicy.AUTH.check(HttpUrl.parse("http://zfjw.lzzy.net/ftp/x.pdf"));
+    }
+
+    @Test
     public void policyInstancesAreDistinct() {
         assertNotNull(HttpPolicy.GITHUB);
         assertNotNull(HttpPolicy.AUTH);

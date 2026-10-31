@@ -31,3 +31,24 @@ export function clearWidget() {
 export function setWidgetTheme(theme) {
   return call('setTheme', { theme })
 }
+
+export async function listWidgets() {
+  if (!widgetAvailable()) return []
+  try {
+    const result = await WidgetBridge.listWidgets()
+    return Array.isArray(result?.widgets) ? result.widgets : []
+  } catch (error) {
+    console.warn('[widget] listWidgets 调用失败', error)
+    return []
+  }
+}
+
+export async function setWidgetStyle(id, style) {
+  if (!widgetAvailable()) throw new Error('桌面组件仅在 App 内可用')
+  return WidgetBridge.setWidgetStyle({ id, style })
+}
+
+export async function refreshWidgets() {
+  if (!widgetAvailable()) throw new Error('桌面组件仅在 App 内可用')
+  return WidgetBridge.refreshWidgets()
+}

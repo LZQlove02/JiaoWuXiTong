@@ -18,6 +18,24 @@ export async function downloadFile(url, filename) {
   return JwxtHttp.download({ url, filename })
 }
 
+// 带登录态的附件下载：只允许 zfjw，保存到应用私有 cache
+export async function authDownload(url, filename) {
+  if (!Capacitor.isNativePlatform()) {
+    throw new Error('原生附件下载仅在 App 内可用')
+  }
+  return JwxtHttp.authDownload({ url, filename })
+}
+
+export async function clearAuthDownloads() {
+  if (!Capacitor.isNativePlatform()) return
+  return JwxtHttp.clearAuthDownloads()
+}
+
+export async function clearPublicDownloads() {
+  if (!Capacitor.isNativePlatform()) return
+  return JwxtHttp.clearPublicDownloads()
+}
+
 export async function fileExists(path) {
   if (!Capacitor.isNativePlatform()) return { exists: false }
   return JwxtHttp.fileExists({ path })

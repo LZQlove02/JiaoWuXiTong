@@ -47,6 +47,50 @@ export function openScheduleChangeNotificationSettings() {
   return call('openNotificationSettings')
 }
 
+export function getCheckTimes() {
+  return call('getCheckTimes')
+}
+
+export function getGradeAlertState() {
+  return call('getGradeAlertState')
+}
+
+export function getPortalAlertState() {
+  return call('getPortalAlertState')
+}
+
+export async function setPortalAlertEnabled(notices, messages) {
+  if (!scheduleChangeAvailable()) {
+    throw new Error('原生提醒设置不可用')
+  }
+  const options = {}
+  if (typeof notices === 'boolean') options.notices = notices
+  if (typeof messages === 'boolean') options.messages = messages
+  return ScheduleChange.setPortalAlertEnabled(options)
+}
+
+export async function setGradeAlertEnabled(enabled) {
+  if (!scheduleChangeAvailable()) {
+    throw new Error('原生提醒设置不可用')
+  }
+  return ScheduleChange.setGradeAlertEnabled({ enabled })
+}
+
+// 时间写入失败需要让设置页给出明确提示，因此这里不吞异常
+export async function saveCheckTimes(morning, noon) {
+  if (!scheduleChangeAvailable()) {
+    throw new Error('原生提醒设置不可用')
+  }
+  return ScheduleChange.setCheckTimes({ morning, noon })
+}
+
+export async function resetCheckTimes() {
+  if (!scheduleChangeAvailable()) {
+    throw new Error('原生提醒设置不可用')
+  }
+  return ScheduleChange.resetCheckTimes()
+}
+
 // 退出登录：清掉基线与变更历史，避免下一个账号看到上一个人的课表信息
 export function clearScheduleChange() {
   return call('clear')

@@ -10,8 +10,11 @@ import {
   maybeRequestChangeNotificationPermission,
   openScheduleChangeNotificationSettings,
   requestChangeNotificationPermission,
+  resetCheckTimes,
+  saveCheckTimes,
   scheduleChangeAvailable,
-  setScheduleChangeEnabled
+  setScheduleChangeEnabled,
+  getCheckTimes
 } from '../native/scheduleChangeBridge'
 
 // 变更状态全部来自原生引擎；Web 端（无插件）保持空态，不影响课表等主流程。
@@ -21,6 +24,7 @@ export const useChangesStore = defineStore('changes', () => {
   const unread = ref(0)
   const enabled = ref(true)
   const notificationsEnabled = ref(true)
+  const checkTimes = ref({ morning: '07:10', noon: '12:50' })
   const loaded = ref(false)
   const applying = ref(false)
   const error = ref('')
@@ -76,6 +80,10 @@ export const useChangesStore = defineStore('changes', () => {
       return
     }
     applyState(state)
+    const times = await getCheckTimes()
+    if (times && times.morning && times.noon) {
+      checkTimes.value = { morning: times.morning, noon: times.noon }
+    }
   }
 
   async function refresh() {
@@ -153,6 +161,31 @@ export const useChangesStore = defineStore('changes', () => {
     openScheduleChangeNotificationSettings()
   }
 
+  // 检查时间由课表变更、成绩提醒等后台任务共用；Web 端只保存页面状态
+  async function updateCheckTimes(morning, noon) {
+    if (!scheduleChangeAvailable()) {
+      checkTimes.value = { morning, noon }
+      return checkTimes.value
+    }
+    const result = await saveCheckTimes(morning, noon)
+    if (result && result.morning && result.noon) {
+      checkTimes.value = { morning: result.morning, noon: result.noon }
+    }
+    return checkTimes.value
+  }
+
+  async function restoreDefaultCheckTimes() {
+    if (!scheduleChangeAvailable()) {
+      checkTimes.value = { morning: '07:10', noon: '12:50' }
+      return checkTimes.value
+    }
+    const result = await resetCheckTimes()
+    if (result && result.morning && result.noon) {
+      checkTimes.value = { morning: result.morning, noon: result.noon }
+    }
+    return checkTimes.value
+  }
+
   // 后台检查在 App 前台触发时，原生会发 changed 事件；这里刷新一次提醒条
   function listen() {
     if (listening || !scheduleChangeAvailable()) return
@@ -173,6 +206,7 @@ export const useChangesStore = defineStore('changes', () => {
     unread,
     enabled,
     notificationsEnabled,
+    checkTimes,
     loaded,
     applying,
     error,
@@ -187,6 +221,8 @@ export const useChangesStore = defineStore('changes', () => {
     setEnabled,
     requestNotificationPermission,
     openNotificationSettings,
+    updateCheckTimes,
+    restoreDefaultCheckTimes,
     listen,
     dispose
   }

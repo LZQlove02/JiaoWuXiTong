@@ -14,10 +14,20 @@
       <button class="week-btn" aria-label="上一周" @click="changeWeek(-1)">
         <AppIcon name="chevron-left" />
       </button>
-      <div class="week-center">
-        <span class="week-num">第 {{ selectedWeek }} 周</span>
+      <button
+        class="week-center"
+        type="button"
+        aria-label="选择周次"
+        aria-haspopup="dialog"
+        :aria-expanded="weekPickerOpen"
+        @click="openWeekPicker"
+      >
+        <span class="week-num">
+          第 {{ selectedWeek }} 周
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
         <span class="tiny">{{ weekRange }}</span>
-      </div>
+      </button>
       <button class="week-btn" aria-label="下一周" @click="changeWeek(1)">
         <AppIcon name="chevron-right" />
       </button>
@@ -103,15 +113,38 @@
     <p v-if="hasChangeMarks" class="tiny legend change-legend">
       本周变化已标出：停课 · 调课 · 新增
     </p>
+
+    <div v-if="weekPickerOpen" class="sheet-mask" @click.self="closeWeekPicker">
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="选择周次">
+        <p class="sheet-title">选择周次</p>
+        <div class="week-grid">
+          <button
+            v-for="week in weekOptions"
+            :key="week"
+            type="button"
+            class="week-cell"
+            :class="{ 'is-current': week === currentWeek, 'is-selected': week === selectedWeek }"
+            @click="selectWeek(week)"
+          >
+            <span class="week-cell-num">{{ week }}</span>
+            <span class="week-cell-label">{{ week === currentWeek ? '本周' : '周' }}</span>
+          </button>
+        </div>
+        <button type="button" class="sheet-action" @click="selectWeek(currentWeek)">
+          回到本周
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
 import { useChangesStore } from '../stores/changes'
+import { useUiStore } from '../stores/ui'
 import { SECTION_TIMES, WEEKDAY_LABELS, formatDate, getWeekNumber, getWeekday } from '../utils/date'
 import { buildChangeMarks, markOf } from '../utils/changeMarks'
 import { changeMeta } from '../utils/changeLabels'
@@ -120,6 +153,7 @@ import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
 const changes = useChangesStore()
+const ui = useUiStore()
 const router = useRouter()
 const { schedule, currentTerm, scheduleLoading, errors } = storeToRefs(academic)
 
@@ -133,6 +167,16 @@ const currentWeek = computed(() =>
     : 1
 )
 const selectedWeek = ref(1)
+const weekPickerOpen = ref(false)
+
+// 课表可能排到 20 周以上；至少保留 20 周，避免最后几周无法选择
+const maxWeek = computed(() => {
+  const weeks = (schedule.value?.sessions || []).flatMap((item) => item.weeks || [])
+  return Math.max(20, currentWeek.value, ...weeks)
+})
+const weekOptions = computed(() =>
+  Array.from({ length: maxWeek.value }, (_, index) => index + 1)
+)
 
 const weekRange = computed(() => {
   if (!currentTerm.value) return ''
@@ -210,9 +254,30 @@ function courseColor(courseId) {
 
 function changeWeek(step) {
   const next = selectedWeek.value + step
-  if (next < 1 || next > 20) return
+  if (next < 1 || next > maxWeek.value) return
   selectedWeek.value = next
 }
+
+function openWeekPicker() {
+  weekPickerOpen.value = true
+}
+
+function closeWeekPicker() {
+  weekPickerOpen.value = false
+}
+
+function selectWeek(week) {
+  selectedWeek.value = Math.min(Math.max(week, 1), maxWeek.value)
+  closeWeekPicker()
+}
+
+watch(weekPickerOpen, (open) => {
+  if (open) {
+    ui.setOverlayCloser(closeWeekPicker)
+  } else {
+    ui.clearOverlayCloser()
+  }
+})
 
 function openCourse(id) {
   router.push(`/course/${id}?week=${selectedWeek.value}`)
@@ -233,6 +298,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer)
+  if (weekPickerOpen.value) ui.clearOverlayCloser()
 })
 </script>
 
@@ -272,11 +338,24 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 1px;
+  padding: 4px 12px;
+  border-radius: 10px;
+}
+
+.week-center:active {
+  background: var(--card-muted);
 }
 
 .week-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 15px;
   font-weight: 600;
+}
+
+.week-num svg {
+  color: var(--text-tertiary);
 }
 
 .loading {
@@ -455,5 +534,80 @@ onUnmounted(() => {
   background: var(--brand-soft);
   color: var(--brand);
   font-size: 13px;
+}
+
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.sheet {
+  width: 100%;
+  max-width: 760px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 18px 16px calc(env(safe-area-inset-bottom) + 20px);
+  border-radius: 16px 16px 0 0;
+  background: var(--card);
+}
+
+.sheet-title {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.week-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 9px 4px;
+  border-radius: 10px;
+  background: var(--card-muted);
+  color: var(--text-secondary);
+}
+
+.week-cell.is-current {
+  color: var(--brand);
+}
+
+.week-cell.is-selected {
+  background: var(--brand);
+  color: #fff;
+}
+
+.week-cell-num {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.week-cell-label {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.sheet-action {
+  width: 100%;
+  height: 44px;
+  margin-top: 14px;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 500;
 }
 </style>

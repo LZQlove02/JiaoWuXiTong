@@ -35,6 +35,8 @@ public class ScheduleChangeBridge extends Plugin {
     public void load() {
         instance = this;
         ScheduleChangeNotifier.ensureChannel(getContext());
+        GradeAlertNotifier.ensureChannel(getContext());
+        PortalAlertNotifier.ensureChannel(getContext());
         ScheduleCheckScheduler.scheduleAll(getContext());
     }
 
@@ -84,7 +86,7 @@ public class ScheduleChangeBridge extends Plugin {
             call.reject("课表对账失败");
             return;
         }
-        if (ScheduleChangeStore.isEnabled(getContext())) {
+        if (BackgroundCheckPolicy.isAnyEnabled(getContext())) {
             ScheduleCheckScheduler.scheduleAll(getContext());
         }
         call.resolve(state());
@@ -115,6 +117,84 @@ public class ScheduleChangeBridge extends Plugin {
     }
 
     @PluginMethod
+    public void getGradeAlertState(PluginCall call) {
+        call.resolve(gradeState());
+    }
+
+    @PluginMethod
+    public void setGradeAlertEnabled(PluginCall call) {
+        Boolean enabled = call.getBoolean("enabled");
+        GradeAlertService.setEnabled(getContext(), enabled != null && enabled);
+        call.resolve(gradeState());
+    }
+
+    private JSObject gradeState() {
+        JSObject result = new JSObject();
+        result.put("enabled", GradeAlertStore.isEnabled(getContext()));
+        result.put("notificationsEnabled", ScheduleChangeNotifier.notificationsEnabled(getContext()));
+        return result;
+    }
+
+    @PluginMethod
+    public void getPortalAlertState(PluginCall call) {
+        call.resolve(portalAlertState());
+    }
+
+    @PluginMethod
+    public void setPortalAlertEnabled(PluginCall call) {
+        Boolean notices = call.getBoolean("notices");
+        Boolean messages = call.getBoolean("messages");
+        if (notices != null) {
+            PortalAlertService.setEnabled(getContext(), true, notices);
+        }
+        if (messages != null) {
+            PortalAlertService.setEnabled(getContext(), false, messages);
+        }
+        call.resolve(portalAlertState());
+    }
+
+    private JSObject portalAlertState() {
+        JSObject result = new JSObject();
+        result.put("noticesEnabled", PortalAlertStore.isNoticesEnabled(getContext()));
+        result.put("messagesEnabled", PortalAlertStore.isMessagesEnabled(getContext()));
+        result.put("notificationsEnabled", ScheduleChangeNotifier.notificationsEnabled(getContext()));
+        return result;
+    }
+
+    @PluginMethod
+    public void getCheckTimes(PluginCall call) {
+        call.resolve(checkTimes());
+    }
+
+    /** 两个时段同时生效；格式错误或间隔不足 60 分钟时拒绝，不修改旧值。 */
+    @PluginMethod
+    public void setCheckTimes(PluginCall call) {
+        String morning = call.getString("morning");
+        String noon = call.getString("noon");
+        if (!CheckTimeStore.write(getContext(), morning, noon)) {
+            call.reject("时间格式无效，或两次检查间隔不足 60 分钟");
+            return;
+        }
+        ScheduleCheckScheduler.scheduleAll(getContext());
+        call.resolve(checkTimes());
+    }
+
+    @PluginMethod
+    public void resetCheckTimes(PluginCall call) {
+        CheckTimeStore.reset(getContext());
+        ScheduleCheckScheduler.scheduleAll(getContext());
+        call.resolve(checkTimes());
+    }
+
+    private JSObject checkTimes() {
+        CheckTimes times = CheckTimeStore.read(getContext());
+        JSObject result = new JSObject();
+        result.put("morning", times.morningText());
+        result.put("noon", times.noonText());
+        return result;
+    }
+
+    @PluginMethod
     public void requestNotificationPermission(PluginCall call) {
         if (Build.VERSION.SDK_INT < 33
                 || ScheduleChangeNotifier.notificationsEnabled(getContext())) {
@@ -132,7 +212,7 @@ public class ScheduleChangeBridge extends Plugin {
     @PluginMethod
     public void maybeRequestNotificationPermission(PluginCall call) {
         boolean shouldAsk = Build.VERSION.SDK_INT >= 33
-                && ScheduleChangeStore.isEnabled(getContext())
+                && BackgroundCheckPolicy.isAnyEnabled(getContext())
                 && !ScheduleChangeNotifier.notificationsEnabled(getContext())
                 && !ScheduleChangeStore.hasAskedNotification(getContext())
                 && AppVisibility.isForeground();

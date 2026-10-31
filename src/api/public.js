@@ -81,6 +81,19 @@ export function parseArticleList(html, baseUrl = BASE) {
   return items
 }
 
+const ARTICLE_ATTACHMENT = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|7z|txt)(?:[?#]|$)/i
+
+function resolvePublicUrl(href, baseUrl) {
+  if (!href) return ''
+  try {
+    const resolved = new URL(href, baseUrl || undefined)
+    if (resolved.protocol !== 'https:' || resolved.hostname !== 'www.lzpu.edu.cn') return ''
+    return resolved.toString()
+  } catch (error) {
+    return ''
+  }
+}
+
 export function parseArticle(html, { id, section, url }) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const container =
@@ -90,6 +103,32 @@ export function parseArticle(html, { id, section, url }) {
   const heading = container.querySelector('h1, .articleTitle, .title')
   const paragraphs = Array.from(container.querySelectorAll('p'))
     .map((item) => item.textContent.trim())
+    .filter(Boolean)
+
+  const images = Array.from(container.querySelectorAll('img'))
+    .map((img) => ({
+      url: resolvePublicUrl(img.getAttribute('src'), url),
+      alt: (img.getAttribute('alt') || '').trim()
+    }))
+    .filter((item) => item.url)
+
+  const attachments = Array.from(container.querySelectorAll('a[href]'))
+    .map((link) => {
+      const href = link.getAttribute('href') || ''
+      if (!ARTICLE_ATTACHMENT.test(href)) return null
+      const resolved = resolvePublicUrl(href, url)
+      if (!resolved) return null
+      const text = (link.textContent || '').replace(/\s+/g, ' ').trim()
+      let name = text
+      if (!name) {
+        try {
+          name = decodeURIComponent(new URL(resolved).pathname.split('/').pop() || '')
+        } catch (error) {
+          name = ''
+        }
+      }
+      return name ? { name, url: resolved } : null
+    })
     .filter(Boolean)
 
   return {
@@ -102,6 +141,8 @@ export function parseArticle(html, { id, section, url }) {
     text: paragraphs.length
       ? ''
       : (container.textContent || '').replace(/\s+/g, ' ').trim(),
+    images,
+    attachments,
     source: '教务处官网',
     url
   }
@@ -128,6 +169,8 @@ export function getCachedArticle(section, id) {
     title: cached.title,
     paragraphs: cached.paragraphs || [],
     text: cached.text || '',
+    images: cached.images || [],
+    attachments: cached.attachments || [],
     source: cached.source,
     url: cached.url,
     fetchedAt: cached.fetchedAt,

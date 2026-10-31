@@ -38,7 +38,13 @@
       </div>
 
       <pre v-if="withDiagnostics" class="diagnostics">{{ diagnosticsText }}</pre>
-      <p class="note">诊断信息只含版本、机型与系统版本，不含学号、姓名、成绩或登录会话。</p>
+      <div v-if="crash" class="crash-row">
+        <span>已记录最近一次崩溃</span>
+        <button type="button" class="crash-clear" @click="clearCrash">清除记录</button>
+      </div>
+      <p class="note">
+        诊断信息只含版本、机型、系统版本与应用/原生崩溃摘要，不含学号、姓名、成绩或登录会话。
+      </p>
     </section>
 
     <div class="actions">
@@ -62,7 +68,14 @@ import { Capacitor } from '@capacitor/core'
 import BackBar from '../components/BackBar.vue'
 import { useUiStore } from '../stores/ui'
 import { useUpdateStore } from '../stores/update'
-import { composeFeedback, copyText, errorCode, getDeviceInfo } from '../native/supportBridge'
+import {
+  clearCrashLog,
+  composeFeedback,
+  copyText,
+  errorCode,
+  getDeviceInfo,
+  getLastCrash
+} from '../native/supportBridge'
 import { buildDiagnostics } from '../utils/diagnostics'
 import {
   FEEDBACK_EMAIL,
@@ -77,6 +90,7 @@ const description = ref('')
 const contact = ref('')
 const withDiagnostics = ref(true)
 const device = ref(null)
+const crash = ref('')
 const busy = ref(false)
 const hint = ref('')
 const toast = ref('')
@@ -92,7 +106,8 @@ const diagnosticsText = computed(() =>
     device: device.value,
     theme: ui.theme,
     platform,
-    online: navigator.onLine
+    online: navigator.onLine,
+    crash: crash.value
   })
 )
 
@@ -139,6 +154,16 @@ async function send() {
   }
 }
 
+async function clearCrash() {
+  try {
+    await clearCrashLog()
+    crash.value = ''
+    showToast('已清除本地崩溃记录')
+  } catch (error) {
+    showToast('清除失败，请稍后重试')
+  }
+}
+
 async function copy() {
   hint.value = ''
   if (!description.value.trim()) {
@@ -160,6 +185,12 @@ onMounted(async () => {
     device.value = await getDeviceInfo()
   } catch (error) {
     // 取不到设备信息时诊断文本自动降级为「未知」
+  }
+  try {
+    const crashInfo = await getLastCrash()
+    crash.value = crashInfo?.found ? crashInfo.summary || '' : ''
+  } catch (error) {
+    // 读不到本地崩溃记录时按无记录处理
   }
 })
 
@@ -253,6 +284,21 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.crash-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.crash-clear {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--brand);
 }
 
 .note {

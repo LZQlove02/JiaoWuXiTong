@@ -3,10 +3,13 @@ package com.lzpu.jwxt;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 import com.lzpu.jwxt.change.AppVisibility;
 import com.lzpu.jwxt.change.ScheduleChangeBridge;
+import com.lzpu.jwxt.change.GradeAlertNotifier;
+import com.lzpu.jwxt.change.PortalAlertNotifier;
 import com.lzpu.jwxt.change.ScheduleChangeNotifier;
 import com.lzpu.jwxt.change.ScheduleCheckScheduler;
 
@@ -22,7 +25,26 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         // 用户强停 App 会清掉闹钟，每次打开 App 补排一次
         ScheduleChangeNotifier.ensureChannel(this);
+        GradeAlertNotifier.ensureChannel(this);
+        PortalAlertNotifier.ensureChannel(this);
         ScheduleCheckScheduler.scheduleAll(this);
+        applySystemFontScale();
+    }
+
+    /**
+     * 文字大小跟随系统无障碍设置。上限 1.5 倍，避免固定像素的课表网格在大字体下溢出；
+     * 系统字号变化会让 Activity 重建，onCreate 时重新读取即可。
+     */
+    private void applySystemFontScale() {
+        try {
+            WebView webView = getBridge() == null ? null : getBridge().getWebView();
+            if (webView == null) return;
+            float scale = getResources().getConfiguration().fontScale;
+            float clamped = Math.min(Math.max(scale, 0.85f), 1.5f);
+            webView.getSettings().setTextZoom(Math.round(clamped * 100));
+        } catch (RuntimeException error) {
+            // WebView 未就绪时忽略，使用系统默认缩放
+        }
     }
 
     @Override

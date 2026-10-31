@@ -24,6 +24,7 @@ export function buildDiagnostics({
   theme = 'system',
   platform = '',
   online = true,
+  crash = '',
   now = new Date()
 } = {}) {
   const model = [device?.manufacturer, device?.model].filter(Boolean).join(' ').trim()
@@ -40,5 +41,7 @@ export function buildDiagnostics({
     `网络：${online ? '在线' : '离线'}`,
     `生成时间：${formatStamp(now)}`
   ]
-  return lines.filter(Boolean).join('\n')
+  const base = lines.filter(Boolean).join('\n')
+  const crashText = String(crash || '').trim()
+  return crashText ? `${base}\n\n【最近崩溃】\n${crashText}` : base
 }

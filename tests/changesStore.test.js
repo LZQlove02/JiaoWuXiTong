@@ -10,6 +10,11 @@ vi.mock('../src/native/scheduleChangeBridge', () => ({
   requestChangeNotificationPermission: vi.fn(),
   maybeRequestChangeNotificationPermission: vi.fn(() => Promise.resolve({ asked: false })),
   openScheduleChangeNotificationSettings: vi.fn(),
+  getCheckTimes: vi.fn(() => Promise.resolve({ morning: '07:10', noon: '12:50' })),
+  saveCheckTimes: vi.fn(),
+  resetCheckTimes: vi.fn(),
+  getGradeAlertState: vi.fn(),
+  setGradeAlertEnabled: vi.fn(),
   clearScheduleChange: vi.fn(),
   addScheduleChangeListener: vi.fn(() => () => {})
 }))

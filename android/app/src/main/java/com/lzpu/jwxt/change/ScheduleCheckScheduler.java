@@ -9,15 +9,13 @@ import android.os.Build;
 import java.util.Calendar;
 
 /**
- * 每天 07:10 / 12:50 两次单次闹钟，触发后各自排下一天。
+ * 每天两次单次闹钟（默认 07:10 / 12:50，可在设置中修改），触发后各自排下一天。
  * 用 setAndAllowWhileIdle（非精确），避免申请 SCHEDULE_EXACT_ALARM 权限。
  */
 public final class ScheduleCheckScheduler {
 
     static final int SLOT_MORNING = 1;
     static final int SLOT_NOON = 2;
-    private static final int[] HOURS = {7, 12};
-    private static final int[] MINUTES = {10, 50};
     private static final int REQUEST_BASE = 2100;
 
     private ScheduleCheckScheduler() {
@@ -25,7 +23,7 @@ public final class ScheduleCheckScheduler {
 
     public static void scheduleAll(Context context) {
         Context app = context.getApplicationContext();
-        if (!ScheduleChangeStore.isEnabled(app)) {
+        if (!BackgroundCheckPolicy.isAnyEnabled(app)) {
             cancelAll(app);
             return;
         }
@@ -44,11 +42,11 @@ public final class ScheduleCheckScheduler {
     static void scheduleSlot(Context context, int slot) {
         if (slot < SLOT_MORNING || slot > SLOT_NOON) return;
         Context app = context.getApplicationContext();
-        if (!ScheduleChangeStore.isEnabled(app)) return;
+        if (!BackgroundCheckPolicy.isAnyEnabled(app)) return;
         AlarmManager manager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
         if (manager == null) return;
 
-        long triggerAt = nextTrigger(slot, System.currentTimeMillis());
+        long triggerAt = nextTrigger(slot, System.currentTimeMillis(), CheckTimeStore.read(app));
         PendingIntent pending = pending(app, slot);
         if (pending == null) return;
         try {
@@ -77,11 +75,13 @@ public final class ScheduleCheckScheduler {
         return PendingIntent.getBroadcast(context, REQUEST_BASE + slot, intent, flags);
     }
 
-    private static long nextTrigger(int slot, long now) {
-        int index = slot - 1;
+    /** 单测用：按给定时段计算下一次触发；早于当前时间则顺延到明天。 */
+    static long nextTrigger(int slot, long now, CheckTimes times) {
+        int minutes = slot == SLOT_MORNING ? times.morningMinutes : times.noonMinutes;
         Calendar next = Calendar.getInstance();
-        next.set(Calendar.HOUR_OF_DAY, HOURS[index]);
-        next.set(Calendar.MINUTE, MINUTES[index]);
+        next.setTimeInMillis(now);
+        next.set(Calendar.HOUR_OF_DAY, minutes / 60);
+        next.set(Calendar.MINUTE, minutes % 60);
         next.set(Calendar.SECOND, 0);
         next.set(Calendar.MILLISECOND, 0);
         if (next.getTimeInMillis() <= now) {

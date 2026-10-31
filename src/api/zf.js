@@ -48,7 +48,7 @@ export function clearScheduleSnapshot() {
   localStorage.removeItem(SNAPSHOT_KEY)
 }
 
-// 仅 debug 包：会话可用时探测成绩/考试/选课的真实入口，结果只进 logcat。
+// 仅 debug 包：会话可用时探测成绩/选课的真实入口，结果只进 logcat。
 // 探测失败不影响正常流程。
 function probeInDebugBuild(term) {
   isDebugBuild()
@@ -322,6 +322,16 @@ export function mergeGradeGroups(results) {
   }
 }
 
+function dedupeEvaluations(items) {
+  const seen = new Set()
+  return items.filter((item, index) => {
+    const key = String(item?.jxb_id || item?.kch_id || `row_${index}`)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 // 评教记录只读解析：不包含任何提交动作，只把列表映射成展示模型
 export function mapEvaluations(payload) {
   const items = Array.isArray(payload?.items) ? payload.items : []
@@ -465,7 +475,19 @@ export function parsePortalNoticeList(payload) {
   }
 }
 
-export function parsePortalNoticeDetail(html) {
+// 详情页里的图片/附件地址可能相对当前通知页，统一用 URL 构造解析并限制在 zfjw 域
+function resolveZfjwUrl(href, baseUrl) {
+  if (!href) return ''
+  try {
+    const url = new URL(href, baseUrl || undefined)
+    if (url.protocol !== 'https:' || url.hostname !== 'zfjw.lzzy.net') return ''
+    return url.toString()
+  } catch (error) {
+    return ''
+  }
+}
+
+export function parsePortalNoticeDetail(html, pageUrl = '') {
   const source = String(html || '')
   if (typeof DOMParser === 'undefined') {
     throw parseFailure('通知详情解析环境不可用')
@@ -488,7 +510,15 @@ export function parsePortalNoticeDetail(html) {
       if (text) paragraphs.push(text)
     }
   }
-  const images = content ? [...content.querySelectorAll('img')].length : 0
+  const rawImages = content ? [...content.querySelectorAll('img')] : []
+  const imageUrls = []
+  for (const img of rawImages) {
+    const url = resolveZfjwUrl(img.getAttribute('src'), pageUrl)
+    if (!url) continue
+    imageUrls.push({ url, alt: (img.getAttribute('alt') || '').trim() })
+  }
+  // 保留原始数量用于「还有 N 张图需在教务系统查看」的提示
+  const images = Math.max(imageUrls.length, rawImages.length)
   const attachments = [...doc.querySelectorAll('a[href*="filename="]')]
     .map((a) => {
       const href = a.getAttribute('href') || ''
@@ -499,7 +529,8 @@ export function parsePortalNoticeDetail(html) {
       } catch (error) {
         name = ''
       }
-      return { name: name || (a.textContent || '').trim(), href }
+      const url = resolveZfjwUrl(href, pageUrl)
+      return { name: name || (a.textContent || '').trim(), href, url }
     })
     .filter((item) => item.name)
   if (!paragraphs.length && !attachments.length && images === 0) {
@@ -511,6 +542,7 @@ export function parsePortalNoticeDetail(html) {
     views,
     paragraphs,
     images,
+    imageUrls,
     attachments,
     source: '教务系统（学生门户）',
     fetchedAt: new Date().toISOString()
@@ -842,17 +874,10 @@ export class ZfAcademicApi {
     return merged
   }
 
-  async getExams() {
-    const error = new Error('考试接口尚未接入，暂不可用')
-    error.unsupported = true
-    throw error
-  }
-
-  async getEvaluations() {
-    if (!this.term) throw new Error('尚未登录')
+  async fetchEvaluationsPage(page) {
     const body = await this.requestText(EVALUATION_ENDPOINT, {
       method: 'POST',
-      body: 'page=1&rows=10&sidx=&sord=asc',
+      body: `page=${page}&rows=100&sidx=&sord=asc`,
       label: '评教'
     })
     const payload = this.parseJson(body, '评教')
@@ -861,7 +886,27 @@ export class ZfAcademicApi {
       failure.parseError = true
       throw failure
     }
-    return mapEvaluations(payload)
+    return payload
+  }
+
+  // 评教接口默认分页；按 totalPage 拉全，避免只显示前 10 条
+  async getEvaluations() {
+    if (!this.term) throw new Error('尚未登录')
+    const first = await this.fetchEvaluationsPage(1)
+    const items = [...first.items]
+    const total = Number(first.totalResult)
+    const totalPage = Number(first.totalPage)
+    const pages = Number.isFinite(totalPage) && totalPage > 1
+      ? Math.min(totalPage, 20)
+      : Number.isFinite(total) && total > items.length
+        ? Math.min(Math.ceil(total / 100), 20)
+        : 1
+    for (let page = 2; page <= pages; page += 1) {
+      const next = await this.fetchEvaluationsPage(page)
+      items.push(...next.items)
+      if (!next.items.length) break
+    }
+    return mapEvaluations({ ...first, items: dedupeEvaluations(items) })
   }
 
   async getCourseSelectionStatus() {
@@ -935,14 +980,15 @@ export class ZfAcademicApi {
 
   async getPortalNoticeDetail(id) {
     const url = `${PORTAL_NOTICE_DETAIL}?xwbh=${encodeURIComponent(id)}`
-    return this.requestPortal(url, parsePortalNoticeDetail)
+    return this.requestPortal(url, (raw) => parsePortalNoticeDetail(raw, url))
   }
 
-  async getMessages() {
+  async getMessages(mode = 'unread') {
     const parser = (raw) => parseMessages(this.parseJson(raw, '消息'))
+    const flag = mode === 'all' ? 0 : 1
     const result = await this.collectPortalPages(
       PORTAL_MESSAGES,
-      (page) => `flag=1&sfyy=1&queryModel.showCount=100&queryModel.currentPage=${page}`,
+      (page) => `flag=${flag}&sfyy=1&queryModel.showCount=100&queryModel.currentPage=${page}`,
       parser
     )
     return {

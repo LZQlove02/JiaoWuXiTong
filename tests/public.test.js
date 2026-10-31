@@ -99,4 +99,32 @@ describe('parseArticle', () => {
       })
     ).toBeNull()
   })
+
+  it('解析正文图片与官网附件链接', () => {
+    const html = `
+      <html><body>
+        <div class="articleCon">
+          <div class="conTxt">
+            <h1>流程</h1>
+            <p>正文</p>
+            <p><img src="../images/a.png" /></p>
+            <p><a href="/files/表格.pdf">下载表格</a></p>
+            <p><a href="https://example.com/x.pdf">外部文件</a></p>
+          </div>
+        </div>
+      </body></html>
+    `
+    const data = parseArticle(html, {
+      id: 'content_1',
+      section: 'bszn',
+      url: 'https://www.lzpu.edu.cn/jwysxglc/bszn/content_1'
+    })
+    expect(data.images).toHaveLength(1)
+    expect(data.images[0].url).toBe('https://www.lzpu.edu.cn/jwysxglc/images/a.png')
+    expect(data.attachments).toHaveLength(1)
+    expect(data.attachments[0]).toMatchObject({
+      name: '下载表格',
+      url: 'https://www.lzpu.edu.cn/files/%E8%A1%A8%E6%A0%BC.pdf'
+    })
+  })
 })

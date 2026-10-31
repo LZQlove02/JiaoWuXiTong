@@ -16,12 +16,12 @@ const EMPTY_ERRORS = {
   terms: '',
   schedule: '',
   grades: '',
-  exams: '',
   evaluations: '',
   courseSelection: '',
   portalNotices: '',
   portalNoticeList: '',
-  messages: ''
+  messages: '',
+  messagesAll: ''
 }
 
 function sameTerm(a, b) {
@@ -45,24 +45,23 @@ export const useAcademicStore = defineStore('academic', () => {
   const currentTerm = ref(null)
   const schedule = ref(null)
   const grades = ref(null)
-  const exams = ref([])
   const evaluations = ref(null)
   const courseSelection = ref(null)
   const portalNotices = ref(null)
   const portalNoticeList = ref(null)
   const messages = ref(null)
+  const messagesAll = ref(null)
 
   // 各业务域独立的 loading，避免课表请求结束时把成绩/评教的加载态提前关掉
   const termsLoading = ref(false)
   const scheduleLoading = ref(false)
   const gradesLoading = ref(false)
-  const examsLoading = ref(false)
-  const examsUnsupported = ref(false)
   const evaluationsLoading = ref(false)
   const courseSelectionLoading = ref(false)
   const portalNoticesLoading = ref(false)
   const portalNoticeListLoading = ref(false)
   const messagesLoading = ref(false)
+  const messagesAllLoading = ref(false)
 
   const portalNoticesOffline = ref(false)
   const portalNoticesCachedAt = ref('')
@@ -73,6 +72,9 @@ export const useAcademicStore = defineStore('academic', () => {
   const messagesOffline = ref(false)
   const messagesCachedAt = ref('')
   const messagesExpired = ref(false)
+  const messagesAllOffline = ref(false)
+  const messagesAllCachedAt = ref('')
+  const messagesAllExpired = ref(false)
   const gradesOffline = ref(false)
   const gradesCachedAt = ref('')
   const gradesExpired = ref(false)
@@ -234,21 +236,6 @@ export const useAcademicStore = defineStore('academic', () => {
     }
   }
 
-  async function loadExams(term = currentTerm.value) {
-    examsLoading.value = true
-    setError('exams', '')
-    try {
-      exams.value = await api.getExams(term)
-      examsUnsupported.value = false
-    } catch (err) {
-      // 接口未接入与真实请求失败要区分，前者不应影响首页刷新结果
-      examsUnsupported.value = Boolean(err?.unsupported)
-      setError('exams', err.message || '考试加载失败')
-    } finally {
-      examsLoading.value = false
-    }
-  }
-
   async function loadCourse(id) {
     course.value = null
     course.value = await api.getCourse(id)
@@ -372,31 +359,41 @@ export const useAcademicStore = defineStore('academic', () => {
     }
   }
 
-  async function loadMessages() {
-    const cached = readDataCache('messages', MESSAGES_TTL)
+  // 未阅与全部消息使用不同缓存键，避免「全部」覆盖首页未阅数据
+  async function loadMessages(mode = 'unread') {
+    const all = mode === 'all'
+    const cacheKey = all ? 'messages.all' : 'messages'
+    const target = all ? messagesAll : messages
+    const loading = all ? messagesAllLoading : messagesLoading
+    const offline = all ? messagesAllOffline : messagesOffline
+    const cachedAt = all ? messagesAllCachedAt : messagesCachedAt
+    const expired = all ? messagesAllExpired : messagesExpired
+    const errorKey = all ? 'messagesAll' : 'messages'
+
+    const cached = readDataCache(cacheKey, MESSAGES_TTL)
     if (cached?.data) {
-      messages.value = cached.data
-      messagesCachedAt.value = cached.cachedAt
-      messagesExpired.value = cached.expired
+      target.value = cached.data
+      cachedAt.value = cached.cachedAt
+      expired.value = cached.expired
     }
-    messagesLoading.value = true
-    setError('messages', '')
+    loading.value = true
+    setError(errorKey, '')
     try {
-      const data = await api.getMessages()
-      messages.value = data
-      messagesOffline.value = false
-      messagesExpired.value = false
-      const cacheTime = writeDataCache('messages', data)
-      messagesCachedAt.value = data.fetchedAt || cacheTime
+      const data = await api.getMessages(mode)
+      target.value = data
+      offline.value = false
+      expired.value = false
+      const cacheTime = writeDataCache(cacheKey, data)
+      cachedAt.value = data.fetchedAt || cacheTime
     } catch (err) {
-      if (messages.value) {
-        messagesOffline.value = true
-        messagesExpired.value = Boolean(readDataCache('messages', MESSAGES_TTL)?.expired)
+      if (target.value) {
+        offline.value = true
+        expired.value = Boolean(readDataCache(cacheKey, MESSAGES_TTL)?.expired)
       } else {
-        setError('messages', err.message || '消息加载失败')
+        setError(errorKey, err.message || '消息加载失败')
       }
     } finally {
-      messagesLoading.value = false
+      loading.value = false
     }
   }
 
@@ -405,22 +402,21 @@ export const useAcademicStore = defineStore('academic', () => {
     currentTerm.value = null
     schedule.value = null
     grades.value = null
-    exams.value = []
     evaluations.value = null
     courseSelection.value = null
     portalNotices.value = null
     portalNoticeList.value = null
     messages.value = null
+    messagesAll.value = null
     termsLoading.value = false
     scheduleLoading.value = false
     gradesLoading.value = false
-    examsLoading.value = false
-    examsUnsupported.value = false
     evaluationsLoading.value = false
     courseSelectionLoading.value = false
     portalNoticesLoading.value = false
     portalNoticeListLoading.value = false
     messagesLoading.value = false
+    messagesAllLoading.value = false
     portalNoticesOffline.value = false
     portalNoticesCachedAt.value = ''
     portalNoticesExpired.value = false
@@ -430,6 +426,9 @@ export const useAcademicStore = defineStore('academic', () => {
     messagesOffline.value = false
     messagesCachedAt.value = ''
     messagesExpired.value = false
+    messagesAllOffline.value = false
+    messagesAllCachedAt.value = ''
+    messagesAllExpired.value = false
     gradesOffline.value = false
     gradesCachedAt.value = ''
     gradesExpired.value = false
@@ -452,22 +451,21 @@ export const useAcademicStore = defineStore('academic', () => {
     currentTerm,
     schedule,
     grades,
-    exams,
     evaluations,
     courseSelection,
     portalNotices,
     portalNoticeList,
     messages,
+    messagesAll,
     termsLoading,
     scheduleLoading,
     gradesLoading,
-    examsLoading,
-    examsUnsupported,
     evaluationsLoading,
     courseSelectionLoading,
     portalNoticesLoading,
     portalNoticeListLoading,
     messagesLoading,
+    messagesAllLoading,
     portalNoticesOffline,
     portalNoticesCachedAt,
     portalNoticesExpired,
@@ -477,6 +475,9 @@ export const useAcademicStore = defineStore('academic', () => {
     messagesOffline,
     messagesCachedAt,
     messagesExpired,
+    messagesAllOffline,
+    messagesAllCachedAt,
+    messagesAllExpired,
     gradesOffline,
     gradesCachedAt,
     gradesExpired,
@@ -493,7 +494,6 @@ export const useAcademicStore = defineStore('academic', () => {
     loadSchedule,
     loadGrades,
     loadAllGrades,
-    loadExams,
     loadEvaluations,
     loadCourseSelection,
     loadPortalNotices,

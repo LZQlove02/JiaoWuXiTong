@@ -5,7 +5,6 @@ import Schedule from '../views/Schedule.vue'
 import Grades from '../views/Grades.vue'
 import Profile from '../views/Profile.vue'
 import Login from '../views/Login.vue'
-import Exams from '../views/Exams.vue'
 import Notices from '../views/Notices.vue'
 import PortalNoticeDetail from '../views/PortalNoticeDetail.vue'
 import Messages from '../views/Messages.vue'
@@ -51,7 +50,6 @@ const routes = [
     component: Feedback,
     meta: { guest: true, title: '意见反馈' }
   },
-  { path: '/exams', name: 'exams', component: Exams },
   { path: '/notices', name: 'notices', component: Notices },
   {
     path: '/notices/:id',

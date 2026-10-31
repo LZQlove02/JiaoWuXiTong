@@ -22,6 +22,20 @@ describe('deepLinkPath', () => {
     expect(deepLinkPath('  lzpu://messages  ')).toBe('/messages')
   })
 
+  it('解析通知、课程与消息详情深链', () => {
+    expect(deepLinkPath('lzpu://notice/N1')).toBe('/notices/N1')
+    expect(deepLinkPath('lzpu://course/C1?week=3')).toBe('/course/C1')
+    expect(deepLinkPath('lzpu://message/M1')).toBe('/messages?id=M1')
+    expect(deepLinkPath('lzpu:notice/N1')).toBe('/notices/N1')
+  })
+
+  it('详情 ID 非法时返回空串', () => {
+    expect(deepLinkPath('lzpu://notice/')).toBe('')
+    expect(deepLinkPath('lzpu://notice/..%2F')).toBe('')
+    expect(deepLinkPath('lzpu://notice/%3Cscript%3E')).toBe('')
+    expect(deepLinkPath(`lzpu://notice/${'a'.repeat(65)}`)).toBe('')
+  })
+
   it('未知 host、空值与其它 scheme 一律返回空串', () => {
     expect(deepLinkPath('lzpu://unknown')).toBe('')
     expect(deepLinkPath('lzpu://')).toBe('')

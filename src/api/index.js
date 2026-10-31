@@ -32,7 +32,6 @@ export const api = {
   getSchedule: guarded('getSchedule'),
   getGrades: guarded('getGrades'),
   getAllGrades: guarded('getAllGrades'),
-  getExams: guarded('getExams'),
   getEvaluations: guarded('getEvaluations'),
   getCourseSelectionStatus: guarded('getCourseSelectionStatus'),
   getPortalNotices: guarded('getPortalNotices'),

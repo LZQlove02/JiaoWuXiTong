@@ -1,6 +1,6 @@
 import { authGet, authPost } from './nativeHttp'
 
-// 仅 debug 构建调用：从教务首页与「我的应用」菜单中找成绩、考试、选课的真实入口。
+// 仅 debug 构建调用：从教务首页与「我的应用」菜单中找成绩、选课的真实入口。
 // 只输出状态码、页面长度与结构，不输出任何 Cookie、学号或成绩内容。
 const MENU_URLS = [
   'https://zfjw.lzzy.net/xtgl/index_initMenu.html',
@@ -8,7 +8,7 @@ const MENU_URLS = [
   'https://zfjw.lzzy.net/index_cxWdyy.html'
 ]
 
-const INTERESTING_PATH = /\/(?:cjcx|kwgl|xsxk)\/[A-Za-z0-9_.]+\.html(?:\?[^"'\s<>]*)?/gi
+const INTERESTING_PATH = /\/(?:cjcx|xsxk)\/[A-Za-z0-9_.]+\.html(?:\?[^"'\s<>]*)?/gi
 
 let probed = false
 
@@ -80,19 +80,6 @@ async function probeDataEndpoint(url, body) {
   }
 }
 
-function collectExamHints(body) {
-  const normalized = String(body || '').replace(/\\\//g, '/')
-  const hints = new Set()
-  for (const match of normalized.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-    const text = match[2].replace(/<[^>]+>/g, '').trim()
-    if (text.includes('考试')) hints.add(`${text} -> ${match[1]}`)
-  }
-  for (const match of normalized.matchAll(/[^"'\s<>]{0,80}考试[^"'\s<>]{0,80}/g)) {
-    if (/\.html|gnmkdm/.test(match[0])) hints.add(match[0])
-  }
-  return [...hints]
-}
-
 function collectModuleLabels(body) {
   const normalized = String(body || '').replace(/\\\//g, '/')
   const result = new Set()
@@ -107,27 +94,6 @@ function collectModuleLabels(body) {
   return [...result]
 }
 
-function describeExamPage(body) {
-  const text = String(body || '')
-  const title = text.match(/<title[^>]*>([^<]*)<\/title>/i)
-  const flags = ['考试', '未开放', '无权限', '登录', '暂无', '错误'].filter((key) => text.includes(key))
-  return `标题 ${title ? title[1].trim() : '无'}${flags.length ? ` 关键词 ${flags.join(',')}` : ''}`
-}
-
-async function probeExamPageFields() {
-  try {
-    const response = await authGet('https://zfjw.lzzy.net/kwgl/kscx_cxXsksxxIndex.html?gnmkdm=N2155')
-    const body = String(response?.body || '')
-    const names = new Set()
-    for (const match of body.matchAll(/name=["']([^"']+)["']/gi)) {
-      names.add(match[1])
-    }
-    console.log(`[probe] 考试页 ${response?.status} ${body.length}B 表单字段 ${[...names].join(',')} ${describeExamPage(body)}`)
-  } catch (error) {
-    console.log(`[probe] 考试页失败 ${error?.message || error}`)
-  }
-}
-
 export async function probeZfjwEndpoints(term) {
   if (probed) return
   probed = true
@@ -139,10 +105,6 @@ export async function probeZfjwEndpoints(term) {
       const links = collectLinks(body)
       if (links.length) {
         console.log(`[probe] 候选入口\n${links.join('\n')}`)
-      }
-      const hints = collectExamHints(body)
-      if (hints.length) {
-        console.log(`[probe] 考试线索\n${hints.join('\n')}`)
       }
       const codes = collectModuleLabels(body)
       if (codes.length) {
@@ -159,5 +121,4 @@ export async function probeZfjwEndpoints(term) {
     'https://zfjw.lzzy.net/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005',
     form
   )
-  await probeExamPageFields()
 }

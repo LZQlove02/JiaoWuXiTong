@@ -64,10 +64,6 @@ export function pad(n) {
   return String(n).padStart(2, '0')
 }
 
-export function daysUntil(dateStr, now = new Date()) {
-  return diffDays(now, dateStr)
-}
-
 export function greeting(hour = new Date().getHours()) {
   if (hour < 6) return '夜深了'
   if (hour < 11) return '早上好'

@@ -5,6 +5,7 @@
       <div class="user-main">
         <p class="user-name">{{ auth.user?.name }}</p>
         <p class="tiny">{{ auth.user?.id }} · {{ auth.user?.className }}</p>
+        <p v-if="auth.user?.major" class="tiny">{{ auth.user.major }}</p>
         <p v-if="auth.user?.college" class="tiny">{{ auth.user.college }}</p>
       </div>
     </section>

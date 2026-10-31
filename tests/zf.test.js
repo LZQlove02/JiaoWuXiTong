@@ -402,8 +402,33 @@ describe('评教记录与选课状态（只读）', () => {
     expect(authPost).toHaveBeenCalledTimes(1)
     const [url, body] = authPost.mock.calls[0]
     expect(url).toContain('xspj_cxXspjIndex.html?doType=query')
-    expect(body).toBe('page=1&rows=10&sidx=&sord=asc')
+    expect(body).toBe('page=1&rows=100&sidx=&sord=asc')
     expect(result.items[0].submitted).toBe(true)
+  })
+
+  it('getEvaluations 按 totalPage 翻页并去重', async () => {
+    authPost.mockImplementation((url, body) => {
+      const page = Number(/page=(\d+)/.exec(body)?.[1] || 1)
+      const items = page === 1
+        ? [
+            { jxb_id: 'j1', kcmc: '课程 A', tjzt: '1' },
+            { jxb_id: 'j2', kcmc: '课程 B', tjzt: '0' }
+          ]
+        : [
+            { jxb_id: 'j2', kcmc: '课程 B', tjzt: '0' },
+            { jxb_id: 'j3', kcmc: '课程 C', tjzt: '1' }
+          ]
+      return Promise.resolve({
+        status: 200,
+        body: JSON.stringify({ totalPage: 2, totalResult: 3, items })
+      })
+    })
+    const api = new ZfAcademicApi()
+    api.term = term
+    const result = await api.getEvaluations()
+    expect(authPost).toHaveBeenCalledTimes(2)
+    expect(result.items).toHaveLength(3)
+    expect(result.items[2].courseName).toBe('课程 C')
   })
 
   it('getCourseSelectionStatus 只读取选课入口页', async () => {
@@ -570,6 +595,42 @@ describe('学生门户通知与消息（只读）', () => {
     expect(detail.images).toBe(1)
     expect(detail.paragraphs).toEqual([])
   })
+
+  it('通知详情图片与附件按详情页地址解析为 zfjw 完整 URL', () => {
+    const html = `
+      <h3>附件通知</h3>
+      <div class="news_con">
+        <p>正文</p>
+        <p><img src="/xtgl/img/a.png" /></p>
+        <p><a href="../ftp/x.pdf?filename=%E9%99%84%E4%BB%B61.pdf">附件1</a></p>
+      </div>
+    `
+    const detail = parsePortalNoticeDetail(
+      html,
+      'https://zfjw.lzzy.net/xtgl/xwck_ckXw.html?xwbh=ID1'
+    )
+    expect(detail.imageUrls).toHaveLength(1)
+    expect(detail.imageUrls[0].url).toBe('https://zfjw.lzzy.net/xtgl/img/a.png')
+    expect(detail.images).toBe(1)
+    expect(detail.attachments[0].url).toBe('https://zfjw.lzzy.net/ftp/x.pdf?filename=%E9%99%84%E4%BB%B61.pdf')
+  })
+
+  it('非 zfjw 域的附件与图片不进入可下载列表', () => {
+    const html = `
+      <h3>外部链接通知</h3>
+      <div class="news_con">
+        <p>正文</p>
+        <p><img src="https://cdn.example.com/a.png" /></p>
+        <p><a href="https://ftp.lzzy.net/x.pdf?filename=附件.pdf">外部附件</a></p>
+      </div>
+    `
+    const detail = parsePortalNoticeDetail(
+      html,
+      'https://zfjw.lzzy.net/xtgl/xwck_ckXw.html?xwbh=ID1'
+    )
+    expect(detail.imageUrls).toHaveLength(0)
+    expect(detail.attachments[0].url).toBe('')
+  })
 })
 
 describe('学生门户请求与分页', () => {
@@ -620,6 +681,18 @@ describe('学生门户请求与分页', () => {
     expect(authPost.mock.calls[0][1]).toContain('flag=1&sfyy=1')
   })
 
+  it('全部消息使用 flag=0', async () => {
+    authPost.mockResolvedValue({
+      status: 200,
+      body: JSON.stringify({
+        totalResult: 1,
+        items: [{ zjxx: 'm1', xxbt: '调课提醒', cjsj: '2026-10-08 15:56:39' }]
+      })
+    })
+    await new ZfAcademicApi().getMessages('all')
+    expect(authPost.mock.calls[0][1]).toContain('flag=0&sfyy=1')
+  })
+
   it('返回登录页 HTML 时标记会话失效而不是解析失败', async () => {
     authGet.mockResolvedValue({
       status: 200,
@@ -627,12 +700,6 @@ describe('学生门户请求与分页', () => {
     })
     await expect(new ZfAcademicApi().getPortalNotices()).rejects.toMatchObject({
       sessionExpired: true
-    })
-  })
-
-  it('考试接口未接入时带 unsupported 标记', async () => {
-    await expect(new ZfAcademicApi().getExams()).rejects.toMatchObject({
-      unsupported: true
     })
   })
 })

@@ -165,10 +165,66 @@ public final class ScheduleChangeService {
         ScheduleChangeStore.writeBaseline(app, baseline);
     }
 
-    /** 后台闹钟入口：拉课表 → 对账 → 需要时发通知。 */
+    /** 后台闹钟入口：课表、成绩、门户提醒共用同一组时段，任一开启就执行。 */
     public static void checkNow(Context context) {
         Context app = context.getApplicationContext();
-        if (!ScheduleChangeStore.isEnabled(app)) return;
+        boolean scheduleEnabled = ScheduleChangeStore.isEnabled(app);
+        final boolean gradeEnabled = GradeAlertStore.isEnabled(app);
+        boolean portalEnabled = PortalAlertStore.isAnyEnabled(app);
+        if (!scheduleEnabled && !gradeEnabled && !portalEnabled) return;
+
+        // 成绩、门户抓取与课表对账各自并行，避免多段请求叠加超出广播窗口
+        Thread gradeThread = null;
+        if (gradeEnabled) {
+            gradeThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        GradeAlertService.checkNow(app);
+                    } catch (RuntimeException error) {
+                        ChangeDebug.warn(app, "成绩后台检查失败: "
+                                + error.getClass().getSimpleName());
+                    }
+                }
+            }, "grade-check");
+            gradeThread.start();
+        }
+
+        Thread portalThread = null;
+        if (portalEnabled) {
+            portalThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        PortalAlertService.checkNow(app);
+                    } catch (RuntimeException error) {
+                        ChangeDebug.warn(app, "门户提醒检查失败: "
+                                + error.getClass().getSimpleName());
+                    }
+                }
+            }, "portal-check");
+            portalThread.start();
+        }
+
+        try {
+            if (scheduleEnabled) checkSchedule(app);
+        } finally {
+            joinQuietly(gradeThread);
+            joinQuietly(portalThread);
+        }
+    }
+
+    private static void joinQuietly(Thread thread) {
+        if (thread == null) return;
+        try {
+            thread.join(9000);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** 后台课表对账，与成绩/门户检查并行执行。 */
+    private static void checkSchedule(Context app) {
         ScheduleChangeStore.Baseline baseline = ScheduleChangeStore.readBaseline(app);
         if (baseline == null || baseline.term == null) return;
 
@@ -212,7 +268,10 @@ public final class ScheduleChangeService {
             if (enabled) {
                 ScheduleCheckScheduler.scheduleAll(app);
             } else {
-                ScheduleCheckScheduler.cancelAll(app);
+                // 课表变更关闭后，如果成绩提醒仍开启，必须保留后台闹钟
+                if (!BackgroundCheckPolicy.isAnyEnabled(app)) {
+                    ScheduleCheckScheduler.cancelAll(app);
+                }
                 ScheduleChangeNotifier.cancelAll(app);
                 WidgetStore.markChangeBadge(app, false);
             }
@@ -226,6 +285,8 @@ public final class ScheduleChangeService {
         synchronized (LOCK) {
             // 先按现有条目取消通知，再清日志，否则通知栏会留下旧提醒
             ScheduleChangeNotifier.cancelAll(app);
+            GradeAlertService.clearForLogout(app);
+            PortalAlertService.clearForLogout(app);
             ScheduleChangeStore.clearBaseline(app);
             ScheduleChangeStore.writeEntries(app, new ArrayList<>(), Calendar.getInstance());
             ScheduleChangeStore.clearLastSessionExpiredDate(app);

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="schedule"
+        android:shortcutLongLabel="@string/shortcut_schedule_long"
+        android:shortcutShortLabel="@string/shortcut_schedule">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="lzpu://schedule"
+            android:targetClass="com.lzpu.jwxt.MainActivity"
+            android:targetPackage="com.lzpu.jwxt" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="grades"
+        android:shortcutLongLabel="@string/shortcut_grades_long"
+        android:shortcutShortLabel="@string/shortcut_grades">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="lzpu://grades"
+            android:targetClass="com.lzpu.jwxt.MainActivity"
+            android:targetPackage="com.lzpu.jwxt" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="notices"
+        android:shortcutLongLabel="@string/shortcut_notices_long"
+        android:shortcutShortLabel="@string/shortcut_notices">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="lzpu://notices"
+            android:targetClass="com.lzpu.jwxt.MainActivity"
+            android:targetPackage="com.lzpu.jwxt" />
+    </shortcut>
+
+</shortcuts>
