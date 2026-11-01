@@ -8,6 +8,7 @@ import {
   shortRoom,
   weekAnchorOf
 } from '../src/widget/payload'
+import { SECTION_TIMES } from '../src/utils/date'
 
 const term = {
   xnm: '2026',
@@ -212,6 +213,38 @@ describe('小组件 payload：课表', () => {
     expect(currentWeekOf({ startDate: '2026-12-01' }, morning)).toBe(1)
     expect(currentWeekOf(null, morning)).toBe(1)
     expect(currentWeekOf({ startDate: '2026-08-31' }, new Date(2027, 5, 1))).toBe(20)
+  })
+})
+
+describe('小组件 payload：自定义节次时间', () => {
+  const custom = {
+    ...SECTION_TIMES,
+    1: { start: '08:30', end: '09:10' },
+    2: { start: '09:20', end: '10:00' },
+    5: { start: '12:20', end: '13:00' },
+    7: { start: '15:40', end: '16:20' }
+  }
+
+  it('今日课程、下一节课与本周网格都使用自定义时间', () => {
+    const payload = build({ sectionTimes: custom })
+    expect(payload.today.map((item) => [item.startTime, item.endTime])).toEqual([
+      ['12:20', '13:00'],
+      ['14:30', '16:20']
+    ])
+    expect(payload.next).toMatchObject({
+      name: '形势与政策（三）',
+      dayLabel: '今天',
+      startTime: '12:20'
+    })
+    expect(payload.week.find((item) => item.weekday === 6)).toMatchObject({
+      startTime: '08:30',
+      endTime: '10:00'
+    })
+  })
+
+  it('未传 sectionTimes 时回退内置默认时间', () => {
+    expect(build().today[0]).toMatchObject({ startTime: '11:35', endTime: '12:15' })
+    expect(build().today[1]).toMatchObject({ startTime: '14:30', endTime: '15:55' })
   })
 })
 

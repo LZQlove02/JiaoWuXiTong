@@ -19,6 +19,14 @@
 - 应用备份、FileProvider、日志中泄露个人信息
 - 写操作（选课 / 退课 / 评教）被意外触发或超时重发
 
+## 认证 Cookie 处理
+
+- `zfjw.lzzy.net` 的会话 Cookie 只以 Android Keystore AES-GCM 加密保存在应用私有目录，退出登录时删除。
+- 学校「一周免登录」会话 Cookie `CASTGC` 在登录成功/取消后保留（需在登录页勾选 Keep me signed in），仅在用户明确退出登录时清除，以便切换账号；会话失效或冷启动不清除。
+- `JSESSIONID`、`XSRF-TOKEN`、`challenge_cookie`、`_shmas`、`_upstream_id` 等一次性挑战与会话 Cookie 每次登录后清除，避免“设备请求校验失败”。
+- 约一年有效期的设备信任 Cookie `_shmat` 保留服务端原始属性，不由 App 重写或延长有效期。
+- 设备信任 Cookie 不写入应用自有存储，只存在 WebView Cookie 库；清除应用数据或卸载即删除。应用不保存账号密码。
+
 ## 处理约定
 
 - 收到报告后尽力在 7 天内确认并回复。

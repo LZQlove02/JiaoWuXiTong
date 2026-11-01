@@ -29,6 +29,7 @@ import UpdateDialog from './components/UpdateDialog.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
 import { useChangesStore } from './stores/changes'
+import { useScheduleSettingsStore } from './stores/scheduleSettings'
 import { useUiStore } from './stores/ui'
 import { useUpdateStore } from './stores/update'
 import { acceptDisclaimer, isDisclaimerAccepted } from './utils/disclaimer'
@@ -41,6 +42,7 @@ const ui = useUiStore()
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const changes = useChangesStore()
+const scheduleSettings = useScheduleSettingsStore()
 const update = useUpdateStore()
 const showTabBar = computed(() => route.meta.tab === true)
 const mainRef = ref(null)
@@ -116,6 +118,7 @@ function installWidgetSync() {
     grades: academic.grades,
     messages: academic.messages,
     portalNotices: academic.portalNotices,
+    sectionTimes: scheduleSettings.times,
     changeUnread: changes.unread,
     changeEnabled: changes.enabled,
     changeKnown: changes.loaded && !changes.error
@@ -128,6 +131,8 @@ function installWidgetSync() {
       () => academic.grades,
       () => academic.messages,
       () => academic.portalNotices,
+      () => scheduleSettings.times,
+      () => scheduleSettings.periodCount,
       () => changes.unread,
       () => changes.enabled
     ],
@@ -139,6 +144,14 @@ function installWidgetSync() {
   )
   // 恢复结束后无论登录与否都写一次，保证组件状态和 App 一致
   auth.bootstrap().finally(() => syncWidget(context))
+  // 改完节次时间重新对账一次：原生基线里存的是上次传入的时段，
+  // 不重传的话后台检查仍会按旧时间判断「课程是否已结束」
+  watch(
+    () => scheduleSettings.times,
+    () => {
+      if (auth.isLoggedIn) changes.applyFromSchedule(academic.schedule)
+    }
+  )
   // 热启动回到前台：原生可能已把 payload 写成 stale（跨周降级），此时 store 没变、
   // 普通同步会跳过，这里强制重写一次，组件才会从「打开 App 同步课表」恢复。
   // 会话恢复期间不能写，否则冷启动会先写一份 loggedIn=false，桌面闪一下「请登录」

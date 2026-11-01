@@ -44,7 +44,7 @@
       <div v-if="scheduleLoading && !schedule" class="loading">正在加载今日课程…</div>
       <div v-else-if="todayCourses.length" class="today-list">
         <div v-for="item in todayCourses" :key="item.courseId + item.startSection" class="course-row">
-          <span class="course-time">{{ sectionRange(item.startSection, item.endSection) }}</span>
+          <span class="course-time">{{ sectionRange(item.startSection, item.endSection, scheduleSettings.times) }}</span>
           <div class="course-main">
             <p class="course-name">{{ courseName(item.courseId) }}</p>
             <p class="tiny">{{ item.room }}</p>
@@ -160,6 +160,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAcademicStore } from '../stores/academic'
+import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { formatDate, formatDateTime, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
 import { mergeEntryOrder, movePath } from '../utils/entryOrder'
 import AppIcon from '../components/AppIcon.vue'
@@ -168,6 +169,7 @@ import ChangeBanner from '../components/ChangeBanner.vue'
 
 const auth = useAuthStore()
 const academic = useAcademicStore()
+const scheduleSettings = useScheduleSettingsStore()
 const router = useRouter()
 const {
   schedule,

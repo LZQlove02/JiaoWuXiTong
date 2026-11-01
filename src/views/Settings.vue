@@ -45,6 +45,18 @@
       </router-link>
     </section>
 
+    <h2 class="section-title">课表时间</h2>
+    <section class="card settings">
+      <router-link class="setting-row" to="/schedule-settings">
+        <span class="setting-left"><AppIcon name="calendar" />节次时间与每日节数</span>
+        <span class="tiny">{{ scheduleSettings.periodCount }} 节</span>
+        <AppIcon name="chevron-right" />
+      </router-link>
+      <p class="setting-note">
+        逐节修改起止时间；课表、桌面组件与变更提醒同步使用。有更晚的课会自动扩展显示。
+      </p>
+    </section>
+
     <h2 class="section-title">成绩提醒</h2>
     <section class="card settings">
       <div class="setting-row">
@@ -179,11 +191,13 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { App as CapApp } from '@capacitor/app'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '../stores/ui'
 import { useChangesStore } from '../stores/changes'
 import { useGradeAlertStore } from '../stores/gradeAlert'
 import { usePortalAlertStore } from '../stores/portalAlert'
+import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { useUpdateStore } from '../stores/update'
 import { clearAuthDownloads, clearPublicDownloads } from '../api/nativeHttp'
 import { getStorageInfo } from '../native/supportBridge'
@@ -202,6 +216,7 @@ const ui = useUiStore()
 const changes = useChangesStore()
 const gradeAlert = useGradeAlertStore()
 const portalAlert = usePortalAlertStore()
+const scheduleSettings = useScheduleSettingsStore()
 const update = useUpdateStore()
 const router = useRouter()
 
@@ -220,6 +235,9 @@ const savingTimes = ref(false)
 const localBytes = ref(0)
 const nativeBytes = ref(0)
 const widgets = ref([])
+let widgetRetryTimer = null
+let appStateListener = null
+let disposed = false
 
 const storageLabel = computed(() => formatBytes(localBytes.value + nativeBytes.value))
 const widgetStyleLabels = {
@@ -261,6 +279,7 @@ async function cycleWidgetStyle(widget) {
 async function onRefreshWidgets() {
   try {
     await refreshWidgetsNative()
+    await loadWidgets()
     showToast('已刷新桌面组件')
   } catch (error) {
     showToast(error?.message || '桌面组件刷新失败')
@@ -301,7 +320,14 @@ function closeDisclaimer() {
 }
 
 onBeforeUnmount(() => {
+  disposed = true
   if (disclaimerOpen.value) ui.clearOverlayCloser()
+  clearTimeout(widgetRetryTimer)
+  widgetRetryTimer = null
+  if (appStateListener) {
+    appStateListener.remove()
+    appStateListener = null
+  }
 })
 
 // 清理范围：公开内容缓存 + 个人数据缓存 + 已下载附件/图片，不动登录态与主题
@@ -416,6 +442,21 @@ onMounted(async () => {
   portalAlert.init()
   refreshStorage()
   loadWidgets()
+  // 组件刚添加/系统绑定有延迟时，首屏可能少列；短延时再读一次
+  widgetRetryTimer = setTimeout(loadWidgets, 800)
+  try {
+    const listener = await CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) loadWidgets()
+    })
+    // 页面在监听注册完成前已卸载时立即移除，避免泄漏
+    if (disposed) {
+      listener.remove()
+    } else {
+      appStateListener = listener
+    }
+  } catch (error) {
+    // Web 预览或无原生监听时忽略
+  }
   await update.loadVersion()
 })
 </script>

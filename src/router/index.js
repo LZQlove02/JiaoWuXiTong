@@ -15,6 +15,7 @@ import Calendar from '../views/Calendar.vue'
 import Evaluation from '../views/Evaluation.vue'
 import CourseSelection from '../views/CourseSelection.vue'
 import Settings from '../views/Settings.vue'
+import ScheduleSettings from '../views/ScheduleSettings.vue'
 import Changes from '../views/Changes.vue'
 import About from '../views/About.vue'
 import Feedback from '../views/Feedback.vue'
@@ -30,6 +31,12 @@ const routes = [
     name: 'settings',
     component: Settings,
     meta: { title: '设置' }
+  },
+  {
+    path: '/schedule-settings',
+    name: 'schedule-settings',
+    component: ScheduleSettings,
+    meta: { title: '课表时间' }
   },
   {
     path: '/changes',

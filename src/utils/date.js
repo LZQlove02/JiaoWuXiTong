@@ -10,14 +10,18 @@ export const SECTION_TIMES = {
   9: { start: '17:00', end: '17:40' },
   10: { start: '19:30', end: '20:10' },
   11: { start: '20:15', end: '20:55' },
-  12: { start: '21:00', end: '21:40' }
+  12: { start: '21:00', end: '21:40' },
+  // 13-15 节默认补齐，用户可在「课表时间」页自行修改
+  13: { start: '21:45', end: '22:25' },
+  14: { start: '22:30', end: '23:10' },
+  15: { start: '23:15', end: '23:55' }
 }
 
 export const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日']
 
-export function sectionRange(start, end) {
-  const first = SECTION_TIMES[start]
-  const last = SECTION_TIMES[end]
+export function sectionRange(start, end, sectionTimes = SECTION_TIMES) {
+  const first = sectionTimes[start]
+  const last = sectionTimes[end]
   if (!first || !last) return ''
   return `${first.start}-${last.end}`
 }

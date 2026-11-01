@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { SECTION_TIMES } from '../utils/date'
 import { useAuthStore } from './auth'
+import { useScheduleSettingsStore } from './scheduleSettings'
 import {
   addScheduleChangeListener,
   applyScheduleChange,
@@ -20,6 +20,8 @@ import {
 // 变更状态全部来自原生引擎；Web 端（无插件）保持空态，不影响课表等主流程。
 export const useChangesStore = defineStore('changes', () => {
   const auth = useAuthStore()
+  // 变更提醒里的节次时间与课表设置保持一致，改完设置重新对账即生效
+  const scheduleSettings = useScheduleSettingsStore()
   const entries = ref([])
   const unread = ref(0)
   const enabled = ref(true)
@@ -114,7 +116,7 @@ export const useChangesStore = defineStore('changes', () => {
           xqm: String(term.xqm),
           startDate: String(term.startDate)
         },
-        sectionTimes: SECTION_TIMES
+        sectionTimes: scheduleSettings.times
       })
       applyState(state)
       if (state) {

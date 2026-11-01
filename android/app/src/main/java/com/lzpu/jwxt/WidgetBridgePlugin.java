@@ -68,9 +68,9 @@ public class WidgetBridgePlugin extends Plugin {
         JSONArray widgets = new JSONArray();
         if (manager != null) {
             try {
-                addWidgets(manager, NextClassWidgetProvider.class, "next", "下一节课", widgets);
-                addWidgets(manager, TodayWidgetProvider.class, "today", "今日课程", widgets);
-                addWidgets(manager, WeekWidgetProvider.class, "week", "本周课表", widgets);
+                addWidgets(manager, NextClassWidgetProvider.class, "next", "下一节课（2×2）", widgets);
+                addWidgets(manager, TodayWidgetProvider.class, "today", "今日课程（4×2）", widgets);
+                addWidgets(manager, WeekWidgetProvider.class, "week", "本周课表（4×4）", widgets);
             } catch (JSONException error) {
                 call.reject("WIDGET_LIST_FAILED");
                 return;

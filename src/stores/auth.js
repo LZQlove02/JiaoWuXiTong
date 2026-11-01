@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { resetAcademicApi, setAcademicApi } from '../api'
 import { ZfAcademicApi, clearScheduleSnapshot } from '../api/zf'
-import { clearAuthCookies, loadAuthCookies } from '../api/nativeHttp'
+import { clearAuthCookies, clearSsoSession, loadAuthCookies } from '../api/nativeHttp'
 import { clearScheduleChange } from '../native/scheduleChangeBridge'
 import { setSessionExpiredHandler } from '../utils/sessionExpiry'
 import { clearDataCaches } from '../utils/dataCache'
@@ -148,6 +148,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    // 明确退出登录才清 CASTGC；会话失效走 clearLocalSession，保留学校一周免登录
+    try {
+      await clearSsoSession()
+    } catch (error) {
+      // 原生清理失败不影响退出登录本身
+    }
     await clearLocalSession()
     await resetAcademic()
   }

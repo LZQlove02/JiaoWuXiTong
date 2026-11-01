@@ -68,6 +68,7 @@
         <!-- 桌面小组件：下一节课 -->
         <receiver
             android:name=".widget.NextClassWidgetProvider"
+            android:label="@string/widget_next_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -80,6 +81,7 @@
         <!-- 桌面小组件：今日课程 -->
         <receiver
             android:name=".widget.TodayWidgetProvider"
+            android:label="@string/widget_today_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -92,6 +94,7 @@
         <!-- 桌面小组件：本周课表 -->
         <receiver
             android:name=".widget.WeekWidgetProvider"
+            android:label="@string/widget_week_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

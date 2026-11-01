@@ -84,12 +84,13 @@ export function shortRoom(room) {
 }
 
 // sessions 里没有课程名与颜色，必须按 courseId join 课程表
-function classItem(session, courses) {
+// sectionTimes 来自「课表时间」设置，缺省回退内置默认时间
+function classItem(session, courses, sectionTimes = SECTION_TIMES) {
   const course = courses.get(session.courseId) || {}
   const start = Number(session.startSection) || 0
   const end = Number(session.endSection) || 0
-  const first = SECTION_TIMES[start]
-  const last = SECTION_TIMES[end]
+  const first = sectionTimes[start]
+  const last = sectionTimes[end]
   return {
     start,
     end,
@@ -109,12 +110,12 @@ function byStart(a, b) {
 
 // 下一节课：今天还没开始上课的最近一节；进行中的课不算「下一节」，也不越过它顺延到明天。
 // 今天没有未开始的课，才顺延到本周内最近有课的一天。
-export function pickNextClass(weekSessions, courses, weekday, nowMinutes) {
+export function pickNextClass(weekSessions, courses, weekday, nowMinutes, sectionTimes = SECTION_TIMES) {
   const today = weekSessions
     .filter((session) => Number(session.weekday) === weekday)
     .sort(byStart)
   for (const session of today) {
-    const item = classItem(session, courses)
+    const item = classItem(session, courses, sectionTimes)
     const startAt = toMinutes(item.startTime)
     // 时间缺失时按「还没开始」处理，宁可显示也不空着
     if (startAt === null || startAt > nowMinutes) return { ...item, dayLabel: '今天' }
@@ -125,7 +126,7 @@ export function pickNextClass(weekSessions, courses, weekday, nowMinutes) {
       .filter((session) => Number(session.weekday) === target)
       .sort(byStart)
     if (!sessions.length) continue
-    const item = classItem(sessions[0], courses)
+    const item = classItem(sessions[0], courses, sectionTimes)
     return { ...item, dayLabel: offset === 1 ? '明天' : `周${WEEKDAY_LABELS[target - 1] || ''}` }
   }
   return null
@@ -179,6 +180,7 @@ function noticeView(notices) {
  * @param {object|null} input.portalNotices  academic.portalNotices
  * @param {number} [input.changeUnread]  课表变更未读数
  * @param {boolean} [input.changeEnabled] 课表变更提醒开关
+ * @param {object} [input.sectionTimes] 自定义节次时间，缺省用内置 SECTION_TIMES
  * @param {Date} [input.now]
  */
 export function buildWidgetPayload(input = {}) {
@@ -198,11 +200,12 @@ export function buildWidgetPayload(input = {}) {
   const weekSessions = sessionsInWeek(schedule?.sessions, week)
   const weekday = getWeekday(now)
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const sectionTimes = input.sectionTimes || SECTION_TIMES
 
   const today = weekSessions
     .filter((session) => Number(session.weekday) === weekday)
     .sort(byStart)
-    .map((session) => classItem(session, courses))
+    .map((session) => classItem(session, courses, sectionTimes))
 
   const remainingToday = today.filter((item) => {
     const endAt = toMinutes(item.endTime)
@@ -210,7 +213,7 @@ export function buildWidgetPayload(input = {}) {
   }).length
 
   const weekGrid = weekSessions
-    .map((session) => classItem(session, courses))
+    .map((session) => classItem(session, courses, sectionTimes))
     .sort((a, b) => a.weekday - b.weekday || a.start - b.start)
 
   return {
@@ -228,7 +231,7 @@ export function buildWidgetPayload(input = {}) {
     // 区分「课表还没加载」与「本周确实没课」
     scheduleLoaded: Boolean(schedule && Array.isArray(schedule.sessions)),
     today,
-    next: pickNextClass(weekSessions, courses, weekday, nowMinutes),
+    next: pickNextClass(weekSessions, courses, weekday, nowMinutes, sectionTimes),
     remainingToday,
     week: weekGrid,
     messages: messageView(input.messages),

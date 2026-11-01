@@ -31,6 +31,8 @@ import java.util.Map;
 public class SsoLoginActivity extends Activity {
 
     private static final String AUTH_SERVER_HOST = "authserver.lzzy.net";
+    private static final String SSO_PREFS = "lzpu_sso";
+    private static final String KEY_COOKIE_RESET = "cookie_cleanup_v3";
     private static final String LOGIN_URL =
             "https://authserver.lzzy.net/authserver/login"
                     + "?service=http%3A%2F%2Fzfjw.lzzy.net%2Fsso%2Fjziotlogin";
@@ -106,7 +108,27 @@ public class SsoLoginActivity extends Activity {
             }
         });
 
-        webView.loadUrl(LOGIN_URL);
+        // 升级后首次打开登录页清理一次一次性安全挑战 Cookie（challenge_cookie/_shmas 等），
+        // 保留 `_shmat` 设备信任与 CASTGC（学校“一周免登录”）。
+        if (!getSharedPreferences(SSO_PREFS, MODE_PRIVATE)
+                .getBoolean(KEY_COOKIE_RESET, false)) {
+            SsoCookieCleaner.expireTransient(cookieManager);
+            SsoCookieCleaner.expireZfjw(cookieManager);
+            cookieManager.flush();
+            getSharedPreferences(SSO_PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_COOKIE_RESET, true)
+                    .apply();
+            webView.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    // 用户可能在这 300ms 内退出登录页，WebView 已在 onDestroy 置空
+                    if (webView != null) webView.loadUrl(LOGIN_URL);
+                }
+            }, 300);
+        } else {
+            webView.loadUrl(LOGIN_URL);
+        }
     }
 
     private boolean isAllowed(Uri uri) {
@@ -238,28 +260,36 @@ public class SsoLoginActivity extends Activity {
             header.append(entry.getKey()).append('=').append(entry.getValue());
         }
 
-        Intent data = new Intent();
+        final Intent data = new Intent();
         data.putExtra("cookieHeader", header.toString());
         data.putExtra("finalUrl", webView.getUrl());
-        clearSessionData();
-        setResult(RESULT_OK, data);
-        finish();
+        clearSessionData(new Runnable() {
+            @Override
+            public void run() {
+                setResult(RESULT_OK, data);
+                finish();
+            }
+        });
     }
 
     /**
-     * 登录流程结束后清空 WebView 持有的 Cookie 与页面缓存，
-     * 避免会话明文残留在应用私有目录。不清 WebStorage，否则会连带清掉
-     * 应用自身的 localStorage（主题、导入数据、课表快照）。
+     * 登录流程结束后清除一次性安全挑战与教务会话，保留 CASTGC（学校“一周免登录”）
+     * 与 `_shmat` 设备信任。不再整体 removeAllCookies / 重写设备 Cookie，
+     * 避免同名重复或过期挑战值导致“设备请求校验失败”。
+     * 不清 WebStorage，否则会连带清掉应用自身的 localStorage（主题、导入数据、课表快照）。
      */
-    private void clearSessionData() {
+    private void clearSessionData(Runnable onDone) {
         CookieManager cookieManager = CookieManager.getInstance();
-        cookieManager.removeAllCookies(null);
+        SsoCookieCleaner.expireTransient(cookieManager);
+        SsoCookieCleaner.expireZfjw(cookieManager);
         cookieManager.flush();
-        if (webView == null) return;
-        webView.clearCache(true);
-        webView.clearHistory();
-        webView.clearFormData();
-        webView.loadUrl("about:blank");
+        if (webView != null) {
+            webView.clearCache(true);
+            webView.clearHistory();
+            webView.clearFormData();
+            webView.loadUrl("about:blank");
+        }
+        if (onDone != null) onDone.run();
     }
 
     private void collectCookies(Map<String, String> target, String url) {
@@ -277,9 +307,13 @@ public class SsoLoginActivity extends Activity {
     private void cancel() {
         if (finished) return;
         finished = true;
-        clearSessionData();
-        setResult(RESULT_CANCELED);
-        finish();
+        clearSessionData(new Runnable() {
+            @Override
+            public void run() {
+                setResult(RESULT_CANCELED);
+                finish();
+            }
+        });
     }
 
     @Override

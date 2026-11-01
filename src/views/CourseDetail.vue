@@ -27,7 +27,7 @@
           <div class="session-main">
             <p class="session-time">
               第 {{ item.startSection }}-{{ item.endSection }} 节
-              <span class="tiny">（{{ sectionRange(item.startSection, item.endSection) }}）</span>
+              <span class="tiny">（{{ sectionRange(item.startSection, item.endSection, scheduleSettings.times) }}）</span>
               <span v-if="item.inWeek" class="week-pill">本周</span>
             </p>
             <p class="tiny">{{ item.room }} · {{ formatWeeks(item.weeks) }}</p>
@@ -49,12 +49,14 @@ import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
+import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { WEEKDAY_LABELS, sectionRange } from '../utils/date'
 import BackBar from '../components/BackBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const route = useRoute()
 const academic = useAcademicStore()
+const scheduleSettings = useScheduleSettingsStore()
 const { course } = storeToRefs(academic)
 
 const selectedWeek = computed(() => {

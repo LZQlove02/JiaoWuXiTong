@@ -48,6 +48,12 @@ export async function loginWithSso() {
   return SsoLogin.login()
 }
 
+// 明确退出登录时清 CASTGC 一周会话；会话失效时不调用，保留免登录能力
+export async function clearSsoSession() {
+  if (!Capacitor.isNativePlatform()) return
+  return SsoLogin.clearSession()
+}
+
 export async function setAuthCookies(cookie) {
   if (!Capacitor.isNativePlatform()) {
     throw new Error('原生 HTTP 插件仅在 App 内可用')

@@ -46,7 +46,10 @@
     </div>
 
     <div v-else class="timetable-wrap card">
-      <div class="timetable">
+      <div
+        class="timetable"
+        :style="{ gridTemplateRows: `44px repeat(${totalSections}, 56px)` }"
+      >
         <div class="corner"></div>
         <div
           v-for="(label, index) in weekdayLabels"
@@ -58,10 +61,10 @@
           <span class="day-date">{{ dayDates[index] }}</span>
         </div>
 
-        <template v-for="section in 12" :key="`t${section}`">
+        <template v-for="section in totalSections" :key="`t${section}`">
           <div class="time-cell" :style="{ gridRow: section + 1 }">
             <span class="section-num">{{ section }}</span>
-            <span class="section-time">{{ SECTION_TIMES[section].start }}</span>
+            <span class="section-time">{{ sectionStart(section) }}</span>
           </div>
         </template>
 
@@ -144,8 +147,9 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAcademicStore } from '../stores/academic'
 import { useChangesStore } from '../stores/changes'
+import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { useUiStore } from '../stores/ui'
-import { SECTION_TIMES, WEEKDAY_LABELS, formatDate, getWeekNumber, getWeekday } from '../utils/date'
+import { WEEKDAY_LABELS, formatDate, getWeekNumber, getWeekday } from '../utils/date'
 import { buildChangeMarks, markOf } from '../utils/changeMarks'
 import { changeMeta } from '../utils/changeLabels'
 import AppIcon from '../components/AppIcon.vue'
@@ -153,6 +157,7 @@ import EmptyState from '../components/EmptyState.vue'
 
 const academic = useAcademicStore()
 const changes = useChangesStore()
+const scheduleSettings = useScheduleSettingsStore()
 const ui = useUiStore()
 const router = useRouter()
 const { schedule, currentTerm, scheduleLoading, errors } = storeToRefs(academic)
@@ -216,6 +221,16 @@ const changeGhosts = computed(() => {
     (entry) => entry.from && !occupiedSlots.value.has(`${entry.from.weekday}-${entry.from.startSection}`)
   )
 })
+const maxUsedSection = computed(() => {
+  const sessionEnds = visibleSessions.value.map((item) => Number(item.endSection) || 0)
+  const ghostEnds = changeGhosts.value.map((entry) => Number(entry.from?.endSection) || 0)
+  return Math.max(0, ...sessionEnds, ...ghostEnds)
+})
+const totalSections = computed(() => scheduleSettings.visibleRows(maxUsedSection.value))
+
+function sectionStart(section) {
+  return scheduleSettings.timeFor(section).start || '--:--'
+}
 const hasChangeMarks = computed(
   () => showChangeMarks.value
     && (Object.keys(changeMarks.value.marks).length > 0 || changeGhosts.value.length > 0)
@@ -374,7 +389,6 @@ onUnmounted(() => {
 .timetable {
   display: grid;
   grid-template-columns: 40px repeat(7, 72px);
-  grid-template-rows: 44px repeat(12, 56px);
   gap: 3px;
   min-width: 564px;
   position: relative;
