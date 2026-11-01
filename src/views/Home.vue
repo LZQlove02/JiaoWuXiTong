@@ -66,7 +66,7 @@
 
     <div class="section-head">
       <h2 class="section-title">快捷入口</h2>
-      <span class="tiny sort-hint">长按拖动排序 · Alt+方向键</span>
+      <span class="tiny sort-hint">长按拖动排序</span>
     </div>
     <div
       class="grid"
@@ -80,7 +80,7 @@
         :data-path="entry.path"
         class="entry card"
         :class="{ 'entry--dragging': drag.active && drag.path === entry.path }"
-        :aria-label="`${entry.label}，${entry.desc}。长按拖动排序，或按 Alt 加方向键移动`"
+        :aria-label="`${entry.label}，${entry.desc}。长按拖动排序`"
         @click="goEntry(entry)"
         @keydown="onEntryKeydown($event, entry)"
       >
