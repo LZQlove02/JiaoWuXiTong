@@ -34,6 +34,8 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const loading = ref(false)
   const restoring = ref(false)
+  // 本次会话是否刚完成登录：仅用于一次性欢迎提示，冷启动恢复会话不算
+  const justLoggedIn = ref(false)
   const isLoggedIn = computed(() => Boolean(user.value))
   let bootstrapPromise = null
   let expiringPromise = null
@@ -51,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearDataCaches()
     resetAcademicApi()
     user.value = null
+    justLoggedIn.value = false
   }
 
   // 会话失效统一出口：任一业务请求判定 401/登录页后，只清理一次并回登录页
@@ -136,6 +139,7 @@ export const useAuthStore = defineStore('auth', () => {
       setAcademicApi(zf)
       await resetAcademic()
       user.value = profile
+      justLoggedIn.value = true
       return profile
     } catch (error) {
       // 登录后校验未通过时丢弃这次无效会话，避免把坏 Cookie 留到下次启动
@@ -158,6 +162,12 @@ export const useAuthStore = defineStore('auth', () => {
     await resetAcademic()
   }
 
+  function consumeJustLoggedIn() {
+    if (!justLoggedIn.value) return false
+    justLoggedIn.value = false
+    return true
+  }
+
   return {
     user,
     loading,
@@ -165,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoggedIn,
     bootstrap,
     loginWithSso,
-    logout
+    logout,
+    consumeJustLoggedIn
   }
 })

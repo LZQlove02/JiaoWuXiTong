@@ -151,6 +151,8 @@
         <span class="tiny">{{ dragEntry.desc }}</span>
       </div>
     </Teleport>
+
+    <WelcomeTip v-if="showWelcomeTip" @close="showWelcomeTip = false" />
   </div>
 </template>
 
@@ -163,14 +165,17 @@ import { useAcademicStore } from '../stores/academic'
 import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { formatDate, formatDateTime, getWeekNumber, getWeekday, greeting, sectionRange } from '../utils/date'
 import { mergeEntryOrder, movePath } from '../utils/entryOrder'
+import { isWelcomeTipSeen, markWelcomeTipSeen } from '../utils/welcomeTip'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ChangeBanner from '../components/ChangeBanner.vue'
+import WelcomeTip from '../components/WelcomeTip.vue'
 
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const scheduleSettings = useScheduleSettingsStore()
 const router = useRouter()
+const showWelcomeTip = ref(false)
 const {
   schedule,
   scheduleLoading,
@@ -581,7 +586,16 @@ async function refreshHome() {
   }
 }
 
+// 仅在本次真正登录后提示一次；冷启动恢复会话、老用户升级都不打扰
+function maybeShowWelcomeTip() {
+  if (isWelcomeTipSeen()) return
+  if (!auth.consumeJustLoggedIn()) return
+  showWelcomeTip.value = true
+  markWelcomeTipSeen()
+}
+
 onMounted(async () => {
+  maybeShowWelcomeTip()
   clockTimer = setInterval(() => {
     now.value = new Date()
   }, 60 * 1000)

@@ -167,6 +167,10 @@
         <span class="setting-left"><AppIcon name="refresh" />检查更新</span>
         <span class="tiny">{{ updateLabel }}</span>
       </button>
+      <router-link class="setting-row" to="/tutorial">
+        <span class="setting-left"><AppIcon name="guide" />使用教程</span>
+        <AppIcon name="chevron-right" />
+      </router-link>
       <button class="setting-row" @click="showAbout">
         <span class="setting-left"><AppIcon name="info" />关于</span>
         <span v-if="update.currentVersion" class="tiny">v{{ update.currentVersion }}</span>

@@ -17,6 +17,7 @@ import CourseSelection from '../views/CourseSelection.vue'
 import Settings from '../views/Settings.vue'
 import ScheduleSettings from '../views/ScheduleSettings.vue'
 import Changes from '../views/Changes.vue'
+import Tutorial from '../views/Tutorial.vue'
 import About from '../views/About.vue'
 import Feedback from '../views/Feedback.vue'
 
@@ -43,6 +44,12 @@ const routes = [
     name: 'changes',
     component: Changes,
     meta: { title: '课表变更' }
+  },
+  {
+    path: '/tutorial',
+    name: 'tutorial',
+    component: Tutorial,
+    meta: { title: '使用教程' }
   },
   {
     path: '/about',
