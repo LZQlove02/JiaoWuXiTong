@@ -23,12 +23,12 @@ describe('首启免责声明同意状态', () => {
 
   it('同意后按当前声明版本记录', () => {
     expect(acceptDisclaimer()).toBe(true)
-    expect(localStorage.getItem('lzpu.disclaimer.accepted')).toBe(DISCLAIMER_VERSION)
+    expect(localStorage.getItem('jiaowu.disclaimer.accepted')).toBe(DISCLAIMER_VERSION)
     expect(isDisclaimerAccepted()).toBe(true)
   })
 
   it('旧声明版本不通过', () => {
-    localStorage.setItem('lzpu.disclaimer.accepted', '0')
+    localStorage.setItem('jiaowu.disclaimer.accepted', '0')
     expect(isDisclaimerAccepted()).toBe(false)
   })
 

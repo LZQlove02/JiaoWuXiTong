@@ -3,10 +3,10 @@
     <BackBar title="关于" />
 
     <div class="brand">
-      <img class="logo" src="../assets/app-icon.png" alt="柳职教务" />
-      <h1 class="app-name">柳职教务</h1>
+      <img class="logo" src="../assets/app-icon.png" alt="教务助手" />
+      <h1 class="app-name">教务助手</h1>
       <p class="app-version">{{ versionText }}</p>
-      <p class="app-sub">柳州职业技术大学 · 教务助手（非官方）</p>
+      <p class="app-sub">教务助手（非官方） · 只读客户端</p>
     </div>
   </div>
 </template>

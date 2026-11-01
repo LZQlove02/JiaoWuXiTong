@@ -2,7 +2,7 @@
   <div class="welcome-mask" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
     <div class="welcome-card">
       <img class="welcome-logo" src="../assets/app-icon.png" alt="" />
-      <h2 id="welcome-title" class="welcome-title">欢迎使用柳职教务</h2>
+      <h2 id="welcome-title" class="welcome-title">欢迎使用教务助手</h2>
       <p class="welcome-sub">第一次使用，先看看这几条</p>
       <ul class="welcome-list">
         <li>在统一认证页勾选 Keep me signed in，可保留约一周免登录。</li>

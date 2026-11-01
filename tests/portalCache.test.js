@@ -22,7 +22,7 @@ describe('学生门户缓存', () => {
   })
 
   it('内容损坏时返回 null，不抛错', () => {
-    localStorage.setItem('lzpu.portal.v1.notices.index', '{bad json')
+    localStorage.setItem('jiaowu.portal.v1.notices.index', '{bad json')
     expect(readPortalCache('notices.index', PORTAL_NOTICE_TTL)).toBeNull()
   })
 })

@@ -3,9 +3,9 @@
 export const PERSONAL_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 export const PUBLIC_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
 
-const PERSONAL_PREFIXES = ['lzpu.data.v1.', 'lzpu.portal.v1.']
-const PUBLIC_PREFIX = 'lzpu.cache.public.v1.'
-const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
+const PERSONAL_PREFIXES = ['jiaowu.data.v1.', 'jiaowu.portal.v1.']
+const PUBLIC_PREFIX = 'jiaowu.cache.public.v1.'
+const SNAPSHOT_KEY = 'jiaowu.zf.snapshot.v1'
 
 function isExpired(value, limit, now) {
   const time = typeof value === 'number' ? value : Date.parse(value)

@@ -4,7 +4,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 
 const AppTheme = registerPlugin('AppTheme')
-const STORAGE_KEY = 'lzpu.theme'
+const STORAGE_KEY = 'jiaowu.theme'
 
 export const useUiStore = defineStore('ui', () => {
   const theme = ref('system')

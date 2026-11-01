@@ -56,8 +56,8 @@ describe('diagnostics', () => {
 
 describe('feedback', () => {
   it('主题带版本且不超长', () => {
-    expect(buildFeedbackSubject('1.3.0')).toBe('柳职教务使用反馈（v1.3.0）')
-    expect(buildFeedbackSubject('')).toBe('柳职教务使用反馈')
+    expect(buildFeedbackSubject('1.3.0')).toBe('教务助手使用反馈（v1.3.0）')
+    expect(buildFeedbackSubject('')).toBe('教务助手使用反馈')
     expect(buildFeedbackSubject('x'.repeat(300)).length).toBe(SUBJECT_LIMIT)
   })
 
@@ -81,7 +81,7 @@ describe('feedback', () => {
   })
 
   it('邮件链接编码', () => {
-    const link = buildFeedbackMailto('柳职教务使用反馈（v1.3.0）', '问题描述\n换行 & 特殊字符')
+    const link = buildFeedbackMailto('教务助手使用反馈（v1.3.0）', '问题描述\n换行 & 特殊字符')
     expect(link.startsWith(`mailto:${FEEDBACK_EMAIL}?subject=`)).toBe(true)
     expect(link).not.toContain(' ')
     expect(link).not.toContain('\n')

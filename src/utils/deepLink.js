@@ -1,4 +1,4 @@
-// 桌面小组件/通知深链：lzpu://schedule、lzpu://notice/<id> 等。
+// 桌面小组件/通知深链：jiaowu://schedule、jiaowu://notice/<id> 等。
 // 单独抽出来是为了可单测 —— App.vue 里只剩调用。
 export const DEEP_LINK_PATHS = {
   schedule: '/schedule',
@@ -27,7 +27,7 @@ export function deepLinkPath(url) {
   if (!url) return ''
   const text = String(url).trim()
 
-  const dynamic = /^lzpu:(?:\/\/)?(notice|course|message)\/([^/?#]+)/i.exec(text)
+  const dynamic = /^jiaowu:(?:\/\/)?(notice|course|message)\/([^/?#]+)/i.exec(text)
   if (dynamic) {
     const id = safeId(dynamic[2])
     if (!id) return ''
@@ -37,7 +37,7 @@ export function deepLinkPath(url) {
     return `/messages?id=${encodeURIComponent(id)}`
   }
 
-  const match = /^lzpu:(?:\/\/)?([^/?#]+)(?:[/?#].*)?$/i.exec(text)
+  const match = /^jiaowu:(?:\/\/)?([^/?#]+)(?:[/?#].*)?$/i.exec(text)
   if (!match) return ''
   return DEEP_LINK_PATHS[match[1].toLowerCase()] || ''
 }

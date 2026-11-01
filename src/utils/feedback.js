@@ -4,7 +4,7 @@ export const SUBJECT_LIMIT = 120
 export const BODY_LIMIT = 6000
 
 export function buildFeedbackSubject(version = '') {
-  const base = '柳职教务使用反馈'
+  const base = '教务助手使用反馈'
   const subject = version ? `${base}（v${version}）` : base
   return subject.slice(0, SUBJECT_LIMIT)
 }

@@ -19,7 +19,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:name=".LzpuApplication"
+        android:name=".JiaowuApplication"
         android:allowBackup="false"
         android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher"
@@ -41,12 +41,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- 桌面小组件点击：lzpu://schedule 等深链 -->
+            <!-- 桌面小组件点击：jiaowu://schedule 等深链 -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="lzpu" />
+                <data android:scheme="jiaowu" />
             </intent-filter>
 
             <!-- 长按图标快捷方式：课表 / 成绩 / 通知 -->

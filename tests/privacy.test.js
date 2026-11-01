@@ -31,14 +31,14 @@ describe('隐私政策同意状态', () => {
 
   it('同意后按当前版本记录，撤回后失效', () => {
     expect(acceptPrivacy()).toBe(true)
-    expect(localStorage.getItem('lzpu.privacy.accepted')).toBe(PRIVACY_VERSION)
+    expect(localStorage.getItem('jiaowu.privacy.accepted')).toBe(PRIVACY_VERSION)
     expect(isPrivacyAccepted()).toBe(true)
     revokePrivacy()
     expect(isPrivacyAccepted()).toBe(false)
   })
 
   it('旧版本同意不通过', () => {
-    localStorage.setItem('lzpu.privacy.accepted', '0')
+    localStorage.setItem('jiaowu.privacy.accepted', '0')
     expect(isPrivacyAccepted()).toBe(false)
   })
 

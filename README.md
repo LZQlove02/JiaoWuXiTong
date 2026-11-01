@@ -1,9 +1,11 @@
-# 柳职教务（Android 第三方客户端）
+# 教务助手（Android 第三方客户端）
 
-柳州职业技术大学教务系统的个人只读客户端。前端使用 Vue 3 + Vite，Android 壳使用 Capacitor 6，数据直连学校统一认证后的教务系统，不依赖自建服务器。
+面向学校教务系统的个人只读客户端。前端使用 Vue 3 + Vite，Android 壳使用 Capacitor 6，数据直连学校统一认证后的教务系统，不依赖自建服务器。
 
 > 非官方应用，未登录不可进入业务页面；仅支持学校统一认证登录，不保存账号密码。
-> 当前版本：v1.3.6 / versionCode 29；minSdk 23（Android 6.0），targetSdk 35。
+> 当前版本：v2.0.0 / versionCode 30；minSdk 23（Android 6.0），targetSdk 35。
+>
+> **v2.0.0 更名与升级说明**：应用已更名为「教务助手」，包名改为 `com.lzqlove.jiaowu`，深链改为 `jiaowu://`。旧版 `com.lzpu.jwxt` 不能覆盖升级，需要卸载旧版后重新安装；登录态、缓存与桌面组件不会迁移。
 
 ## 功能
 
@@ -80,5 +82,5 @@ release 已开启 R8 混淆与资源裁剪；Capacitor 插件通过反射调用�
 
 - 贡献流程与编码约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 私下上报。
 - 版本变更见 [CHANGELOG.md](CHANGELOG.md)，文档索引见 [docs/README.md](docs/README.md)。
-- 发版步骤见 [docs/发布流程.md](docs/发布流程.md)，APK 发布在公开仓库 [lzpu-jwxt-releases](https://github.com/LZQlove02/lzpu-jwxt-releases/releases)。
+- 发版步骤见 [docs/发布流程.md](docs/发布流程.md)，APK 发布在公开仓库 [公开发布仓库](https://github.com/LZQlove02/lzpu-jwxt-releases/releases)。
 - 本项目保留所有权利，详见 [LICENSE](LICENSE)。

@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">柳职教务</string>
-    <string name="title_activity_main">柳职教务</string>
-    <string name="package_name">com.lzpu.jwxt</string>
-    <string name="custom_url_scheme">com.lzpu.jwxt</string>
+    <string name="app_name">教务助手</string>
+    <string name="title_activity_main">教务助手</string>
+    <string name="package_name">com.lzqlove.jiaowu</string>
+    <string name="custom_url_scheme">com.lzqlove.jiaowu</string>
 
     <!-- 桌面小组件 -->
     <string name="widget_title_next">下一节课</string>

@@ -23,7 +23,7 @@ vi.mock('../src/api/nativeHttp', () => ({
   setAuthCookies: vi.fn()
 }))
 
-const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
+const SNAPSHOT_KEY = 'jiaowu.zf.snapshot.v1'
 
 const term = {
   xnm: '2026',

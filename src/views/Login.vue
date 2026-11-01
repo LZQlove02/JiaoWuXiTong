@@ -1,9 +1,9 @@
 <template>
   <div class="login-page">
     <div class="brand">
-      <img class="logo" src="../assets/app-icon.png" alt="柳职教务" />
-      <h1 class="brand-title">柳职教务</h1>
-      <p class="brand-sub">柳州职业技术大学 · 教务助手</p>
+      <img class="logo" src="../assets/app-icon.png" alt="教务助手" />
+      <h1 class="brand-title">教务助手</h1>
+      <p class="brand-sub">非官方 · 统一认证登录</p>
     </div>
 
     <section class="card login-card">

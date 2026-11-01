@@ -6,7 +6,7 @@ export const MIN_PERIODS = 6
 export const MAX_PERIODS = 15
 export const DEFAULT_PERIODS = 12
 
-const STORAGE_KEY = 'lzpu.schedule.settings.v1'
+const STORAGE_KEY = 'jiaowu.schedule.settings.v1'
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
 
 export function isSectionTimeValid(entry) {

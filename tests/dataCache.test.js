@@ -18,7 +18,7 @@ describe('个人数据缓存', () => {
     expect(cached).toMatchObject({ data: payload, cachedAt, expired: false })
 
     localStorage.setItem(
-      'lzpu.data.v1.grades.2026_3',
+      'jiaowu.data.v1.grades.2026_3',
       JSON.stringify({ data: payload, cachedAt: '2020-01-01T00:00:00.000Z' })
     )
     expect(readDataCache('grades.2026_3', GRADES_TTL)?.expired).toBe(true)
@@ -26,11 +26,11 @@ describe('个人数据缓存', () => {
 
   it('退出登录时只清个人数据缓存，不影响主题与免责声明', () => {
     writeDataCache('grades.2026_3', { grades: [] })
-    localStorage.setItem('lzpu.theme', 'dark')
-    localStorage.setItem('lzpu.disclaimer.accepted', '1')
+    localStorage.setItem('jiaowu.theme', 'dark')
+    localStorage.setItem('jiaowu.disclaimer.accepted', '1')
     clearDataCaches()
     expect(readDataCache('grades.2026_3', GRADES_TTL)).toBeNull()
-    expect(localStorage.getItem('lzpu.theme')).toBe('dark')
-    expect(localStorage.getItem('lzpu.disclaimer.accepted')).toBe('1')
+    expect(localStorage.getItem('jiaowu.theme')).toBe('dark')
+    expect(localStorage.getItem('jiaowu.disclaimer.accepted')).toBe('1')
   })
 })

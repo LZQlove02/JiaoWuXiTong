@@ -2,7 +2,12 @@
 
 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号对应 `android/app/build.gradle` 的 `versionName`。
 
-## [Unreleased]
+## [2.0.0] - 2026-11-01
+
+### 变更
+
+- 应用更名为「教务助手」（应用图标保持不变）；包名改为 `com.lzqlove.jiaowu`，深链改为 `jiaowu://`，本地存储键与原生偏好统一改为 `jiaowu.*` / `jiaowu_*`
+- **破坏性升级**：旧版 `com.lzpu.jwxt` 无法覆盖升级，需卸载后重新安装；登录态、缓存与桌面组件不迁移，桌面组件需重新添加
 
 ### 新增
 

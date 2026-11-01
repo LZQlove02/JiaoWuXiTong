@@ -6,7 +6,7 @@ const SECTIONS = {
   bszn: '/jwysxglc/bszn'
 }
 
-const CACHE_PREFIX = 'lzpu.cache.public.v1.'
+const CACHE_PREFIX = 'jiaowu.cache.public.v1.'
 const CALENDAR_PAGE = `${BASE}/ggfw/xl`
 
 function toHttpsUrl(src) {

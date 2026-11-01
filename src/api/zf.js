@@ -12,7 +12,7 @@ const PORTAL_NOTICE_INDEX = 'https://zfjw.lzzy.net/xtgl/index_cxNews.html?locale
 const PORTAL_NOTICE_LIST = 'https://zfjw.lzzy.net/xtgl/xwck_cxMoreXwList.html?doType=query'
 const PORTAL_NOTICE_DETAIL = 'https://zfjw.lzzy.net/xtgl/xwck_ckXw.html'
 const PORTAL_MESSAGES = 'https://zfjw.lzzy.net/xtgl/index_cxDbsy.html?doType=query'
-const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
+const SNAPSHOT_KEY = 'jiaowu.zf.snapshot.v1'
 // 个人数据本地保留上限：超期快照不再用于离线恢复，并主动删除
 export const SNAPSHOT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 

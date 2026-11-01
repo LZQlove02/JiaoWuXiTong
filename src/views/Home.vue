@@ -28,7 +28,7 @@
       <div>
         <p class="tiny">{{ greetingText }}，{{ auth.user?.name || '同学' }}</p>
         <div class="title-line">
-          <h1 class="page-title">柳职教务</h1>
+          <h1 class="page-title">教务助手</h1>
           <span v-if="isOffline" class="pill pill--warning">课表离线缓存</span>
         </div>
         <p class="tiny">{{ currentTerm?.label }} · {{ weekLabel }}</p>
@@ -232,7 +232,7 @@ let clockTimer = null
 const greetingText = computed(() => greeting(now.value.getHours()))
 const weekday = computed(() => getWeekday(now.value))
 
-const ORDER_KEY = 'lzpu.home.entryOrder.v1'
+const ORDER_KEY = 'jiaowu.home.entryOrder.v1'
 
 const baseEntries = [
   { path: '/notices', label: '通知', desc: '教务公告', icon: 'notice', color: '#1B5FAA' },

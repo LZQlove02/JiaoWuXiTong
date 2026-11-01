@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'lzpu.privacy.accepted'
+const STORAGE_KEY = 'jiaowu.privacy.accepted'
 
 // 规则修订时同步 +1，老用户下次启动会重新看到并重新同意
 export const PRIVACY_VERSION = '1'

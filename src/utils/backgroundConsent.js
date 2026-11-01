@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'lzpu.background.consent'
+const STORAGE_KEY = 'jiaowu.background.consent'
 
 // 后台检查范围变化时同步 +1，重新向用户说明
 export const BACKGROUND_CONSENT_VERSION = '1'

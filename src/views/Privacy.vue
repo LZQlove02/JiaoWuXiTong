@@ -3,7 +3,7 @@
     <BackBar title="隐私政策" />
 
     <section class="card intro">
-      <h1 class="intro-title">柳职教务隐私政策</h1>
+      <h1 class="intro-title">教务助手隐私政策</h1>
       <p class="meta">版本 v{{ PRIVACY_VERSION }} · {{ PRIVACY_DATE }}</p>
       <p class="lead">
         本应用是个人开发的第三方非官方客户端，仅用于查看你本人的教务信息。请在使用前阅读以下规则，了解我们处理哪些信息、为什么处理以及你可以如何管理这些信息。

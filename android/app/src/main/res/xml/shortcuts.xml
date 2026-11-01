@@ -9,9 +9,9 @@
         android:shortcutShortLabel="@string/shortcut_schedule">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="lzpu://schedule"
-            android:targetClass="com.lzpu.jwxt.MainActivity"
-            android:targetPackage="com.lzpu.jwxt" />
+            android:data="jiaowu://schedule"
+            android:targetClass="com.lzqlove.jiaowu.MainActivity"
+            android:targetPackage="com.lzqlove.jiaowu" />
     </shortcut>
 
     <shortcut
@@ -22,9 +22,9 @@
         android:shortcutShortLabel="@string/shortcut_grades">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="lzpu://grades"
-            android:targetClass="com.lzpu.jwxt.MainActivity"
-            android:targetPackage="com.lzpu.jwxt" />
+            android:data="jiaowu://grades"
+            android:targetClass="com.lzqlove.jiaowu.MainActivity"
+            android:targetPackage="com.lzqlove.jiaowu" />
     </shortcut>
 
     <shortcut
@@ -35,9 +35,9 @@
         android:shortcutShortLabel="@string/shortcut_notices">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="lzpu://notices"
-            android:targetClass="com.lzpu.jwxt.MainActivity"
-            android:targetPackage="com.lzpu.jwxt" />
+            android:data="jiaowu://notices"
+            android:targetClass="com.lzqlove.jiaowu.MainActivity"
+            android:targetPackage="com.lzqlove.jiaowu" />
     </shortcut>
 
 </shortcuts>

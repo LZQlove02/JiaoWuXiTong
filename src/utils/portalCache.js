@@ -1,4 +1,4 @@
-const PREFIX = 'lzpu.portal.v1.'
+const PREFIX = 'jiaowu.portal.v1.'
 
 export const PORTAL_NOTICE_TTL = 6 * 60 * 60 * 1000
 export const PORTAL_NOTICE_DETAIL_TTL = 7 * 24 * 60 * 60 * 1000

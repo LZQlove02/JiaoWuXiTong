@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isWelcomeTipSeen, markWelcomeTipSeen } from '../src/utils/welcomeTip'
 
-const STORAGE_KEY = 'lzpu.welcomeTip.v1'
+const STORAGE_KEY = 'jiaowu.welcomeTip.v1'
 
 describe('首次登录欢迎提示标记', () => {
   beforeEach(() => {

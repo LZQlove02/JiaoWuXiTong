@@ -11,7 +11,7 @@ import {
 } from '../src/stores/scheduleSettings'
 import { SECTION_TIMES } from '../src/utils/date'
 
-const STORAGE_KEY = 'lzpu.schedule.settings.v1'
+const STORAGE_KEY = 'jiaowu.schedule.settings.v1'
 
 function cloneTimes(source) {
   const result = {}

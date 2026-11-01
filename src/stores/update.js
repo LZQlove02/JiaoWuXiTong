@@ -7,8 +7,8 @@ import { checkLatest, openReleasePage } from '../native/supportBridge'
 import { isDisclaimerAccepted } from '../utils/disclaimer'
 import { formatReleaseNotes, isNewer, shouldAutoCheck } from '../utils/update'
 
-const LAST_CHECK_KEY = 'lzpu.update.lastCheckAt'
-const PROMPTED_KEY = 'lzpu.update.promptedTag'
+const LAST_CHECK_KEY = 'jiaowu.update.lastCheckAt'
+const PROMPTED_KEY = 'jiaowu.update.promptedTag'
 
 function readNumber(key) {
   try {

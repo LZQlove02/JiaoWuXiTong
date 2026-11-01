@@ -1,6 +1,6 @@
 // 个人教务数据的本地缓存：断网时回退展示，并在页面上标注更新时间与过期状态。
 // 退出登录或会话失效时由 auth store 统一清空，避免下一个账号看到上一个人的数据。
-const PREFIX = 'lzpu.data.v1.'
+const PREFIX = 'jiaowu.data.v1.'
 
 export const GRADES_TTL = 6 * 60 * 60 * 1000
 export const MESSAGES_TTL = 30 * 60 * 1000

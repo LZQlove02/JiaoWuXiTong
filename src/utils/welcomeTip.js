@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'lzpu.welcomeTip.v1'
+const STORAGE_KEY = 'jiaowu.welcomeTip.v1'
 
 export function isWelcomeTipSeen() {
   try {

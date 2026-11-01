@@ -1,6 +1,6 @@
 {
-  "appId": "com.lzpu.jwxt",
-  "appName": "柳职教务",
+  "appId": "com.lzqlove.jiaowu",
+  "appName": "教务助手",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

@@ -150,7 +150,7 @@
         </button>
         <p class="setting-note">样式只影响对应组件实例；添加或删除请长按桌面空白处操作。</p>
       </template>
-      <p v-else class="setting-note">暂无桌面组件。长按桌面空白处添加「柳职教务」组件后，可在这里统一调整样式和刷新。</p>
+      <p v-else class="setting-note">暂无桌面组件。长按桌面空白处添加「教务助手」组件后，可在这里统一调整样式和刷新。</p>
     </section>
 
     <h2 class="section-title">隐私与数据</h2>
@@ -220,7 +220,7 @@
       mode="reader"
       :clauses="DISCLAIMER_CLAUSES"
       title="使用前请阅读"
-      subtitle="柳职教务 · 免责声明"
+      subtitle="教务助手 · 免责声明"
       :version-text="`声明版本 v${DISCLAIMER_VERSION} · ${DISCLAIMER_DATE}`"
       @close="closeDisclaimer"
     />
@@ -228,7 +228,7 @@
       v-if="backgroundOpen"
       :clauses="BACKGROUND_CLAUSES"
       title="开启前请阅读"
-      subtitle="柳职教务 · 后台检查说明"
+      subtitle="教务助手 · 后台检查说明"
       :version-text="`说明版本 v${BACKGROUND_CONSENT_VERSION}`"
       primary-text="同意并开启"
       decline-text="取消"
@@ -408,9 +408,9 @@ async function clearCache() {
   Object.keys(localStorage)
     .filter(
       (key) =>
-        key.startsWith('lzpu.cache') ||
-        key.startsWith('lzpu.portal.v1.') ||
-        key.startsWith('lzpu.data.v1.')
+        key.startsWith('jiaowu.cache') ||
+        key.startsWith('jiaowu.portal.v1.') ||
+        key.startsWith('jiaowu.data.v1.')
     )
     .forEach((key) => localStorage.removeItem(key))
   try {
