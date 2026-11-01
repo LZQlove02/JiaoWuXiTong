@@ -8,6 +8,9 @@ const STORAGE_KEY = 'lzpu.theme'
 
 export const useUiStore = defineStore('ui', () => {
   const theme = ref('system')
+  // 跟随系统时，用 WebView 的 prefers-color-scheme 作为唯一深浅色来源；
+  // 桌面组件也取这个结果，避免原生 uiMode 与 App 内主题判断不一致。
+  const systemDark = ref(window.matchMedia('(prefers-color-scheme: dark)').matches)
   const tabBarVisible = ref(false)
   const overlayCloser = ref(null)
   const hasOverlay = computed(() => Boolean(overlayCloser.value))
@@ -28,10 +31,11 @@ export const useUiStore = defineStore('ui', () => {
 
   function resolveTheme(value) {
     if (value === 'light' || value === 'dark') return value
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light'
+    return systemDark.value ? 'dark' : 'light'
   }
+
+  // App 当前实际生效的深浅色（跟随系统时已解析成 light / dark）
+  const effectiveTheme = computed(() => resolveTheme(theme.value))
 
   async function syncStatusBar(resolved) {
     if (!Capacitor.isNativePlatform()) return
@@ -78,7 +82,8 @@ export const useUiStore = defineStore('ui', () => {
     applyTheme()
     window
       .matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', () => {
+      .addEventListener('change', (event) => {
+        systemDark.value = event.matches
         if (theme.value === 'system') applyTheme()
       })
     // 横屏/平板时 TabBar 不再通栏，导航栏颜色需要重新判定
@@ -110,6 +115,7 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     theme,
+    effectiveTheme,
     tabBarVisible,
     setTabBarVisible,
     hasOverlay,

@@ -55,6 +55,10 @@
       <p v-if="!offline && updatedLabel" class="tiny footnote">
         更新于 {{ updatedLabel }}
       </p>
+
+      <button v-if="article.url" class="source-link" type="button" @click="openOriginal">
+        查看原文（教务处官网）
+      </button>
     </article>
   </div>
 </template>
@@ -136,6 +140,15 @@ async function openAttachment(file) {
   }
 }
 
+async function openOriginal() {
+  actionError.value = ''
+  try {
+    await openExternal(article.value.url)
+  } catch (error) {
+    actionError.value = error?.message || '无法打开原文，请在浏览器中访问官网。'
+  }
+}
+
 watch(article, (value) => {
   if (value) prepareImages(value)
 }, { immediate: true })
@@ -196,6 +209,18 @@ onMounted(() => {
 
 .attach-head {
   margin-bottom: 8px;
+}
+
+.source-link {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 11px;
+  border-radius: 10px;
+  background: var(--card-muted);
+  color: var(--brand);
+  font-size: 13px;
+  text-align: center;
 }
 
 .attachment {

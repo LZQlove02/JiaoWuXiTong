@@ -22,6 +22,7 @@
 ## 认证 Cookie 处理
 
 - `zfjw.lzzy.net` 的会话 Cookie 只以 Android Keystore AES-GCM 加密保存在应用私有目录，退出登录时删除。
+- 桌面组件 payload、课表变更基线、成绩基线与通知提醒的账号标识同样使用 Keystore AES-GCM 加密；其余个人缓存位于应用私有目录，不参与系统备份，个人数据最长保留 30 天。
 - 学校「一周免登录」会话 Cookie `CASTGC` 在登录成功/取消后保留（需在登录页勾选 Keep me signed in），仅在用户明确退出登录时清除，以便切换账号；会话失效或冷启动不清除。
 - `JSESSIONID`、`XSRF-TOKEN`、`challenge_cookie`、`_shmas`、`_upstream_id` 等一次性挑战与会话 Cookie 每次登录后清除，避免“设备请求校验失败”。
 - 约一年有效期的设备信任 Cookie `_shmat` 保留服务端原始属性，不由 App 重写或延长有效期。

@@ -7,8 +7,8 @@ vi.mock('../src/api', () => ({
 }))
 vi.mock('../src/api/zf', () => {
   const ZfAcademicApi = vi.fn(function () {
-    this.loginWithSso = vi.fn(async () => ({ id: '20256030001', name: '测试' }))
-    this.restoreSession = vi.fn(async () => ({ id: '20256030001', name: '测试' }))
+    this.loginWithSso = vi.fn(async () => ({ id: 'test-student-1', name: '测试' }))
+    this.restoreSession = vi.fn(async () => ({ id: 'test-student-1', name: '测试' }))
   })
   return { ZfAcademicApi, clearScheduleSnapshot: vi.fn() }
 })

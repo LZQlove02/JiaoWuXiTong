@@ -62,6 +62,10 @@
       </div>
 
       <p v-if="actionError" class="tiny action-error">{{ actionError }}</p>
+
+      <button v-if="detail.url" class="source-link" type="button" @click="openOriginal">
+        查看原文（教务系统）
+      </button>
     </article>
   </div>
 </template>
@@ -72,7 +76,7 @@ import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { api } from '../api'
 import { authDownload } from '../api/nativeHttp'
-import { openLocalFile } from '../native/supportBridge'
+import { openExternal, openLocalFile } from '../native/supportBridge'
 import { PORTAL_NOTICE_DETAIL_TTL, readPortalCache, writePortalCache } from '../utils/portalCache'
 import { formatDateTime } from '../utils/date'
 import BackBar from '../components/BackBar.vue'
@@ -155,6 +159,15 @@ async function openAttachment(file) {
   }
 }
 
+async function openOriginal() {
+  actionError.value = ''
+  try {
+    await openExternal(detail.value.url)
+  } catch (err) {
+    actionError.value = err?.message || '无法打开原文，请在教务系统中查看。'
+  }
+}
+
 async function load() {
   const id = String(route.params.id || '').trim()
   if (!id) {
@@ -227,6 +240,18 @@ onMounted(load)
 .image-tip {
   margin-top: 8px;
   color: var(--text-tertiary);
+}
+
+.source-link {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 11px;
+  border-radius: 10px;
+  background: var(--card-muted);
+  color: var(--brand);
+  font-size: 13px;
+  text-align: center;
 }
 
 .image-list {

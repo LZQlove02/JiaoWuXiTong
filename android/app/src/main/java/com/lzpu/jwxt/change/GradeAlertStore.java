@@ -3,6 +3,8 @@ package com.lzpu.jwxt.change;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.lzpu.jwxt.LocalCipher;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -36,7 +38,8 @@ public final class GradeAlertStore {
     }
 
     public static boolean isEnabled(Context context) {
-        return prefs(context).getBoolean(KEY_ENABLED, true);
+        // 默认关闭：与课表变更提醒一致，首次开启前需要用户明确同意
+        return prefs(context).getBoolean(KEY_ENABLED, false);
     }
 
     public static void setEnabled(Context context, boolean enabled) {
@@ -44,7 +47,7 @@ public final class GradeAlertStore {
     }
 
     public static Baseline readBaseline(Context context) {
-        String raw = prefs(context).getString(KEY_BASELINE, "");
+        String raw = LocalCipher.open(prefs(context).getString(KEY_BASELINE, ""));
         if (raw == null || raw.isEmpty()) return null;
         try {
             JSONObject json = new JSONObject(raw);
@@ -87,7 +90,7 @@ public final class GradeAlertStore {
             }
             json.put("courses", courseJson);
             json.put("savedAt", savedAt == null ? "" : savedAt);
-            prefs(context).edit().putString(KEY_BASELINE, json.toString()).apply();
+            prefs(context).edit().putString(KEY_BASELINE, LocalCipher.seal(json.toString())).apply();
         } catch (JSONException error) {
             // 写不进去时保留旧基线，下一次成功后再覆盖
         }

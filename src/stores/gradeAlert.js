@@ -11,7 +11,8 @@ import {
  * 这里只负责设置页展示与开关同步。
  */
 export const useGradeAlertStore = defineStore('gradeAlert', () => {
-  const enabled = ref(true)
+  // 后台检查默认关闭，开启前由设置页说明检查范围与数据存放
+  const enabled = ref(false)
   const notificationsEnabled = ref(true)
   const loaded = ref(false)
 

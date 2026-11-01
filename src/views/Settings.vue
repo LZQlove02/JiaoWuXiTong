@@ -33,7 +33,7 @@
         </button>
       </div>
       <p class="setting-note">
-        每天自动检查两次（默认 07:10、12:50，可在下方修改；系统省电策略下可能略有延迟）；只提醒本周的停课、调课与新增。系统清理后台后，重新打开 App 会自动恢复检查。
+        每天自动检查两次（默认 07:10、12:50，可在下方修改；系统省电策略下可能略有延迟）；只提醒本周的停课、调课与新增。默认关闭，开启前会说明后台检查范围；系统清理后台后，重新打开 App 会自动恢复检查。
       </p>
       <button class="setting-row" @click="openNotificationSettings">
         <span class="setting-left">通知权限</span>
@@ -153,6 +153,36 @@
       <p v-else class="setting-note">暂无桌面组件。长按桌面空白处添加「柳职教务」组件后，可在这里统一调整样式和刷新。</p>
     </section>
 
+    <h2 class="section-title">隐私与数据</h2>
+    <section class="card settings">
+      <router-link class="setting-row" to="/privacy">
+        <span class="setting-left"><AppIcon name="shield" />隐私政策</span>
+        <span class="setting-right">
+          <span class="tiny">v{{ privacyVersion }}</span>
+          <AppIcon name="chevron-right" />
+        </span>
+      </router-link>
+      <router-link class="setting-row" to="/licenses">
+        <span class="setting-left"><AppIcon name="info" />开源许可</span>
+        <AppIcon name="chevron-right" />
+      </router-link>
+      <button class="setting-row" @click="openDisclaimer">
+        <span class="setting-left"><AppIcon name="notice" />免责声明</span>
+        <span class="tiny">v{{ disclaimerVersion }}</span>
+      </button>
+      <button class="setting-row" @click="askClearData">
+        <span class="setting-left"><AppIcon name="trash" />清除本机个人数据</span>
+        <AppIcon name="chevron-right" />
+      </button>
+      <button class="setting-row" @click="askWithdrawPrivacy">
+        <span class="setting-left"><AppIcon name="shield" />撤回隐私同意</span>
+        <AppIcon name="chevron-right" />
+      </button>
+      <p class="setting-note">
+        清除本机个人数据会退出登录并删除本机缓存；撤回隐私同意还会停止处理，下次启动需重新阅读并同意。
+      </p>
+    </section>
+
     <h2 class="section-title">通用</h2>
     <section class="card settings">
       <div class="setting-row">
@@ -179,17 +209,41 @@
         <span class="setting-left"><AppIcon name="mail" />意见反馈</span>
         <AppIcon name="chevron-right" />
       </router-link>
-      <button class="setting-row" @click="openDisclaimer">
-        <span class="setting-left"><AppIcon name="shield" />免责声明</span>
-        <span class="tiny">v{{ disclaimerVersion }}</span>
-      </button>
     </section>
 
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
     </transition>
 
-    <DisclaimerGate v-if="disclaimerOpen" mode="reader" @close="closeDisclaimer" />
+    <ConsentGate
+      v-if="disclaimerOpen"
+      mode="reader"
+      :clauses="DISCLAIMER_CLAUSES"
+      title="使用前请阅读"
+      subtitle="柳职教务 · 免责声明"
+      :version-text="`声明版本 v${DISCLAIMER_VERSION} · ${DISCLAIMER_DATE}`"
+      @close="closeDisclaimer"
+    />
+    <ConsentGate
+      v-if="backgroundOpen"
+      :clauses="BACKGROUND_CLAUSES"
+      title="开启前请阅读"
+      subtitle="柳职教务 · 后台检查说明"
+      :version-text="`说明版本 v${BACKGROUND_CONSENT_VERSION}`"
+      primary-text="同意并开启"
+      decline-text="取消"
+      @accept="onBackgroundAccept"
+      @decline="onBackgroundDecline"
+    />
+    <ConfirmDialog
+      v-if="confirm"
+      :title="confirm.title"
+      :message="confirm.message"
+      :confirm-text="confirm.confirmText"
+      :danger="confirm.danger"
+      @confirm="runConfirm"
+      @cancel="confirm = null"
+    />
   </div>
 </template>
 
@@ -198,6 +252,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { App as CapApp } from '@capacitor/app'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '../stores/ui'
+import { useAuthStore } from '../stores/auth'
 import { useChangesStore } from '../stores/changes'
 import { useGradeAlertStore } from '../stores/gradeAlert'
 import { usePortalAlertStore } from '../stores/portalAlert'
@@ -210,13 +265,23 @@ import {
   refreshWidgets as refreshWidgetsNative,
   setWidgetStyle
 } from '../native/widgetBridge'
-import { DISCLAIMER_VERSION } from '../utils/disclaimer'
+import { DISCLAIMER_CLAUSES, DISCLAIMER_DATE, DISCLAIMER_VERSION } from '../utils/disclaimer'
+import { PRIVACY_VERSION, revokePrivacy } from '../utils/privacy'
+import {
+  BACKGROUND_CLAUSES,
+  BACKGROUND_CONSENT_VERSION,
+  acceptBackgroundConsent,
+  isBackgroundConsentAccepted,
+  revokeBackgroundConsent
+} from '../utils/backgroundConsent'
 import { estimateLocalStorageBytes, formatBytes } from '../utils/storage'
 import AppIcon from '../components/AppIcon.vue'
 import BackBar from '../components/BackBar.vue'
-import DisclaimerGate from '../components/DisclaimerGate.vue'
+import ConsentGate from '../components/ConsentGate.vue'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const ui = useUiStore()
+const auth = useAuthStore()
 const changes = useChangesStore()
 const gradeAlert = useGradeAlertStore()
 const portalAlert = usePortalAlertStore()
@@ -233,6 +298,10 @@ const themeOptions = [
 const toast = ref('')
 const disclaimerOpen = ref(false)
 const disclaimerVersion = DISCLAIMER_VERSION
+const privacyVersion = PRIVACY_VERSION
+const backgroundOpen = ref(false)
+const pendingAlert = ref('')
+const confirm = ref(null)
 const morningTime = ref(changes.checkTimes.morning)
 const noonTime = ref(changes.checkTimes.noon)
 const savingTimes = ref(false)
@@ -372,13 +441,25 @@ async function checkUpdate() {
 async function toggleChanges() {
   const next = !changes.enabled
   if (next) {
-    const granted = await changes.requestNotificationPermission()
-    await changes.setEnabled(true)
-    showToast(granted ? '已开启课表变更提醒' : '已开启（系统通知未授权）')
+    if (!isBackgroundConsentAccepted()) {
+      askBackgroundConsent('changes')
+      return
+    }
+    await enableChanges()
     return
   }
   await changes.setEnabled(false)
   showToast('已关闭课表变更提醒')
+}
+
+async function enableChanges() {
+  try {
+    const granted = await changes.requestNotificationPermission()
+    await changes.setEnabled(true)
+    showToast(granted ? '已开启课表变更提醒' : '已开启（系统通知未授权）')
+  } catch (error) {
+    showToast(error?.message || '课表变更提醒设置失败')
+  }
 }
 
 function openNotificationSettings() {
@@ -387,13 +468,15 @@ function openNotificationSettings() {
 
 async function toggleGradeAlert() {
   const next = !gradeAlert.enabled
-  try {
-    if (next) {
-      const granted = await changes.requestNotificationPermission()
-      await gradeAlert.setEnabled(true)
-      showToast(granted ? '已开启成绩提醒' : '已开启（系统通知未授权）')
+  if (next) {
+    if (!isBackgroundConsentAccepted()) {
+      askBackgroundConsent('grades')
       return
     }
+    await enableGradeAlert()
+    return
+  }
+  try {
     await gradeAlert.setEnabled(false)
     showToast('已关闭成绩提醒')
   } catch (error) {
@@ -401,14 +484,100 @@ async function toggleGradeAlert() {
   }
 }
 
+async function enableGradeAlert() {
+  try {
+    const granted = await changes.requestNotificationPermission()
+    await gradeAlert.setEnabled(true)
+    showToast(granted ? '已开启成绩提醒' : '已开启（系统通知未授权）')
+  } catch (error) {
+    showToast(error?.message || '成绩提醒设置失败')
+  }
+}
+
 async function togglePortalAlert(kind) {
   const next = kind === 'notices' ? !portalAlert.noticesEnabled : !portalAlert.messagesEnabled
+  if (next && !isBackgroundConsentAccepted()) {
+    askBackgroundConsent(kind)
+    return
+  }
   try {
-    if (next) await changes.requestNotificationPermission()
-    await portalAlert.setEnabled(kind, next)
-    showToast(next ? '已开启提醒' : '已关闭提醒')
+    if (next) {
+      await enablePortalAlert(kind)
+      return
+    }
+    await portalAlert.setEnabled(kind, false)
+    showToast('已关闭提醒')
   } catch (error) {
     showToast(error?.message || '提醒设置失败')
+  }
+}
+
+async function enablePortalAlert(kind) {
+  try {
+    await changes.requestNotificationPermission()
+    await portalAlert.setEnabled(kind, true)
+    showToast('已开启提醒')
+  } catch (error) {
+    showToast(error?.message || '提醒设置失败')
+  }
+}
+
+function askBackgroundConsent(action) {
+  pendingAlert.value = action
+  backgroundOpen.value = true
+}
+
+async function onBackgroundAccept() {
+  acceptBackgroundConsent()
+  backgroundOpen.value = false
+  const action = pendingAlert.value
+  pendingAlert.value = ''
+  if (action === 'changes') await enableChanges()
+  else if (action === 'grades') await enableGradeAlert()
+  else if (action === 'notices' || action === 'messages') await enablePortalAlert(action)
+}
+
+function onBackgroundDecline() {
+  backgroundOpen.value = false
+  pendingAlert.value = ''
+}
+
+function askClearData() {
+  confirm.value = {
+    title: '清除本机个人数据',
+    message: '将退出登录并删除本机保存的会话、课表、成绩、通知缓存与桌面组件数据。学校服务器上的数据不受影响。',
+    confirmText: '清除并退出',
+    danger: true,
+    action: 'clear'
+  }
+}
+
+function askWithdrawPrivacy() {
+  confirm.value = {
+    title: '撤回隐私同意',
+    message: '撤回后将停止处理并清除本机个人数据，下次启动需重新阅读并同意隐私政策。',
+    confirmText: '撤回并清除',
+    danger: true,
+    action: 'withdraw'
+  }
+}
+
+async function runConfirm() {
+  const action = confirm.value?.action
+  confirm.value = null
+  if (!action) return
+  try {
+    await auth.logout()
+    if (action === 'withdraw') {
+      revokePrivacy()
+      revokeBackgroundConsent()
+      window.location.reload()
+      return
+    }
+    router.replace('/login')
+    showToast('已清除本机个人数据')
+  } catch (error) {
+    showToast(error?.message || '操作失败，请重试')
   }
 }
 
@@ -518,6 +687,13 @@ onMounted(async () => {
   gap: 10px;
   font-size: 15px;
   color: var(--text);
+}
+
+.setting-right {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .setting-note {

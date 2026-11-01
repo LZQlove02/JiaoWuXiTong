@@ -1,8 +1,21 @@
 <template>
-  <DisclaimerGate
-    v-if="!consented"
+  <ConsentGate
+    v-if="stage === 'disclaimer'"
+    :clauses="DISCLAIMER_CLAUSES"
+    title="使用前请阅读"
+    subtitle="柳职教务 · 免责声明"
+    :version-text="`声明版本 v${DISCLAIMER_VERSION} · ${DISCLAIMER_DATE}`"
     :declined="declined"
-    @accept="onAccept"
+    @accept="onAcceptDisclaimer"
+    @decline="onDecline"
+  />
+  <ConsentGate
+    v-else-if="stage === 'privacy'"
+    :clauses="PRIVACY_SECTIONS"
+    title="隐私政策"
+    subtitle="柳职教务 · 个人信息处理规则"
+    :version-text="`v${PRIVACY_VERSION} · ${PRIVACY_DATE}`"
+    @accept="onAcceptPrivacy"
     @decline="onDecline"
   />
   <div v-else-if="auth.restoring" class="boot">
@@ -24,7 +37,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import TabBar from './components/TabBar.vue'
-import DisclaimerGate from './components/DisclaimerGate.vue'
+import ConsentGate from './components/ConsentGate.vue'
 import UpdateDialog from './components/UpdateDialog.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
@@ -32,7 +45,21 @@ import { useChangesStore } from './stores/changes'
 import { useScheduleSettingsStore } from './stores/scheduleSettings'
 import { useUiStore } from './stores/ui'
 import { useUpdateStore } from './stores/update'
-import { acceptDisclaimer, isDisclaimerAccepted } from './utils/disclaimer'
+import {
+  DISCLAIMER_CLAUSES,
+  DISCLAIMER_DATE,
+  DISCLAIMER_VERSION,
+  acceptDisclaimer,
+  isDisclaimerAccepted
+} from './utils/disclaimer'
+import {
+  PRIVACY_DATE,
+  PRIVACY_SECTIONS,
+  PRIVACY_VERSION,
+  acceptPrivacy,
+  isPrivacyAccepted
+} from './utils/privacy'
+import { pruneLocalData } from './utils/retention'
 import { clearWidgetNow, resyncWidget, syncWidget, syncWidgetTheme } from './widget/sync'
 import { deepLinkPath } from './utils/deepLink'
 
@@ -47,7 +74,15 @@ const update = useUpdateStore()
 const showTabBar = computed(() => route.meta.tab === true)
 const mainRef = ref(null)
 
-const consented = ref(isDisclaimerAccepted())
+function initialStage() {
+  if (!isDisclaimerAccepted()) return 'disclaimer'
+  if (!isPrivacyAccepted()) return 'privacy'
+  return 'ready'
+}
+
+// 首启顺序：免责声明 → 隐私政策 → 恢复会话；每一步单独同意
+const stage = ref(initialStage())
+const consented = computed(() => stage.value === 'ready')
 const declined = ref(false)
 let nativeReady = false
 
@@ -72,10 +107,9 @@ watch(
   { immediate: true }
 )
 
-// 同意免责声明后才恢复会话：未同意前不读 Cookie、不发请求
-async function onAccept() {
-  acceptDisclaimer()
-  consented.value = true
+// 两份文本都同意后才恢复会话：未同意前不读 Cookie、不发请求
+async function startApp() {
+  pruneLocalData()
   const booting = auth.bootstrap()
   setupNative()
   await router.isReady()
@@ -84,6 +118,23 @@ async function onAccept() {
   if (auth.isLoggedIn && router.currentRoute.value.name === 'login') {
     router.replace('/')
   }
+}
+
+async function onAcceptDisclaimer() {
+  acceptDisclaimer()
+  // 老用户已同意过隐私政策时直接进入；否则继续展示隐私政策
+  if (isPrivacyAccepted()) {
+    stage.value = 'ready'
+    await startApp()
+    return
+  }
+  stage.value = 'privacy'
+}
+
+async function onAcceptPrivacy() {
+  acceptPrivacy()
+  stage.value = 'ready'
+  await startApp()
 }
 
 function onDecline() {
@@ -110,7 +161,9 @@ async function openDeepLink(url) {
 
 // 组件数据全部来自已加载的 store，不新增网络请求
 function installWidgetSync() {
-  syncWidgetTheme(ui.theme)
+  // 只下发已解析的 light / dark：组件不再按原生 uiMode 自行判断深浅色，
+  // 避免 App 关闭期间系统切深色后，组件在闹钟或任意刷新时突然换字色
+  syncWidgetTheme(ui.effectiveTheme)
   const context = () => ({
     user: auth.user,
     currentTerm: academic.currentTerm,
@@ -158,7 +211,8 @@ function installWidgetSync() {
   CapApp.addListener('appStateChange', ({ isActive }) => {
     if (isActive && !auth.restoring) resyncWidget(context)
   })
-  watch(() => ui.theme, (theme) => syncWidgetTheme(theme))
+  // 跟随系统时，系统深浅色切换会改变 effectiveTheme，组件与 App 同步更新
+  watch(() => ui.effectiveTheme, (theme) => syncWidgetTheme(theme))
   // 4x4 的 GPA 摘要要用成绩；成绩页只在进入时才拉，这里登录后静默补一次
   watch(
     [() => auth.isLoggedIn, () => academic.currentTerm],
@@ -244,7 +298,7 @@ watch(
 
 onMounted(() => {
   ui.initTheme()
-  // 已同意（老用户）时立即初始化；首次启动等门禁页同意后再走 setupNative
+  // 已同意（老用户）时立即初始化；超期缓存已在 main.js 恢复会话前清理
   if (consented.value) setupNative()
 })
 </script>

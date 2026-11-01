@@ -3,6 +3,8 @@ package com.lzpu.jwxt.change;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.lzpu.jwxt.LocalCipher;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 
@@ -54,11 +56,14 @@ public final class PortalAlertStore {
     }
 
     public static String readStudentId(Context context) {
-        return prefs(context).getString(KEY_STUDENT_ID, "");
+        return LocalCipher.open(prefs(context).getString(KEY_STUDENT_ID, ""));
     }
 
     public static void writeStudentId(Context context, String studentId) {
-        prefs(context).edit().putString(KEY_STUDENT_ID, studentId == null ? "" : studentId).apply();
+        // 学号属于个人信息，与其他基线数据一致使用 Keystore AES-GCM 加密落盘
+        prefs(context).edit()
+                .putString(KEY_STUDENT_ID, LocalCipher.seal(studentId == null ? "" : studentId))
+                .apply();
     }
 
     public static boolean isReady(Context context, boolean notices) {

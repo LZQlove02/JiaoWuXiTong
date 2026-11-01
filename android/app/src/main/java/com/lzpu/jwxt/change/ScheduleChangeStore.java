@@ -3,6 +3,8 @@ package com.lzpu.jwxt.change;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.lzpu.jwxt.LocalCipher;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -50,7 +52,7 @@ public final class ScheduleChangeStore {
     // ---------- 基线 ----------
 
     public static Baseline readBaseline(Context context) {
-        String raw = prefs(context).getString(KEY_BASELINE, "");
+        String raw = LocalCipher.open(prefs(context).getString(KEY_BASELINE, ""));
         if (raw == null || raw.isEmpty()) return null;
         try {
             JSONObject json = new JSONObject(raw);
@@ -89,7 +91,7 @@ public final class ScheduleChangeStore {
             }
             json.put("sectionTimes", times);
             json.put("savedAt", baseline.savedAt);
-            prefs(context).edit().putString(KEY_BASELINE, json.toString()).apply();
+            prefs(context).edit().putString(KEY_BASELINE, LocalCipher.seal(json.toString())).apply();
         } catch (JSONException error) {
             // 写不进去时保留旧基线，下一次再试
         }
@@ -120,7 +122,7 @@ public final class ScheduleChangeStore {
 
     public static List<ChangeEntry> readEntries(Context context) {
         List<ChangeEntry> entries = new ArrayList<>();
-        String raw = prefs(context).getString(KEY_ENTRIES, "");
+        String raw = LocalCipher.open(prefs(context).getString(KEY_ENTRIES, ""));
         if (raw == null || raw.isEmpty()) return entries;
         try {
             JSONArray array = new JSONArray(raw);
@@ -140,7 +142,7 @@ public final class ScheduleChangeStore {
         try {
             JSONArray array = new JSONArray();
             for (ChangeEntry entry : pruned) array.put(entry.toJson());
-            prefs(context).edit().putString(KEY_ENTRIES, array.toString()).apply();
+            prefs(context).edit().putString(KEY_ENTRIES, LocalCipher.seal(array.toString())).apply();
         } catch (JSONException error) {
             // 单条写入失败不阻塞主流程
         }
@@ -198,7 +200,8 @@ public final class ScheduleChangeStore {
     // ---------- 设置 ----------
 
     public static boolean isEnabled(Context context) {
-        return prefs(context).getBoolean(KEY_ENABLED, true);
+        // 默认关闭：后台检查需用户首次开启前阅读说明并主动同意
+        return prefs(context).getBoolean(KEY_ENABLED, false);
     }
 
     public static void setEnabled(Context context, boolean enabled) {

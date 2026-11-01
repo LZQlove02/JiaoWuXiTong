@@ -26,42 +26,42 @@ public class ScheduleChangeServiceTest {
     public void noBaselineResets() {
         assertEquals(ScheduleChangeService.BaselineAction.RESET,
                 ScheduleChangeService.decide(null, new TermInfo("2026", "3", "2026-08-31"),
-                        "20256030001", 10));
+                        "test-student-1", 10));
     }
 
     @Test
     public void termChangeResets() {
         assertEquals(ScheduleChangeService.BaselineAction.RESET,
-                ScheduleChangeService.decide(baseline("3", "20256030001", 10),
-                        new TermInfo("2026", "12", "2027-02-23"), "20256030001", 10));
+                ScheduleChangeService.decide(baseline("3", "test-student-1", 10),
+                        new TermInfo("2026", "12", "2027-02-23"), "test-student-1", 10));
     }
 
     @Test
     public void ownerChangeResets() {
         assertEquals(ScheduleChangeService.BaselineAction.RESET,
-                ScheduleChangeService.decide(baseline("3", "20256030001", 10),
+                ScheduleChangeService.decide(baseline("3", "test-student-1", 10),
                         new TermInfo("2026", "3", "2026-08-31"), "20256039999", 10));
     }
 
     @Test
     public void emptyNewScheduleKeepsBaseline() {
         assertEquals(ScheduleChangeService.BaselineAction.SKIP_EMPTY,
-                ScheduleChangeService.decide(baseline("3", "20256030001", 10),
-                        new TermInfo("2026", "3", "2026-08-31"), "20256030001", 0));
+                ScheduleChangeService.decide(baseline("3", "test-student-1", 10),
+                        new TermInfo("2026", "3", "2026-08-31"), "test-student-1", 0));
     }
 
     @Test
     public void firstEmptyBaselineStillWrites() {
         assertEquals(ScheduleChangeService.BaselineAction.DIFF,
-                ScheduleChangeService.decide(baseline("3", "20256030001", 0),
-                        new TermInfo("2026", "3", "2026-08-31"), "20256030001", 0));
+                ScheduleChangeService.decide(baseline("3", "test-student-1", 0),
+                        new TermInfo("2026", "3", "2026-08-31"), "test-student-1", 0));
     }
 
     @Test
     public void normalTermDiffs() {
         assertEquals(ScheduleChangeService.BaselineAction.DIFF,
-                ScheduleChangeService.decide(baseline("3", "20256030001", 10),
-                        new TermInfo("2026", "3", "2026-08-31"), "20256030001", 10));
+                ScheduleChangeService.decide(baseline("3", "test-student-1", 10),
+                        new TermInfo("2026", "3", "2026-08-31"), "test-student-1", 10));
     }
 
     @Test

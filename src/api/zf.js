@@ -13,6 +13,8 @@ const PORTAL_NOTICE_LIST = 'https://zfjw.lzzy.net/xtgl/xwck_cxMoreXwList.html?do
 const PORTAL_NOTICE_DETAIL = 'https://zfjw.lzzy.net/xtgl/xwck_ckXw.html'
 const PORTAL_MESSAGES = 'https://zfjw.lzzy.net/xtgl/index_cxDbsy.html?doType=query'
 const SNAPSHOT_KEY = 'lzpu.zf.snapshot.v1'
+// 个人数据本地保留上限：超期快照不再用于离线恢复，并主动删除
+export const SNAPSHOT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 const QUARTER_RANK = { 3: 0, 12: 1, 16: 2 }
 
@@ -22,6 +24,11 @@ function readSnapshot() {
     if (!raw) return null
     const data = JSON.parse(raw)
     if (!data || !data.profile || !data.term || !data.schedule) return null
+    const fetchedTime = Date.parse(data.fetchedAt)
+    if (!Number.isFinite(fetchedTime) || Date.now() - fetchedTime > SNAPSHOT_RETENTION_MS) {
+      localStorage.removeItem(SNAPSHOT_KEY)
+      return null
+    }
     return data
   } catch (error) {
     return null
@@ -33,7 +40,15 @@ function writeSnapshot(api) {
     localStorage.setItem(
       SNAPSHOT_KEY,
       JSON.stringify({
-        profile: api.profile,
+        // 只保留离线展示必需的字段，不落头像等无关信息
+        profile: {
+          id: api.profile.id,
+          name: api.profile.name,
+          className: api.profile.className,
+          major: api.profile.major,
+          college: api.profile.college,
+          enrollmentYear: api.profile.enrollmentYear
+        },
         term: api.term,
         schedule: api.schedule,
         fetchedAt: api.fetchedAt
@@ -544,6 +559,7 @@ export function parsePortalNoticeDetail(html, pageUrl = '') {
     images,
     imageUrls,
     attachments,
+    url: pageUrl || '',
     source: '教务系统（学生门户）',
     fetchedAt: new Date().toISOString()
   }

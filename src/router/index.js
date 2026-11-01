@@ -19,6 +19,8 @@ import ScheduleSettings from '../views/ScheduleSettings.vue'
 import Changes from '../views/Changes.vue'
 import Tutorial from '../views/Tutorial.vue'
 import About from '../views/About.vue'
+import Privacy from '../views/Privacy.vue'
+import OpenSource from '../views/OpenSource.vue'
 import Feedback from '../views/Feedback.vue'
 
 const routes = [
@@ -63,6 +65,18 @@ const routes = [
     name: 'feedback',
     component: Feedback,
     meta: { guest: true, title: '意见反馈' }
+  },
+  {
+    path: '/privacy',
+    name: 'privacy',
+    component: Privacy,
+    meta: { guest: true, title: '隐私政策' }
+  },
+  {
+    path: '/licenses',
+    name: 'licenses',
+    component: OpenSource,
+    meta: { guest: true, title: '开源许可' }
   },
   { path: '/notices', name: 'notices', component: Notices },
   {

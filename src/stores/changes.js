@@ -24,7 +24,8 @@ export const useChangesStore = defineStore('changes', () => {
   const scheduleSettings = useScheduleSettingsStore()
   const entries = ref([])
   const unread = ref(0)
-  const enabled = ref(true)
+  // 后台检查默认关闭，首次开启前会展示检查范围与数据存放说明
+  const enabled = ref(false)
   const notificationsEnabled = ref(true)
   const checkTimes = ref({ morning: '07:10', noon: '12:50' })
   const loaded = ref(false)

@@ -1,0 +1,90 @@
+const STORAGE_KEY = 'lzpu.privacy.accepted'
+
+// 规则修订时同步 +1，老用户下次启动会重新看到并重新同意
+export const PRIVACY_VERSION = '1'
+export const PRIVACY_DATE = '2026-11-01'
+export const PRIVACY_CONTACT = '3507924962@qq.com'
+
+export const PRIVACY_SECTIONS = [
+  {
+    id: 'controller',
+    title: '处理者与联系方式',
+    text: '本应用由个人开发者 LZQlove02 开发与维护，属于第三方非官方客户端，与柳州职业技术大学及其教务系统无隶属关系，也未获官方授权。个人信息保护相关事宜可通过意见反馈或邮箱 3507924962@qq.com 联系。'
+  },
+  {
+    id: 'data',
+    title: '处理的个人信息',
+    text: '登录后仅处理你本人的教务数据：学号、姓名、班级、专业、学院、课表、成绩、评教记录、通知与消息，以及你在应用内查看过的附件和图片缓存。意见反馈时，可由你主动勾选附带设备型号、系统版本与本地崩溃摘要。本应用不申请通讯录、位置、短信、相册等权限，也不读取 IMEI、OAID 等设备标识。'
+  },
+  {
+    id: 'purpose',
+    title: '处理目的与方式',
+    text: '上述信息仅用于在应用内展示你的课表、成绩、通知等教务信息，并提供离线缓存、桌面组件与提醒。数据来自学校教务系统，通过学校统一认证页面登录后，以你的会话只读获取；本应用不保存账号密码，也不修改学校数据。'
+  },
+  {
+    id: 'background',
+    title: '后台检查',
+    text: '课表变更提醒、成绩提醒、通知与消息提醒默认关闭。开启后，应用会在你设定的每天两个时段（默认 07:10、12:50）在后台访问教务系统，仅检查课表变更、不及格成绩和新通知/新消息；结果保存在本机应用私有目录，不上传服务器，锁屏通知只显示通用摘要。你可以随时在设置中关闭。'
+  },
+  {
+    id: 'storage',
+    title: '存储位置与保存期限',
+    text: '登录会话 Cookie 使用 Android Keystore 的 AES-GCM 加密保存；桌面组件数据、课表变更基线、成绩基线与通知提醒的账号标识同样加密保存。其余教务数据保存在应用私有目录，不参与系统备份。登录期间保留，退出登录、清除本机个人数据或卸载应用时删除。学校统一认证可能保留一周免登录会话 Cookie 与设备信任 Cookie，仅存在于 WebView Cookie 库，用于减少重复登录；退出登录会清除免登录会话，卸载或清除应用数据即全部删除。公开内容缓存按 6 小时（列表）/7 天（详情）过期，个人数据缓存最长保留 30 天。'
+  },
+  {
+    id: 'sharing',
+    title: '共享、转让与公开',
+    text: '不向任何第三方出售、提供或公开你的个人信息。检查更新仅向 GitHub 发送不含个人信息的匿名请求；意见反馈仅在你主动点击发送时，通过系统邮件应用发往固定邮箱，正文由你确认后发出。通知与公示正文由学校公开发布，应用仅展示并保留来源，不二次加工或传播。'
+  },
+  {
+    id: 'rights',
+    title: '你的权利',
+    text: '你可以在应用内查看、更正（以学校教务系统为准）和删除本机数据：设置 → 清除本机个人数据，或退出登录。也可以撤回隐私同意：设置 → 撤回隐私同意，撤回后将停止处理并清除本机数据。对处理规则有异议，可通过意见反馈或上述邮箱联系。'
+  },
+  {
+    id: 'minor',
+    title: '未成年人保护',
+    text: '本应用面向高校学生，不面向未满 14 周岁的未成年人。如发现相关情况，请联系我们删除相关数据。'
+  },
+  {
+    id: 'security',
+    title: '安全措施',
+    text: '应用全程使用 HTTPS，配合主机白名单、逐跳重定向校验与统一认证证书固定；登录 WebView 不暴露 JS 接口，登录结束后清除站点 Cookie、缓存与表单，并在完成后销毁，该 WebView 的其余站点存储保存在系统 WebView 沙箱内，应用不会读取，清除应用数据或卸载时删除；本地数据受 Android 应用沙箱保护，锁屏通知仅显示脱敏文案。'
+  },
+  {
+    id: 'update',
+    title: '规则更新',
+    text: '本规则修订后会更新版本号，并在下次启动时重新提示、重新取得你的同意。'
+  }
+]
+
+export function acceptedPrivacyVersion() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) || ''
+  } catch (error) {
+    // 存储不可用时按未同意处理
+    return ''
+  }
+}
+
+export function isPrivacyAccepted() {
+  return acceptedPrivacyVersion() === PRIVACY_VERSION
+}
+
+export function acceptPrivacy() {
+  try {
+    localStorage.setItem(STORAGE_KEY, PRIVACY_VERSION)
+    return true
+  } catch (error) {
+    // 写不进去也放行本次会话，下次启动会重新提示
+    return false
+  }
+}
+
+export function revokePrivacy() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch (error) {
+    // 存储不可用时无需处理
+  }
+}

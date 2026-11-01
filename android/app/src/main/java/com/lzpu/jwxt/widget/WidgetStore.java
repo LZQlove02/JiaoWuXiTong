@@ -3,10 +3,13 @@ package com.lzpu.jwxt.widget;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.lzpu.jwxt.LocalCipher;
+
 import org.json.JSONObject;
 
 /**
  * 组件数据存储：App 私有 SharedPreferences，不导出、不参与备份。
+ * payload 使用 Keystore AES-GCM 加密，避免课程名等明文落盘。
  * JS 侧通过 WidgetBridge 写入，组件进程只读。
  */
 public final class WidgetStore {
@@ -32,13 +35,15 @@ public final class WidgetStore {
 
     public static void writePayload(Context context, String json) {
         synchronized (PAYLOAD_LOCK) {
-            prefs(context).edit().putString(KEY_PAYLOAD, json == null ? "" : json).apply();
+            prefs(context).edit()
+                    .putString(KEY_PAYLOAD, LocalCipher.seal(json == null ? "" : json))
+                    .apply();
         }
     }
 
     public static String readPayload(Context context) {
         synchronized (PAYLOAD_LOCK) {
-            return prefs(context).getString(KEY_PAYLOAD, "");
+            return LocalCipher.open(prefs(context).getString(KEY_PAYLOAD, ""));
         }
     }
 

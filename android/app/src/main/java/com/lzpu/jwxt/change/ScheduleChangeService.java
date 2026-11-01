@@ -290,6 +290,11 @@ public final class ScheduleChangeService {
             ScheduleChangeStore.clearBaseline(app);
             ScheduleChangeStore.writeEntries(app, new ArrayList<>(), Calendar.getInstance());
             ScheduleChangeStore.clearLastSessionExpiredDate(app);
+            // 退出登录后没有会话，关闭全部后台提醒，避免无意义地访问教务系统
+            ScheduleChangeStore.setEnabled(app, false);
+            GradeAlertStore.setEnabled(app, false);
+            PortalAlertStore.setNoticesEnabled(app, false);
+            PortalAlertStore.setMessagesEnabled(app, false);
             ScheduleCheckScheduler.cancelAll(app);
             WidgetStore.markChangeBadge(app, false);
             WidgetUpdater.refreshAll(app);

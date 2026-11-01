@@ -15,6 +15,11 @@
     </section>
 
     <router-link class="feedback-link" to="/feedback">遇到问题？意见反馈</router-link>
+    <div class="legal-links">
+      <router-link to="/privacy">隐私政策</router-link>
+      <span>·</span>
+      <router-link to="/licenses">开源许可</router-link>
+    </div>
   </div>
 </template>
 
@@ -81,6 +86,20 @@ async function ssoLogin() {
   margin-top: 20px;
   text-align: center;
   font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.legal-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.legal-links a {
   color: var(--text-tertiary);
 }
 

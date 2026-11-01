@@ -3,13 +3,13 @@
     class="gate"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="disclaimer-title"
+    aria-labelledby="consent-title"
   >
     <div class="gate-card">
       <header class="gate-head">
         <img class="gate-logo" src="../assets/app-icon.png" alt="" />
-        <h1 id="disclaimer-title" class="gate-title">使用前请阅读</h1>
-        <p class="gate-sub">柳职教务 · 免责声明</p>
+        <h1 id="consent-title" class="gate-title">{{ title }}</h1>
+        <p class="gate-sub">{{ subtitle }}</p>
       </header>
 
       <div class="gate-body">
@@ -35,9 +35,9 @@
         </button>
         <template v-else>
           <button ref="primaryRef" class="primary" type="button" @click="$emit('accept')">
-            同意并继续
+            {{ primaryText }}
           </button>
-          <button class="ghost" type="button" @click="$emit('decline')">不同意，退出</button>
+          <button class="ghost" type="button" @click="$emit('decline')">{{ declineText }}</button>
         </template>
       </footer>
     </div>
@@ -46,51 +46,29 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { DISCLAIMER_DATE, DISCLAIMER_VERSION } from '../utils/disclaimer'
 
 const props = defineProps({
-  // gate：首次启动门禁；reader：设置页只读重读
+  // gate：同意门禁；reader：设置页只读重读
   mode: { type: String, default: 'gate' },
   // Web 预览环境退不掉，用一句静态提示兜底
-  declined: { type: Boolean, default: false }
+  declined: { type: Boolean, default: false },
+  title: { type: String, default: '使用前请阅读' },
+  subtitle: { type: String, default: '' },
+  // [{ title, text }]
+  clauses: { type: Array, required: true },
+  versionText: { type: String, default: '' },
+  primaryText: { type: String, default: '同意并继续' },
+  declineText: { type: String, default: '不同意，退出' }
 })
 
 defineEmits(['accept', 'decline', 'close'])
 
-const clauses = [
-  {
-    title: '非官方应用',
-    text: '本应用为个人开发的第三方客户端，与学校及教务系统运营方无隶属关系；仅限校内同学免费自行安装使用，不做商业用途，禁止二次打包与改名分发。'
-  },
-  {
-    title: '数据来源',
-    text: '课表、成绩等数据来自学校教务系统，仅限本人账号只读使用；不采集、不上传他人数据。'
-  },
-  {
-    title: '账号安全',
-    text: '登录在学校统一认证页面完成，本应用不保存账号密码；本机仅保存加密会话，可在退出登录时删除。'
-  },
-  {
-    title: '使用风险',
-    text: '接口可能随时变更或失效，数据仅供参考，以学校教务系统为准；使用本应用产生的后果由使用者自行承担。'
-  },
-  {
-    title: '合规使用',
-    text: '请遵守学校网络与信息管理规定，不得用于爬取、传播他人数据或商业用途。'
-  },
-  {
-    title: '声明更新',
-    text: '本声明修订后将于下次启动重新提示。'
-  }
-]
-
 const primaryRef = ref(null)
 
 const footNote = computed(() => {
-  const base = `声明版本 v${DISCLAIMER_VERSION} · ${DISCLAIMER_DATE}`
-  return props.mode === 'reader'
-    ? base
-    : `继续即表示你已阅读并同意上述条款 · ${base}`
+  if (props.mode === 'reader') return props.versionText
+  const note = '继续即表示你已阅读并同意上述条款'
+  return props.versionText ? `${note} · ${props.versionText}` : note
 })
 
 onMounted(() => {
