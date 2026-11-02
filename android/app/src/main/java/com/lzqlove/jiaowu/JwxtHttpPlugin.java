@@ -8,6 +8,7 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.lzqlove.jiaowu.keepalive.SessionKeepAliveScheduler;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -18,10 +19,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -84,8 +83,6 @@ public class JwxtHttpPlugin extends Plugin {
             .followRedirects(false)
             .followSslRedirects(false)
             .build();
-
-    private volatile String authCookieHeader = "";
 
     @PluginMethod
     public void get(PluginCall call) {
@@ -214,12 +211,9 @@ public class JwxtHttpPlugin extends Plugin {
             return;
         }
 
-        String cookie = authCookieHeader;
-        if (cookie.isEmpty()) {
-            // 冷启动后插件字段可能还没被 JS 恢复，直接读加密存储兜底
-            String saved = AuthCookieStore.load(getContext());
-            cookie = saved == null ? "" : saved;
-        }
+        // 前后台共用加密存储中的最新会话，冷启动后也能直接读到
+        String saved = AuthCookieStore.load(getContext());
+        final String cookie = saved == null ? "" : saved;
         final Request request;
         try {
             Request.Builder builder = new Request.Builder()
@@ -428,9 +422,10 @@ public class JwxtHttpPlugin extends Plugin {
     @PluginMethod
     public void setAuthCookies(PluginCall call) {
         String cookie = call.getString("cookie");
-        authCookieHeader = cookie == null ? "" : cookie;
-        if (!authCookieHeader.isEmpty()) {
-            AuthCookieStore.save(getContext(), authCookieHeader);
+        String value = cookie == null ? "" : cookie;
+        if (!value.isEmpty()) {
+            AuthCookieStore.save(getContext(), value);
+            SessionKeepAliveScheduler.resumeIfEnabled(getContext());
         }
         call.resolve();
     }
@@ -439,9 +434,6 @@ public class JwxtHttpPlugin extends Plugin {
     public void loadAuthCookies(PluginCall call) {
         String cookie = AuthCookieStore.load(getContext());
         boolean restored = cookie != null && !cookie.isEmpty();
-        if (restored) {
-            authCookieHeader = cookie;
-        }
         JSObject result = new JSObject();
         result.put("restored", restored);
         call.resolve(result);
@@ -449,14 +441,13 @@ public class JwxtHttpPlugin extends Plugin {
 
     @PluginMethod
     public void clearAuthCookies(PluginCall call) {
-        authCookieHeader = "";
         AuthCookieStore.clear(getContext());
+        SessionKeepAliveScheduler.cancel(getContext());
         call.resolve();
     }
 
     /**
-     * 登录后的业务请求。只允许 zfjw HTTPS，Cookie 从 WebView 登录结果传入，
-     * 内存中使用，并通过 Android Keystore 加密后持久化。
+     * 登录后的业务请求。只允许 zfjw HTTPS，Cookie 使用本地加密存储中的最新会话。
      */
     @PluginMethod
     public void authGet(PluginCall call) {
@@ -465,6 +456,7 @@ public class JwxtHttpPlugin extends Plugin {
             call.reject("url is required");
             return;
         }
+        String cookie = AuthCookieStore.load(getContext());
 
         final Request request;
         try {
@@ -472,8 +464,8 @@ public class JwxtHttpPlugin extends Plugin {
                     .url(url)
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8");
-            if (!authCookieHeader.isEmpty()) {
-                builder.header("Cookie", authCookieHeader);
+            if (cookie != null && !cookie.isEmpty()) {
+                builder.header("Cookie", cookie);
             }
             request = builder.get().build();
         } catch (IllegalArgumentException e) {
@@ -520,6 +512,7 @@ public class JwxtHttpPlugin extends Plugin {
         RequestBody requestBody = RequestBody.create(
                 body == null ? "" : body,
                 MediaType.parse("application/x-www-form-urlencoded; charset=UTF-8"));
+        String cookie = AuthCookieStore.load(getContext());
         final Request request;
         try {
             Request.Builder builder = new Request.Builder()
@@ -528,8 +521,8 @@ public class JwxtHttpPlugin extends Plugin {
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "application/json,text/html;q=0.9,*/*;q=0.8")
                     .header("X-Requested-With", "XMLHttpRequest");
-            if (!authCookieHeader.isEmpty()) {
-                builder.header("Cookie", authCookieHeader);
+            if (cookie != null && !cookie.isEmpty()) {
+                builder.header("Cookie", cookie);
             }
             request = builder.build();
         } catch (IllegalArgumentException e) {
@@ -579,12 +572,15 @@ public class JwxtHttpPlugin extends Plugin {
         return new HttpExecutor.CookieHandler() {
             @Override
             public String header() {
-                return authCookieHeader;
+                String cookie = AuthCookieStore.load(getContext());
+                return cookie == null ? "" : cookie;
             }
 
             @Override
             public void onResponseHeaders(List<String> setCookies) {
-                if (keepCookies) updateAuthCookies(setCookies);
+                if (keepCookies) {
+                    AuthCookieStore.mergeSetCookies(getContext(), setCookies);
+                }
             }
         };
     }
@@ -610,57 +606,5 @@ public class JwxtHttpPlugin extends Plugin {
                 Log.d(DEBUG_TAG, "重定向 " + code + " -> " + debugUrl(next));
             }
         };
-    }
-
-    /**
-     * 用响应中的 Set-Cookie 更新会话：只保留 name=value，值为空视为删除；
-     * 有变化才重新写入加密存储，避免每个请求都做一次 Keystore 加解密。
-     */
-    private synchronized void updateAuthCookies(List<String> setCookies) {
-        if (setCookies == null || setCookies.isEmpty()) return;
-
-        Map<String, String> jar = new LinkedHashMap<>();
-        putCookiePairs(jar, authCookieHeader);
-        for (String header : setCookies) {
-            String pair = header.split(";", 2)[0].trim();
-            int index = pair.indexOf('=');
-            if (index <= 0) continue;
-            String name = pair.substring(0, index).trim();
-            String value = pair.substring(index + 1).trim();
-            if (name.isEmpty()) continue;
-            if (value.isEmpty()) {
-                jar.remove(name);
-            } else {
-                jar.put(name, value);
-            }
-        }
-
-        String merged = joinCookies(jar);
-        if (merged.equals(authCookieHeader)) return;
-        authCookieHeader = merged;
-        if (merged.isEmpty()) {
-            AuthCookieStore.clear(getContext());
-        } else {
-            AuthCookieStore.save(getContext(), merged);
-        }
-    }
-
-    private static void putCookiePairs(Map<String, String> target, String header) {
-        if (header == null || header.isEmpty()) return;
-        for (String part : header.split(";")) {
-            String pair = part.trim();
-            int index = pair.indexOf('=');
-            if (index <= 0) continue;
-            target.put(pair.substring(0, index).trim(), pair.substring(index + 1).trim());
-        }
-    }
-
-    private static String joinCookies(Map<String, String> jar) {
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, String> entry : jar.entrySet()) {
-            if (builder.length() > 0) builder.append("; ");
-            builder.append(entry.getKey()).append('=').append(entry.getValue());
-        }
-        return builder.toString();
     }
 }

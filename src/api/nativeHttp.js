@@ -48,10 +48,23 @@ export async function loginWithSso() {
   return SsoLogin.login()
 }
 
-// 明确退出登录时清 CASTGC 一周会话；会话失效时不调用，保留免登录能力
+// 明确退出登录时清 CASTGC 会话；会话失效时不调用，保留 WebView 中的登录票据
 export async function clearSsoSession() {
   if (!Capacitor.isNativePlatform()) return
   return SsoLogin.clearSession()
+}
+
+// 「保持登录」：开启后由原生约每 30 分钟在后台维持一次教务会话
+export async function setKeepAlive(enabled) {
+  if (!Capacitor.isNativePlatform()) return { enabled: false, active: false }
+  return SsoLogin.setKeepAlive({ enabled: Boolean(enabled) })
+}
+
+export async function getKeepAliveState() {
+  if (!Capacitor.isNativePlatform()) {
+    return { enabled: false, active: false, intervalMinutes: 30 }
+  }
+  return SsoLogin.getKeepAliveState()
 }
 
 export async function setAuthCookies(cookie) {

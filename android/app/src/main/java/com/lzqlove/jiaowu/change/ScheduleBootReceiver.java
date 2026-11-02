@@ -4,7 +4,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
-/** 开机 / 覆盖安装后补排两个检查闹钟（仅当用户已开启任一后台提醒）。 */
+import com.lzqlove.jiaowu.keepalive.SessionKeepAliveScheduler;
+
+/** 开机 / 覆盖安装后补排后台闹钟（提醒与保持登录）。 */
 public class ScheduleBootReceiver extends BroadcastReceiver {
 
     @Override
@@ -17,6 +19,7 @@ public class ScheduleBootReceiver extends BroadcastReceiver {
             if (BackgroundCheckPolicy.isAnyEnabled(app)) {
                 ScheduleCheckScheduler.scheduleAll(app);
             }
+            SessionKeepAliveScheduler.resumeIfEnabled(app);
         }
     }
 }

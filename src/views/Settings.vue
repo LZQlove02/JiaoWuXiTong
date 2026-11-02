@@ -17,6 +17,27 @@
       </div>
     </section>
 
+    <h2 class="section-title">登录与会话</h2>
+    <section class="card settings">
+      <div class="setting-row">
+        <span class="setting-left"><AppIcon name="refresh" />保持登录</span>
+        <button
+          class="switch"
+          :class="{ 'is-on': keepAliveEnabled }"
+          role="switch"
+          :aria-checked="keepAliveEnabled"
+          aria-label="保持登录"
+          @click="toggleKeepAlive"
+        >
+          <span class="switch-dot"></span>
+        </button>
+      </div>
+      <p class="setting-note">
+        开启后由应用约每 30
+        分钟在后台维持一次教务会话，减少长时间不打开后的重新登录与短信验证。默认关闭；系统省电策略可能造成延迟，学校会话到期后仍需重新登录。
+      </p>
+    </section>
+
     <h2 class="section-title">课表变更提醒</h2>
     <section class="card settings">
       <div class="setting-row">
@@ -33,7 +54,9 @@
         </button>
       </div>
       <p class="setting-note">
-        每天自动检查两次（默认 07:10、12:50，可在下方修改；系统省电策略下可能略有延迟）；只提醒本周的停课、调课与新增。默认关闭，开启前会说明后台检查范围；系统清理后台后，重新打开 App 会自动恢复检查。
+        每天自动检查两次（默认
+        07:10、12:50，可在下方修改；系统省电策略下可能略有延迟）；只提醒本周的停课、调课与新增。默认关闭，开启前会说明后台检查范围；系统清理后台后，重新打开
+        App 会自动恢复检查。
       </p>
       <button class="setting-row" @click="openNotificationSettings">
         <span class="setting-left">通知权限</span>
@@ -150,7 +173,9 @@
         </button>
         <p class="setting-note">样式只影响对应组件实例；添加或删除请长按桌面空白处操作。</p>
       </template>
-      <p v-else class="setting-note">暂无桌面组件。长按桌面空白处添加「教务助手」组件后，可在这里统一调整样式和刷新。</p>
+      <p v-else class="setting-note">
+        暂无桌面组件。长按桌面空白处添加「教务助手」组件后，可在这里统一调整样式和刷新。
+      </p>
     </section>
 
     <h2 class="section-title">隐私与数据</h2>
@@ -235,6 +260,17 @@
       @accept="onBackgroundAccept"
       @decline="onBackgroundDecline"
     />
+    <ConsentGate
+      v-if="keepAliveOpen"
+      :clauses="KEEPALIVE_CLAUSES"
+      title="开启前请阅读"
+      subtitle="教务助手 · 保持登录说明"
+      :version-text="`说明版本 v${KEEPALIVE_CONSENT_VERSION}`"
+      primary-text="同意并开启"
+      decline-text="取消"
+      @accept="onKeepAliveAccept"
+      @decline="onKeepAliveDecline"
+    />
     <ConfirmDialog
       v-if="confirm"
       :title="confirm.title"
@@ -258,7 +294,12 @@ import { useGradeAlertStore } from '../stores/gradeAlert'
 import { usePortalAlertStore } from '../stores/portalAlert'
 import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { useUpdateStore } from '../stores/update'
-import { clearAuthDownloads, clearPublicDownloads } from '../api/nativeHttp'
+import {
+  clearAuthDownloads,
+  clearPublicDownloads,
+  getKeepAliveState,
+  setKeepAlive as setKeepAliveNative
+} from '../api/nativeHttp'
 import { getStorageInfo } from '../native/supportBridge'
 import {
   listWidgets,
@@ -274,6 +315,13 @@ import {
   isBackgroundConsentAccepted,
   revokeBackgroundConsent
 } from '../utils/backgroundConsent'
+import {
+  KEEPALIVE_CLAUSES,
+  KEEPALIVE_CONSENT_VERSION,
+  acceptKeepAliveConsent,
+  isKeepAliveConsentAccepted,
+  revokeKeepAliveConsent
+} from '../utils/keepAliveConsent'
 import { estimateLocalStorageBytes, formatBytes } from '../utils/storage'
 import AppIcon from '../components/AppIcon.vue'
 import BackBar from '../components/BackBar.vue'
@@ -301,6 +349,8 @@ const disclaimerVersion = DISCLAIMER_VERSION
 const privacyVersion = PRIVACY_VERSION
 const backgroundOpen = ref(false)
 const pendingAlert = ref('')
+const keepAliveOpen = ref(false)
+const keepAliveEnabled = ref(false)
 const confirm = ref(null)
 const morningTime = ref(changes.checkTimes.morning)
 const noonTime = ref(changes.checkTimes.noon)
@@ -542,10 +592,52 @@ function onBackgroundDecline() {
   pendingAlert.value = ''
 }
 
+async function loadKeepAlive() {
+  try {
+    const state = await getKeepAliveState()
+    keepAliveEnabled.value = Boolean(state?.enabled)
+  } catch (error) {
+    keepAliveEnabled.value = false
+  }
+}
+
+async function toggleKeepAlive() {
+  if (keepAliveEnabled.value) {
+    await applyKeepAlive(false)
+    return
+  }
+  if (!isKeepAliveConsentAccepted()) {
+    keepAliveOpen.value = true
+    return
+  }
+  await applyKeepAlive(true)
+}
+
+async function applyKeepAlive(enabled) {
+  try {
+    const state = await setKeepAliveNative(enabled)
+    keepAliveEnabled.value = Boolean(state?.enabled)
+    showToast(enabled ? '已开启保持登录' : '已关闭保持登录')
+  } catch (error) {
+    showToast(error?.message || '保持登录设置失败')
+  }
+}
+
+async function onKeepAliveAccept() {
+  acceptKeepAliveConsent()
+  keepAliveOpen.value = false
+  await applyKeepAlive(true)
+}
+
+function onKeepAliveDecline() {
+  keepAliveOpen.value = false
+}
+
 function askClearData() {
   confirm.value = {
     title: '清除本机个人数据',
-    message: '将退出登录并删除本机保存的会话、课表、成绩、通知缓存与桌面组件数据。学校服务器上的数据不受影响。',
+    message:
+      '将退出登录并删除本机保存的会话、课表、成绩、通知缓存与桌面组件数据。学校服务器上的数据不受影响。',
     confirmText: '清除并退出',
     danger: true,
     action: 'clear'
@@ -571,6 +663,12 @@ async function runConfirm() {
     if (action === 'withdraw') {
       revokePrivacy()
       revokeBackgroundConsent()
+      revokeKeepAliveConsent()
+      try {
+        await setKeepAliveNative(false)
+      } catch (error) {
+        // 撤回同意后即使原生取消失败也不阻断清除流程
+      }
       window.location.reload()
       return
     }
@@ -615,6 +713,7 @@ onMounted(async () => {
   portalAlert.init()
   refreshStorage()
   loadWidgets()
+  loadKeepAlive()
   // 组件刚添加/系统绑定有延迟时，首屏可能少列；短延时再读一次
   widgetRetryTimer = setTimeout(loadWidgets, 800)
   try {

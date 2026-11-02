@@ -109,7 +109,7 @@ public class SsoLoginActivity extends Activity {
         });
 
         // 升级后首次打开登录页清理一次一次性安全挑战 Cookie（challenge_cookie/_shmas 等），
-        // 保留 `_shmat` 设备信任与 CASTGC（学校“一周免登录”）。
+        // 保留 `_shmat` 设备信任与 CASTGC（有效期由学校控制，应用不重写）。
         if (!getSharedPreferences(SSO_PREFS, MODE_PRIVATE)
                 .getBoolean(KEY_COOKIE_RESET, false)) {
             SsoCookieCleaner.expireTransient(cookieManager);
@@ -273,8 +273,8 @@ public class SsoLoginActivity extends Activity {
     }
 
     /**
-     * 登录流程结束后清除一次性安全挑战与教务会话，保留 CASTGC（学校“一周免登录”）
-     * 与 `_shmat` 设备信任。不再整体 removeAllCookies / 重写设备 Cookie，
+     * 登录流程结束后清除一次性安全挑战与教务会话，保留 CASTGC 与 `_shmat` 设备信任。
+     * 不再整体 removeAllCookies / 重写设备 Cookie，
      * 避免同名重复或过期挑战值导致“设备请求校验失败”。
      * 不清 WebStorage，否则会连带清掉应用自身的 localStorage（主题、导入数据、课表快照）。
      */

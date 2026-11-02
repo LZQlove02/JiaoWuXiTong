@@ -2,7 +2,7 @@ package com.lzqlove.jiaowu;
 
 import android.webkit.CookieManager;
 
-/** 统一认证/教务 Cookie 的清理边界：保留 CASTGC 以支持学校“一周免登录”。 */
+/** 统一认证/教务 Cookie 的清理边界：保留 CASTGC 与设备信任，避免重复设备校验。 */
 final class SsoCookieCleaner {
 
     private static final String AUTH_SERVER_URL = "https://authserver.lzzy.net";
@@ -21,7 +21,7 @@ final class SsoCookieCleaner {
     /** 登录结束/取消：清一次性挑战与 HTTP 会话，保留 CASTGC 与 `_shmat` 设备信任。 */
     static void expireTransient(CookieManager manager) {
         expireNames(manager, AUTH_SERVER_URL, TRANSIENT, AUTH_PATHS);
-        // CASTGC 保留供下一次免登录使用；只清较老的 TGC 名称
+        // CASTGC 有效期由学校控制，应用只保留、不重写；只清较老的 TGC 名称
         expireNames(manager, AUTH_SERVER_URL, new String[]{"TGC"}, AUTH_PATHS);
     }
 

@@ -124,6 +124,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- 保持登录：约每 30 分钟后台维持一次教务会话 -->
+        <receiver
+            android:name=".keepalive.SessionKeepAliveReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".SsoLoginActivity"
             android:exported="false"

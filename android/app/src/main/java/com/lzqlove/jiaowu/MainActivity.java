@@ -12,6 +12,7 @@ import com.lzqlove.jiaowu.change.GradeAlertNotifier;
 import com.lzqlove.jiaowu.change.PortalAlertNotifier;
 import com.lzqlove.jiaowu.change.ScheduleChangeNotifier;
 import com.lzqlove.jiaowu.change.ScheduleCheckScheduler;
+import com.lzqlove.jiaowu.keepalive.SessionKeepAliveScheduler;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -28,6 +29,7 @@ public class MainActivity extends BridgeActivity {
         GradeAlertNotifier.ensureChannel(this);
         PortalAlertNotifier.ensureChannel(this);
         ScheduleCheckScheduler.scheduleAll(this);
+        SessionKeepAliveScheduler.resumeIfEnabled(this);
         applySystemFontScale();
     }
 

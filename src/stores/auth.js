@@ -152,7 +152,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    // 明确退出登录才清 CASTGC；会话失效走 clearLocalSession，保留学校一周免登录
+    // 明确退出登录才清 CASTGC；会话失效走 clearLocalSession，保留 WebView 中的登录票据
     try {
       await clearSsoSession()
     } catch (error) {

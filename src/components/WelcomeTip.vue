@@ -5,7 +5,7 @@
       <h2 id="welcome-title" class="welcome-title">欢迎使用教务助手</h2>
       <p class="welcome-sub">第一次使用，先看看这几条</p>
       <ul class="welcome-list">
-        <li>在统一认证页勾选 Keep me signed in，可保留约一周免登录。</li>
+        <li>长时间不打开时，可在设置页开启「保持登录」，减少重复登录与短信验证。</li>
         <li>课表时间可在设置中逐节调整，有更晚的课会自动扩展显示。</li>
         <li>桌面长按空白处可添加下一节课、今日课程与本周课表组件。</li>
       </ul>
