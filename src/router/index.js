@@ -16,6 +16,9 @@ import Evaluation from '../views/Evaluation.vue'
 import CourseSelection from '../views/CourseSelection.vue'
 import Settings from '../views/Settings.vue'
 import ScheduleSettings from '../views/ScheduleSettings.vue'
+import ReminderSettings from '../views/ReminderSettings.vue'
+import SessionSettings from '../views/SessionSettings.vue'
+import WidgetSettings from '../views/WidgetSettings.vue'
 import Changes from '../views/Changes.vue'
 import Tutorial from '../views/Tutorial.vue'
 import About from '../views/About.vue'
@@ -33,7 +36,25 @@ const routes = [
     path: '/settings',
     name: 'settings',
     component: Settings,
-    meta: { title: '设置' }
+    meta: { title: '应用设置' }
+  },
+  {
+    path: '/settings/reminders',
+    name: 'reminder-settings',
+    component: ReminderSettings,
+    meta: { title: '提醒与通知' }
+  },
+  {
+    path: '/settings/session',
+    name: 'session-settings',
+    component: SessionSettings,
+    meta: { title: '登录与会话' }
+  },
+  {
+    path: '/settings/widgets',
+    name: 'widget-settings',
+    component: WidgetSettings,
+    meta: { title: '桌面组件' }
   },
   {
     path: '/schedule-settings',

@@ -11,10 +11,46 @@
     </section>
 
     <section class="card settings entry-card">
-      <button class="setting-row" @click="router.push('/settings')">
-        <span class="setting-left"><AppIcon name="settings" />设置</span>
+      <router-link class="setting-row" to="/settings/reminders">
+        <span class="setting-left">
+          <span class="setting-icon"><AppIcon name="notice" /></span>
+          <span class="setting-text">
+            <span class="setting-title">提醒与通知</span>
+            <span class="tiny">课表变更、成绩与通知消息</span>
+          </span>
+        </span>
         <AppIcon name="chevron-right" />
-      </button>
+      </router-link>
+      <router-link class="setting-row" to="/settings/session">
+        <span class="setting-left">
+          <span class="setting-icon"><AppIcon name="logout" /></span>
+          <span class="setting-text">
+            <span class="setting-title">登录与会话</span>
+            <span class="tiny">保持登录，减少短信验证</span>
+          </span>
+        </span>
+        <AppIcon name="chevron-right" />
+      </router-link>
+      <router-link class="setting-row" to="/settings/widgets">
+        <span class="setting-left">
+          <span class="setting-icon"><AppIcon name="calendar" /></span>
+          <span class="setting-text">
+            <span class="setting-title">桌面组件</span>
+            <span class="tiny">组件样式与刷新</span>
+          </span>
+        </span>
+        <AppIcon name="chevron-right" />
+      </router-link>
+      <router-link class="setting-row" to="/settings">
+        <span class="setting-left">
+          <span class="setting-icon"><AppIcon name="settings" /></span>
+          <span class="setting-text">
+            <span class="setting-title">应用设置</span>
+            <span class="tiny">外观、课表时间、隐私与数据</span>
+          </span>
+        </span>
+        <AppIcon name="chevron-right" />
+      </router-link>
     </section>
 
     <button class="logout" @click="onLogout">
@@ -87,21 +123,49 @@ async function onLogout() {
 }
 
 .setting-row {
-  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 14px 0;
+  border-bottom: 1px solid var(--border);
   color: var(--text-tertiary);
 }
 
+.setting-row:last-child {
+  border-bottom: none;
+}
+
 .setting-left {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 15px;
+  gap: 12px;
+}
+
+.setting-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
   color: var(--text);
+}
+
+.setting-title {
+  font-size: 15px;
 }
 
 .logout {
