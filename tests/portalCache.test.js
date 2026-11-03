@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { PORTAL_NOTICE_TTL, readPortalCache, writePortalCache } from '../src/utils/portalCache'
+import {
+  PORTAL_NOTICE_TTL,
+  clearPortalCache,
+  readPortalCache,
+  writePortalCache
+} from '../src/utils/portalCache'
 
 describe('学生门户缓存', () => {
   beforeEach(() => {
@@ -24,5 +29,13 @@ describe('学生门户缓存', () => {
   it('内容损坏时返回 null，不抛错', () => {
     localStorage.setItem('jiaowu.portal.v1.notices.index', '{bad json')
     expect(readPortalCache('notices.index', PORTAL_NOTICE_TTL)).toBeNull()
+  })
+
+  it('清理只移除门户缓存，不影响其他个人数据缓存', () => {
+    writePortalCache('notices.index', { items: [] })
+    localStorage.setItem('jiaowu.data.v1.grades', '{}')
+    clearPortalCache()
+    expect(localStorage.getItem('jiaowu.portal.v1.notices.index')).toBeNull()
+    expect(localStorage.getItem('jiaowu.data.v1.grades')).toBe('{}')
   })
 })

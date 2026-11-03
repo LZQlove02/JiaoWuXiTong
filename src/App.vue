@@ -42,9 +42,14 @@ import UpdateDialog from './components/UpdateDialog.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
 import { useChangesStore } from './stores/changes'
+import { useGradeAlertStore } from './stores/gradeAlert'
+import { usePortalAlertStore } from './stores/portalAlert'
 import { useScheduleSettingsStore } from './stores/scheduleSettings'
 import { useUiStore } from './stores/ui'
 import { useUpdateStore } from './stores/update'
+import { setKeepAlive } from './api/nativeHttp'
+import { isBackgroundConsentAccepted } from './utils/backgroundConsent'
+import { isKeepAliveConsentAccepted } from './utils/keepAliveConsent'
 import {
   DISCLAIMER_CLAUSES,
   DISCLAIMER_DATE,
@@ -69,6 +74,8 @@ const ui = useUiStore()
 const auth = useAuthStore()
 const academic = useAcademicStore()
 const changes = useChangesStore()
+const gradeAlert = useGradeAlertStore()
+const portalAlert = usePortalAlertStore()
 const scheduleSettings = useScheduleSettingsStore()
 const update = useUpdateStore()
 const showTabBar = computed(() => route.meta.tab === true)
@@ -296,8 +303,29 @@ watch(
   { immediate: true }
 )
 
+// 子同意规则升版后，未重新阅读并同意前先停用后台能力，避免旧同意继续生效
+async function enforceSubConsents() {
+  if (!isBackgroundConsentAccepted()) {
+    await Promise.allSettled([
+      changes.setEnabled(false),
+      gradeAlert.setEnabled(false),
+      portalAlert.setEnabled('notices', false),
+      portalAlert.setEnabled('messages', false)
+    ])
+  }
+  if (!isKeepAliveConsentAccepted()) {
+    try {
+      await setKeepAlive(false)
+    } catch (error) {
+      // 原生取消失败时由接收器在无会话场景下兜底
+    }
+  }
+}
+
 onMounted(() => {
   ui.initTheme()
+  // 子同意版本不匹配时先停用后台检查与保活，再进入原有启动流程
+  enforceSubConsents()
   // 已同意（老用户）时立即初始化；超期缓存已在 main.js 恢复会话前清理
   if (consented.value) setupNative()
 })

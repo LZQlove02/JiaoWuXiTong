@@ -25,11 +25,19 @@ export function readPortalCache(key, ttlMs) {
 
 export function writePortalCache(key, data) {
   try {
-    localStorage.setItem(
-      PREFIX + key,
-      JSON.stringify({ data, cachedAt: new Date().toISOString() })
-    )
+    localStorage.setItem(PREFIX + key, JSON.stringify({ data, cachedAt: new Date().toISOString() }))
   } catch (error) {
     // 本地存储不可用时只影响离线回退
+  }
+}
+
+// 退出登录、会话失效或清除本机数据时调用，避免下一个账号读到上一个人的通知与消息
+export function clearPortalCache() {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(PREFIX))
+      .forEach((key) => localStorage.removeItem(key))
+  } catch (error) {
+    // 存储不可用时无需处理
   }
 }

@@ -2,10 +2,19 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { resetAcademicApi, setAcademicApi } from '../api'
 import { ZfAcademicApi, clearScheduleSnapshot } from '../api/zf'
-import { clearAuthCookies, clearSsoSession, loadAuthCookies } from '../api/nativeHttp'
+import {
+  clearAuthCookies,
+  clearAuthDownloads,
+  clearPublicDownloads,
+  clearSsoSession,
+  loadAuthCookies,
+  setKeepAlive
+} from '../api/nativeHttp'
 import { clearScheduleChange } from '../native/scheduleChangeBridge'
+import { clearCrashLog } from '../native/supportBridge'
 import { setSessionExpiredHandler } from '../utils/sessionExpiry'
 import { clearDataCaches } from '../utils/dataCache'
+import { clearPortalCache } from '../utils/portalCache'
 
 const RESTORE_TIMEOUT_MS = 15000
 
@@ -45,12 +54,19 @@ export const useAuthStore = defineStore('auth', () => {
     useAcademicStore().reset()
   }
 
-  // 清掉本机所有会话相关数据：加密 Cookie、课表快照、变更记录与个人数据缓存
+  // 清掉本机所有会话相关数据：加密 Cookie、课表快照、变更记录、个人缓存与附件
   async function clearLocalSession() {
     await clearScheduleChange()
     await clearAuthCookies()
     clearScheduleSnapshot()
     clearDataCaches()
+    clearPortalCache()
+    try {
+      // 附件与正文图缓存可能包含上一账号查看过的材料，退出时必须一并删除
+      await Promise.all([clearAuthDownloads(), clearPublicDownloads()])
+    } catch (error) {
+      // 原生缓存清理失败不阻断会话清理，下次清理仍会尝试
+    }
     resetAcademicApi()
     user.value = null
     justLoggedIn.value = false
@@ -157,11 +173,22 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     // 明确退出登录才清 CASTGC；会话失效走 clearLocalSession，保留 WebView 中的登录票据
     try {
+      // 先关闭「保持登录」：清除开关状态并取消闹钟，避免重新登录后被旧偏好自动恢复
+      await setKeepAlive(false)
+    } catch (error) {
+      // 原生取消失败不阻断退出登录
+    }
+    try {
       await clearSsoSession()
     } catch (error) {
       // 原生清理失败不影响退出登录本身
     }
     await clearLocalSession()
+    try {
+      await clearCrashLog()
+    } catch (error) {
+      // 崩溃摘要清理失败不阻断退出登录
+    }
     await resetAcademic()
   }
 

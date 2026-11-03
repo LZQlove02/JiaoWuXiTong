@@ -14,8 +14,11 @@ vi.mock('../src/api/zf', () => {
 })
 vi.mock('../src/api/nativeHttp', () => ({
   clearAuthCookies: vi.fn(async () => {}),
+  clearAuthDownloads: vi.fn(async () => {}),
+  clearPublicDownloads: vi.fn(async () => {}),
   clearSsoSession: vi.fn(async () => {}),
-  loadAuthCookies: vi.fn(async () => ({ restored: false }))
+  loadAuthCookies: vi.fn(async () => ({ restored: false })),
+  setKeepAlive: vi.fn(async () => ({ enabled: false }))
 }))
 vi.mock('../src/native/scheduleChangeBridge', () => ({
   clearScheduleChange: vi.fn(async () => {})
