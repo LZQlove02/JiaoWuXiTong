@@ -32,7 +32,7 @@
             android:maxLines="1"
             android:text="@string/widget_title_today"
             android:textColor="#1A1C1F"
-            android:textSize="12sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
@@ -47,7 +47,7 @@
             android:paddingBottom="1dp"
             android:text="@string/widget_change_badge"
             android:textColor="#FFFFFF"
-            android:textSize="9sp"
+            android:textSize="10sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
@@ -71,7 +71,7 @@
             android:layout_height="wrap_content"
             android:maxLines="1"
             android:textColor="#8A8F98"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
     </LinearLayout>
 
     <!-- 主体：height=0 + weight=1，行少时留白，footer 不受影响 -->
@@ -99,11 +99,11 @@
                 android:shadowDy="1"
                 android:shadowRadius="2"
                 android:id="@+id/widget_time1"
-                android:layout_width="42dp"
+                android:layout_width="46dp"
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -117,7 +117,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="#1A1C1F"
-                android:textSize="12sp" />
+                android:textSize="14sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -131,9 +131,9 @@
                 android:layout_marginEnd="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:maxWidth="92dp"
+                android:maxWidth="100dp"
                 android:textColor="#8A8F98"
-                android:textSize="9.5sp" />
+                android:textSize="11sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -141,13 +141,13 @@
                 android:shadowDy="1"
                 android:shadowRadius="2"
                 android:id="@+id/widget_state1"
-                android:layout_width="44dp"
+                android:layout_width="48dp"
                 android:ellipsize="end"
                 android:layout_height="wrap_content"
                 android:gravity="end"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="9sp" />
+                android:textSize="10.5sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -163,11 +163,11 @@
                 android:shadowDy="1"
                 android:shadowRadius="2"
                 android:id="@+id/widget_time2"
-                android:layout_width="42dp"
+                android:layout_width="46dp"
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -181,7 +181,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="#1A1C1F"
-                android:textSize="12sp" />
+                android:textSize="14sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -195,9 +195,9 @@
                 android:layout_marginEnd="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:maxWidth="92dp"
+                android:maxWidth="100dp"
                 android:textColor="#8A8F98"
-                android:textSize="9.5sp" />
+                android:textSize="11sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -205,13 +205,13 @@
                 android:shadowDy="1"
                 android:shadowRadius="2"
                 android:id="@+id/widget_state2"
-                android:layout_width="44dp"
+                android:layout_width="48dp"
                 android:ellipsize="end"
                 android:layout_height="wrap_content"
                 android:gravity="end"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="9sp" />
+                android:textSize="10.5sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -227,11 +227,11 @@
                 android:shadowDy="1"
                 android:shadowRadius="2"
                 android:id="@+id/widget_time3"
-                android:layout_width="42dp"
+                android:layout_width="46dp"
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -245,7 +245,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="#1A1C1F"
-                android:textSize="12sp" />
+                android:textSize="14sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -259,9 +259,9 @@
                 android:layout_marginEnd="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:maxWidth="92dp"
+                android:maxWidth="100dp"
                 android:textColor="#8A8F98"
-                android:textSize="9.5sp" />
+                android:textSize="11sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -269,13 +269,13 @@
                 android:shadowDy="1"
                 android:shadowRadius="2"
                 android:id="@+id/widget_state3"
-                android:layout_width="44dp"
+                android:layout_width="48dp"
                 android:ellipsize="end"
                 android:layout_height="wrap_content"
                 android:gravity="end"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="9sp" />
+                android:textSize="10.5sp" />
         </LinearLayout>
 
         <TextView
@@ -289,7 +289,7 @@
             android:gravity="center"
             android:text="@string/widget_no_class"
             android:textColor="#8A8F98"
-            android:textSize="11sp"
+            android:textSize="13sp"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -315,6 +315,6 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#5F6368"
-            android:textSize="10sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

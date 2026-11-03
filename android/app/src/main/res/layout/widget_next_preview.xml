@@ -25,7 +25,7 @@
             android:maxLines="1"
             android:text="下一节课"
             android:textColor="#5F6368"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
 
         <TextView
             android:shadowColor="#66000000"
@@ -39,7 +39,7 @@
             android:maxLines="2"
             android:text="机器学习与深度学习"
             android:textColor="#1A1C1F"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -63,7 +63,7 @@
             android:maxLines="1"
             android:text="14:30-17:40"
             android:textColor="#5F6368"
-            android:textSize="11sp" />
+            android:textSize="13sp" />
 
         <TextView
             android:shadowColor="#66000000"
@@ -76,7 +76,7 @@
             android:maxLines="1"
             android:text="笃行楼T2-A412"
             android:textColor="#8A8F98"
-            android:textSize="10sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <TextView
@@ -107,7 +107,7 @@
             android:maxLines="1"
             android:text="剩 2 节"
             android:textColor="#5F6368"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:shadowColor="#66000000"
@@ -119,6 +119,6 @@
             android:maxLines="1"
             android:text="更新于 09:30"
             android:textColor="#8A8F98"
-            android:textSize="9sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 </LinearLayout>

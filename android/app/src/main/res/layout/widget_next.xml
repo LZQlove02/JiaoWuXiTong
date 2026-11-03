@@ -36,7 +36,7 @@
                 android:maxLines="1"
                 android:text="@string/widget_title_next"
                 android:textColor="#5F6368"
-                android:textSize="11sp" />
+                android:textSize="12sp" />
 
             <ImageView
                 android:id="@+id/widget_style_chip"
@@ -60,7 +60,7 @@
             android:ellipsize="end"
             android:maxLines="2"
             android:textColor="#1A1C1F"
-            android:textSize="12sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -86,7 +86,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#5F6368"
-            android:textSize="11sp" />
+            android:textSize="13sp" />
 
         <TextView
             android:shadowColor="#66000000"
@@ -99,7 +99,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#8A8F98"
-            android:textSize="10sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <!-- 占位撑开，把底部信息压到最下方；RemoteViews 不支持 Space/View，用空 TextView -->
@@ -134,7 +134,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#5F6368"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:shadowColor="#66000000"
@@ -147,6 +147,6 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#8A8F98"
-            android:textSize="9sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 </LinearLayout>
