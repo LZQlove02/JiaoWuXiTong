@@ -57,4 +57,34 @@ describe('退出登录的本机数据清理', () => {
     expect(clearPortalCache).toHaveBeenCalled()
     expect(clearDataCaches).toHaveBeenCalled()
   })
+
+  it('冷启动恢复判定会话失效时执行完整本机清理', async () => {
+    const nativeHttp = await import('../src/api/nativeHttp')
+    const { ZfAcademicApi } = await import('../src/api/zf')
+    nativeHttp.loadAuthCookies.mockResolvedValueOnce({ restored: true })
+    ZfAcademicApi.mockImplementationOnce(function () {
+      this.applySnapshot = vi.fn(() => null)
+      this.restoreSession = vi.fn(async () => {
+        const error = new Error('会话失效')
+        error.sessionExpired = true
+        throw error
+      })
+    })
+
+    const auth = useAuthStore()
+    await auth.bootstrap()
+
+    const { clearScheduleSnapshot } = await import('../src/api/zf')
+    const { clearScheduleChange } = await import('../src/native/scheduleChangeBridge')
+    const { clearPortalCache } = await import('../src/utils/portalCache')
+    const { clearDataCaches } = await import('../src/utils/dataCache')
+
+    expect(nativeHttp.clearAuthCookies).toHaveBeenCalled()
+    expect(clearScheduleChange).toHaveBeenCalled()
+    expect(clearScheduleSnapshot).toHaveBeenCalled()
+    expect(clearDataCaches).toHaveBeenCalled()
+    expect(clearPortalCache).toHaveBeenCalled()
+    expect(nativeHttp.clearAuthDownloads).toHaveBeenCalled()
+    expect(nativeHttp.clearPublicDownloads).toHaveBeenCalled()
+  })
 })

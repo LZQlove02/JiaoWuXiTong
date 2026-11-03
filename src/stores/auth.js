@@ -105,10 +105,9 @@ export const useAuthStore = defineStore('auth', () => {
         return true
       }
     } catch (error) {
-      // 仅在服务端明确判定会话失效时清除凭据；网络不可达或解析失败时保留，避免误登出
+      // 仅在服务端明确判定会话失效时清除本机数据；网络不可达或解析失败时保留，避免误登出
       if (error?.sessionExpired) {
-        await clearAuthCookies()
-        clearDataCaches()
+        await clearLocalSession()
       }
     }
     return false
