@@ -16,37 +16,27 @@
           <span class="setting-icon"><AppIcon name="notice" /></span>
           <span class="setting-text">
             <span class="setting-title">提醒与通知</span>
-            <span class="tiny">课表变更、成绩与通知消息</span>
+            <span class="tiny">课表变更、成绩、通知与检查时间</span>
           </span>
         </span>
         <AppIcon name="chevron-right" />
       </router-link>
-      <router-link class="setting-row" to="/settings/session">
+      <router-link class="setting-row" to="/settings/account">
         <span class="setting-left">
           <span class="setting-icon"><AppIcon name="logout" /></span>
           <span class="setting-text">
-            <span class="setting-title">登录与会话</span>
-            <span class="tiny">保持登录，减少短信验证</span>
+            <span class="setting-title">账号与设备</span>
+            <span class="tiny">登录会话与桌面组件</span>
           </span>
         </span>
         <AppIcon name="chevron-right" />
       </router-link>
-      <router-link class="setting-row" to="/settings/widgets">
-        <span class="setting-left">
-          <span class="setting-icon"><AppIcon name="calendar" /></span>
-          <span class="setting-text">
-            <span class="setting-title">桌面组件</span>
-            <span class="tiny">组件样式与刷新</span>
-          </span>
-        </span>
-        <AppIcon name="chevron-right" />
-      </router-link>
-      <router-link class="setting-row" to="/settings">
+      <router-link class="setting-row" to="/settings/app">
         <span class="setting-left">
           <span class="setting-icon"><AppIcon name="settings" /></span>
           <span class="setting-text">
-            <span class="setting-title">应用设置</span>
-            <span class="tiny">外观、课表时间、隐私与数据</span>
+            <span class="setting-title">应用与隐私</span>
+            <span class="tiny">外观、隐私数据与通用帮助</span>
           </span>
         </span>
         <AppIcon name="chevron-right" />

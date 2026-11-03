@@ -18,7 +18,7 @@
         </button>
       </div>
       <p class="setting-note">
-        每天自动检查两次（默认 07:10、12:50，可在下方修改；系统省电策略下可能略有延迟）；
+        每天自动检查两次（默认 07:10、12:50，可在下方「提醒时间」修改；系统省电策略下可能略有延迟）；
         只提醒本周的停课、调课与新增。默认关闭，开启前会说明后台检查范围；系统清理后台后，重新打开
         App 会自动恢复检查。
       </p>
@@ -110,20 +110,32 @@
       </p>
     </section>
 
+    <h2 class="section-title">课表时间</h2>
+    <section class="card settings">
+      <router-link class="setting-row" to="/schedule-settings">
+        <span class="setting-left"><AppIcon name="calendar" />节次时间与每日节数</span>
+        <span class="tiny">{{ scheduleSettings.periodCount }} 节</span>
+        <AppIcon name="chevron-right" />
+      </router-link>
+      <p class="setting-note">
+        逐节修改起止时间；课表、桌面组件与变更提醒同步使用。有更晚的课会自动扩展显示。
+      </p>
+    </section>
+
     <transition name="fade">
       <div v-if="toast" class="toast">{{ toast }}</div>
     </transition>
 
     <ConsentGate
-      v-if="backgroundOpen"
+      v-if="consentOpen"
       :clauses="BACKGROUND_CLAUSES"
       title="开启前请阅读"
       subtitle="教务助手 · 后台检查说明"
       :version-text="`说明版本 v${BACKGROUND_CONSENT_VERSION}`"
       primary-text="同意并开启"
       decline-text="取消"
-      @accept="onBackgroundAccept"
-      @decline="onBackgroundDecline"
+      @accept="acceptConsent"
+      @decline="declineConsent"
     />
   </div>
 </template>
@@ -133,12 +145,12 @@ import { onMounted, ref, watch } from 'vue'
 import { useChangesStore } from '../stores/changes'
 import { useGradeAlertStore } from '../stores/gradeAlert'
 import { usePortalAlertStore } from '../stores/portalAlert'
+import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import {
   BACKGROUND_CLAUSES,
-  BACKGROUND_CONSENT_VERSION,
-  acceptBackgroundConsent,
-  isBackgroundConsentAccepted
+  BACKGROUND_CONSENT_VERSION
 } from '../utils/backgroundConsent'
+import { useBackgroundGate } from '../composables/useBackgroundGate'
 import AppIcon from '../components/AppIcon.vue'
 import BackBar from '../components/BackBar.vue'
 import ConsentGate from '../components/ConsentGate.vue'
@@ -146,10 +158,10 @@ import ConsentGate from '../components/ConsentGate.vue'
 const changes = useChangesStore()
 const gradeAlert = useGradeAlertStore()
 const portalAlert = usePortalAlertStore()
+const scheduleSettings = useScheduleSettingsStore()
+const { consentOpen, requestConsent, acceptConsent, declineConsent } = useBackgroundGate()
 
 const toast = ref('')
-const backgroundOpen = ref(false)
-const pendingAlert = ref('')
 const morningTime = ref(changes.checkTimes.morning)
 const noonTime = ref(changes.checkTimes.noon)
 const savingTimes = ref(false)
@@ -171,17 +183,12 @@ watch(
 )
 
 async function toggleChanges() {
-  const next = !changes.enabled
-  if (next) {
-    if (!isBackgroundConsentAccepted()) {
-      askBackgroundConsent('changes')
-      return
-    }
-    await enableChanges()
+  if (changes.enabled) {
+    await changes.setEnabled(false)
+    showToast('已关闭课表变更提醒')
     return
   }
-  await changes.setEnabled(false)
-  showToast('已关闭课表变更提醒')
+  requestConsent(enableChanges)
 }
 
 async function enableChanges() {
@@ -199,21 +206,16 @@ function openNotificationSettings() {
 }
 
 async function toggleGradeAlert() {
-  const next = !gradeAlert.enabled
-  if (next) {
-    if (!isBackgroundConsentAccepted()) {
-      askBackgroundConsent('grades')
-      return
+  if (gradeAlert.enabled) {
+    try {
+      await gradeAlert.setEnabled(false)
+      showToast('已关闭成绩提醒')
+    } catch (error) {
+      showToast(error?.message || '成绩提醒设置失败')
     }
-    await enableGradeAlert()
     return
   }
-  try {
-    await gradeAlert.setEnabled(false)
-    showToast('已关闭成绩提醒')
-  } catch (error) {
-    showToast(error?.message || '成绩提醒设置失败')
-  }
+  requestConsent(enableGradeAlert)
 }
 
 async function enableGradeAlert() {
@@ -226,22 +228,13 @@ async function enableGradeAlert() {
   }
 }
 
-async function togglePortalAlert(kind) {
+function togglePortalAlert(kind) {
   const next = kind === 'notices' ? !portalAlert.noticesEnabled : !portalAlert.messagesEnabled
-  if (next && !isBackgroundConsentAccepted()) {
-    askBackgroundConsent(kind)
+  if (next) {
+    requestConsent(() => enablePortalAlert(kind))
     return
   }
-  try {
-    if (next) {
-      await enablePortalAlert(kind)
-      return
-    }
-    await portalAlert.setEnabled(kind, false)
-    showToast('已关闭提醒')
-  } catch (error) {
-    showToast(error?.message || '提醒设置失败')
-  }
+  disablePortalAlert(kind)
 }
 
 async function enablePortalAlert(kind) {
@@ -254,24 +247,13 @@ async function enablePortalAlert(kind) {
   }
 }
 
-function askBackgroundConsent(action) {
-  pendingAlert.value = action
-  backgroundOpen.value = true
-}
-
-async function onBackgroundAccept() {
-  acceptBackgroundConsent()
-  backgroundOpen.value = false
-  const action = pendingAlert.value
-  pendingAlert.value = ''
-  if (action === 'changes') await enableChanges()
-  else if (action === 'grades') await enableGradeAlert()
-  else if (action === 'notices' || action === 'messages') await enablePortalAlert(action)
-}
-
-function onBackgroundDecline() {
-  backgroundOpen.value = false
-  pendingAlert.value = ''
+async function disablePortalAlert(kind) {
+  try {
+    await portalAlert.setEnabled(kind, false)
+    showToast('已关闭提醒')
+  } catch (error) {
+    showToast(error?.message || '提醒设置失败')
+  }
 }
 
 async function saveTimes() {

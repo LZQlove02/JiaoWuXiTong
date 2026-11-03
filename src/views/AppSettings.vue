@@ -1,6 +1,6 @@
 <template>
   <div class="page page--plain">
-    <BackBar title="应用设置" />
+    <BackBar title="应用与隐私" />
 
     <h2 class="section-title">外观</h2>
     <section class="card">
@@ -15,18 +15,6 @@
           {{ option.label }}
         </button>
       </div>
-    </section>
-
-    <h2 class="section-title">课表时间</h2>
-    <section class="card settings">
-      <router-link class="setting-row" to="/schedule-settings">
-        <span class="setting-left"><AppIcon name="calendar" />节次时间与每日节数</span>
-        <span class="tiny">{{ scheduleSettings.periodCount }} 节</span>
-        <AppIcon name="chevron-right" />
-      </router-link>
-      <p class="setting-note">
-        逐节修改起止时间；课表、桌面组件与变更提醒同步使用。有更晚的课会自动扩展显示。
-      </p>
     </section>
 
     <h2 class="section-title">隐私与数据</h2>
@@ -59,7 +47,7 @@
       </p>
     </section>
 
-    <h2 class="section-title">通用</h2>
+    <h2 class="section-title">通用与帮助</h2>
     <section class="card settings">
       <div class="setting-row">
         <span class="setting-left"><AppIcon name="info" />本地缓存</span>
@@ -85,6 +73,7 @@
         <span class="setting-left"><AppIcon name="mail" />意见反馈</span>
         <AppIcon name="chevron-right" />
       </router-link>
+      <p class="setting-note">清除缓存不会退出登录，也不影响主题与提醒设置。</p>
     </section>
 
     <transition name="fade">
@@ -117,7 +106,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '../stores/ui'
 import { useAuthStore } from '../stores/auth'
-import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { useUpdateStore } from '../stores/update'
 import {
   clearAuthDownloads,
@@ -137,7 +125,6 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 const ui = useUiStore()
 const auth = useAuthStore()
-const scheduleSettings = useScheduleSettingsStore()
 const update = useUpdateStore()
 const router = useRouter()
 
@@ -157,16 +144,6 @@ const nativeBytes = ref(0)
 
 const storageLabel = computed(() => formatBytes(localBytes.value + nativeBytes.value))
 
-async function refreshStorage() {
-  localBytes.value = estimateLocalStorageBytes()
-  try {
-    const info = await getStorageInfo()
-    nativeBytes.value = Number(info?.totalBytes) || 0
-  } catch (error) {
-    nativeBytes.value = 0
-  }
-}
-
 const updateLabel = computed(() => {
   if (update.checking) return '检查中…'
   if (update.latest?.tag) return `最新 ${update.latest.tag}`
@@ -178,6 +155,16 @@ function showToast(message) {
   setTimeout(() => {
     toast.value = ''
   }, 1600)
+}
+
+async function refreshStorage() {
+  localBytes.value = estimateLocalStorageBytes()
+  try {
+    const info = await getStorageInfo()
+    nativeBytes.value = Number(info?.totalBytes) || 0
+  } catch (error) {
+    nativeBytes.value = 0
+  }
 }
 
 // 只读重读声明，不改变同意状态；返回键交给 ui store 关闭浮层
@@ -194,41 +181,6 @@ function closeDisclaimer() {
 onBeforeUnmount(() => {
   if (disclaimerOpen.value) ui.clearOverlayCloser()
 })
-
-// 清理范围：公开内容缓存 + 个人数据缓存 + 已下载附件/图片，不动登录态与主题
-async function clearCache() {
-  Object.keys(localStorage)
-    .filter(
-      (key) =>
-        key.startsWith('jiaowu.cache') ||
-        key.startsWith('jiaowu.portal.v1.') ||
-        key.startsWith('jiaowu.data.v1.')
-    )
-    .forEach((key) => localStorage.removeItem(key))
-  try {
-    await Promise.all([clearAuthDownloads(), clearPublicDownloads()])
-  } catch (error) {
-    // 原生缓存清理失败不影响 localStorage 清理结果
-  }
-  await refreshStorage()
-  showToast('已清除本地缓存')
-}
-
-function showAbout() {
-  router.push('/about')
-}
-
-async function checkUpdate() {
-  const status = await update.checkNow()
-  const messages = {
-    latest: '已是最新版本',
-    empty: '发布仓库暂未发布版本',
-    error: update.error || '检查更新失败',
-    busy: '正在检查，请稍候'
-  }
-  if (status === 'update') return
-  showToast(messages[status] || '')
-}
 
 function askClearData() {
   confirm.value = {
@@ -274,6 +226,41 @@ async function runConfirm() {
   } catch (error) {
     showToast(error?.message || '操作失败，请重试')
   }
+}
+
+// 清理范围：公开内容缓存 + 个人数据缓存 + 已下载附件/图片，不动登录态与主题
+async function clearCache() {
+  Object.keys(localStorage)
+    .filter(
+      (key) =>
+        key.startsWith('jiaowu.cache') ||
+        key.startsWith('jiaowu.portal.v1.') ||
+        key.startsWith('jiaowu.data.v1.')
+    )
+    .forEach((key) => localStorage.removeItem(key))
+  try {
+    await Promise.all([clearAuthDownloads(), clearPublicDownloads()])
+  } catch (error) {
+    // 原生缓存清理失败不影响 localStorage 清理结果
+  }
+  await refreshStorage()
+  showToast('已清除本地缓存')
+}
+
+function showAbout() {
+  router.push('/about')
+}
+
+async function checkUpdate() {
+  const status = await update.checkNow()
+  const messages = {
+    latest: '已是最新版本',
+    empty: '发布仓库暂未发布版本',
+    error: update.error || '检查更新失败',
+    busy: '正在检查，请稍候'
+  }
+  if (status === 'update') return
+  showToast(messages[status] || '')
 }
 
 onMounted(async () => {
