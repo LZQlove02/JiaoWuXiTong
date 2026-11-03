@@ -61,8 +61,13 @@ public final class PortalAlertStore {
 
     public static void writeStudentId(Context context, String studentId) {
         // 学号属于个人信息，与其他基线数据一致使用 Keystore AES-GCM 加密落盘
+        String sealed = LocalCipher.seal(studentId == null ? "" : studentId);
+        if (sealed == null) {
+            ChangeDebug.warn(context, "学号加密失败，跳过本次写入");
+            return;
+        }
         prefs(context).edit()
-                .putString(KEY_STUDENT_ID, LocalCipher.seal(studentId == null ? "" : studentId))
+                .putString(KEY_STUDENT_ID, sealed)
                 .apply();
     }
 

@@ -91,7 +91,13 @@ public final class ScheduleChangeStore {
             }
             json.put("sectionTimes", times);
             json.put("savedAt", baseline.savedAt);
-            prefs(context).edit().putString(KEY_BASELINE, LocalCipher.seal(json.toString())).apply();
+            String sealed = LocalCipher.seal(json.toString());
+            if (sealed == null) {
+                // 加密失败时保留旧基线，避免把个人信息以明文写入
+                ChangeDebug.warn(context, "课表基线加密失败，保留旧基线");
+                return;
+            }
+            prefs(context).edit().putString(KEY_BASELINE, sealed).apply();
         } catch (JSONException error) {
             // 写不进去时保留旧基线，下一次再试
         }
@@ -142,7 +148,12 @@ public final class ScheduleChangeStore {
         try {
             JSONArray array = new JSONArray();
             for (ChangeEntry entry : pruned) array.put(entry.toJson());
-            prefs(context).edit().putString(KEY_ENTRIES, LocalCipher.seal(array.toString())).apply();
+            String sealed = LocalCipher.seal(array.toString());
+            if (sealed == null) {
+                ChangeDebug.warn(context, "变更记录加密失败，跳过本次写入");
+                return;
+            }
+            prefs(context).edit().putString(KEY_ENTRIES, sealed).apply();
         } catch (JSONException error) {
             // 单条写入失败不阻塞主流程
         }

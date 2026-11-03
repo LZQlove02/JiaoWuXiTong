@@ -15,7 +15,8 @@ import javax.crypto.spec.GCMParameterSpec;
 /**
  * 本地个人数据的加密存储工具：使用 Android Keystore 的 AES-GCM 密钥，
  * 用于桌面组件 payload、课表变更基线与成绩基线，避免课程名、学号等明文落盘。
- * 读取旧版本明文时按原样返回，下一次写入自动升级为密文。
+ * 读取旧版本明文时按原样返回，下一次写入自动升级为密文；
+ * 加密失败时 seal 返回 null，由调用方放弃本次写入，绝不退回明文。
  */
 public final class LocalCipher {
 
@@ -26,6 +27,10 @@ public final class LocalCipher {
     private LocalCipher() {
     }
 
+    /**
+     * 加密待落盘的个人数据。
+     * 返回 null 表示本次加密失败，调用方必须放弃写入（空值判断不受影响）。
+     */
     public static String seal(String plain) {
         if (plain == null || plain.isEmpty()) return plain;
         try {
@@ -38,8 +43,8 @@ public final class LocalCipher {
             System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
             return PREFIX + Base64.encodeToString(combined, Base64.NO_WRAP);
         } catch (Exception error) {
-            // Keystore 不可用时退回明文，保证功能不中断；调用方仍受应用沙箱保护
-            return plain;
+            // Keystore 不可用时放弃本次写入：宁可不落盘，也不降级为明文
+            return null;
         }
     }
 

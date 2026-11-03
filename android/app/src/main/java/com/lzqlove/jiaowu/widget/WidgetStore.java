@@ -35,8 +35,13 @@ public final class WidgetStore {
 
     public static void writePayload(Context context, String json) {
         synchronized (PAYLOAD_LOCK) {
+            String sealed = LocalCipher.seal(json == null ? "" : json);
+            if (sealed == null) {
+                // 加密失败时保留上一份 payload，不写明文
+                return;
+            }
             prefs(context).edit()
-                    .putString(KEY_PAYLOAD, LocalCipher.seal(json == null ? "" : json))
+                    .putString(KEY_PAYLOAD, sealed)
                     .apply();
         }
     }

@@ -90,7 +90,13 @@ public final class GradeAlertStore {
             }
             json.put("courses", courseJson);
             json.put("savedAt", savedAt == null ? "" : savedAt);
-            prefs(context).edit().putString(KEY_BASELINE, LocalCipher.seal(json.toString())).apply();
+            String sealed = LocalCipher.seal(json.toString());
+            if (sealed == null) {
+                // 加密失败时保留旧基线，下一次成功写入再覆盖
+                ChangeDebug.warn(context, "成绩基线加密失败，保留旧基线");
+                return;
+            }
+            prefs(context).edit().putString(KEY_BASELINE, sealed).apply();
         } catch (JSONException error) {
             // 写不进去时保留旧基线，下一次成功后再覆盖
         }

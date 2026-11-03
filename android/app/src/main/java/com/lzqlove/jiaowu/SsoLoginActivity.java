@@ -18,11 +18,22 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /**
  * 仅用于学校统一认证登录：加载 authserver / zfjw 登录链路，
@@ -45,9 +56,62 @@ public class SsoLoginActivity extends Activity {
             "85:BA:F1:69:43:27:A8:B7:82:D2:CE:BC:A6:A1:A8:14:"
                     + "E1:22:19:D3:F2:D6:4F:1B:F3:6B:A5:66:E9:13:4A:50";
 
+    /**
+     * 加载 WebView 前的 TLS 预检：只接受内置指纹命中的证书，
+     * 不依赖系统 CA（Android 6 的系统信任库不包含 Let's Encrypt 根证书）。
+     * WebView 自身的证书固定只在系统校验失败时触发，无法覆盖被系统信任的中间人证书。
+     */
+    private static final OkHttpClient PREFLIGHT_CLIENT = buildPreflightClient();
+
+    private static OkHttpClient buildPreflightClient() {
+        try {
+            PinnedTrustManager trustManager = new PinnedTrustManager();
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new TrustManager[]{trustManager}, null);
+            return new OkHttpClient.Builder()
+                    .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.SECONDS)
+                    .callTimeout(8, TimeUnit.SECONDS)
+                    .followRedirects(false)
+                    .followSslRedirects(false)
+                    .build();
+        } catch (Exception error) {
+            // 初始化失败时返回 null，预检按失败关闭处理
+            return null;
+        }
+    }
+
+    /** 只放行与内置 SHA-256 指纹完全一致的服务端证书，链式校验交由指纹代替。 */
+    private static final class PinnedTrustManager implements X509TrustManager {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType)
+                throws java.security.cert.CertificateException {
+            throw new java.security.cert.CertificateException("仅校验服务端证书");
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType)
+                throws java.security.cert.CertificateException {
+            if (chain == null || chain.length == 0) {
+                throw new java.security.cert.CertificateException("证书链为空");
+            }
+            if (!AUTH_SERVER_SHA256.equals(sha256(chain[0].getEncoded()))) {
+                throw new java.security.cert.CertificateException("证书指纹不一致");
+            }
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+        }
+    }
+
     private WebView webView;
+    private TextView status;
     private boolean finished;
     private boolean sslDialogShown;
+    private boolean preflightRunning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,7 +120,7 @@ public class SsoLoginActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
 
-        TextView status = new TextView(this);
+        status = new TextView(this);
         status.setText("柳州职业技术大学统一认证");
         status.setTextSize(16);
         status.setPadding(32, 28, 32, 16);
@@ -119,16 +183,110 @@ public class SsoLoginActivity extends Activity {
                     .edit()
                     .putBoolean(KEY_COOKIE_RESET, true)
                     .apply();
-            webView.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    // 用户可能在这 300ms 内退出登录页，WebView 已在 onDestroy 置空
-                    if (webView != null) webView.loadUrl(LOGIN_URL);
-                }
-            }, 300);
-        } else {
-            webView.loadUrl(LOGIN_URL);
         }
+        startSso();
+    }
+
+    /**
+     * 先做一次只认内置指纹的 TLS 预检，再加载 WebView。
+     * WebViewClient 的 onReceivedSslError 只在系统校验失败时触发，
+     * 无法覆盖被系统信任的中间人证书；预检失败直接终止登录，
+     * 避免账号密码提交到未固定的连接。
+     */
+    private void startSso() {
+        if (preflightRunning) return;
+        preflightRunning = true;
+        status.setText("正在校验统一认证服务器证书…");
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final PreflightResult result = preflight();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        preflightRunning = false;
+                        if (webView == null || isFinishing()) return;
+                        if (result.ok) {
+                            status.setText("正在加载统一认证登录页…");
+                            webView.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    // 用户可能在这 300ms 内退出登录页，WebView 已在 onDestroy 置空
+                                    if (webView != null) webView.loadUrl(LOGIN_URL);
+                                }
+                            }, 300);
+                            return;
+                        }
+                        if (result.certError) {
+                            showCertErrorDialog();
+                        } else {
+                            showNetworkErrorDialog();
+                        }
+                    }
+                });
+            }
+        }, "sso-preflight");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /**
+     * 预检：返回是否通过，以及失败来自证书固定/系统校验还是网络不可达，
+     * 用于区分「可能被劫持」与「网络没通」两种提示。
+     */
+    private PreflightResult preflight() {
+        if (PREFLIGHT_CLIENT == null) return PreflightResult.certError();
+        Request request = new Request.Builder().url(LOGIN_URL).head().build();
+        try (Response response = PREFLIGHT_CLIENT.newCall(request).execute()) {
+            return PreflightResult.ok();
+        } catch (SSLException error) {
+            return PreflightResult.certError();
+        } catch (IOException error) {
+            return PreflightResult.networkError();
+        }
+    }
+
+    private static final class PreflightResult {
+        final boolean ok;
+        final boolean certError;
+
+        private PreflightResult(boolean ok, boolean certError) {
+            this.ok = ok;
+            this.certError = certError;
+        }
+
+        static PreflightResult ok() {
+            return new PreflightResult(true, false);
+        }
+
+        static PreflightResult certError() {
+            return new PreflightResult(false, true);
+        }
+
+        static PreflightResult networkError() {
+            return new PreflightResult(false, false);
+        }
+    }
+
+    private void showCertErrorDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("证书校验失败")
+                .setMessage("无法通过内置证书校验连接统一认证服务器。\n\n"
+                        + "可能是网络被劫持、服务器证书已轮换，或系统时间异常。已停止登录，"
+                        + "请确认网络环境或更新 App 后重试。")
+                .setPositiveButton("知道了", (dialog, which) -> cancel())
+                .setCancelable(false)
+                .show();
+    }
+
+    private void showNetworkErrorDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("无法连接统一认证")
+                .setMessage("暂时无法连接统一认证服务器，请检查网络后重试。")
+                .setPositiveButton("重试", (dialog, which) -> startSso())
+                .setNegativeButton("取消", (dialog, which) -> cancel())
+                .setCancelable(false)
+                .show();
     }
 
     private boolean isAllowed(Uri uri) {
