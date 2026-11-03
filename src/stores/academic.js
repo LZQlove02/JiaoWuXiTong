@@ -151,6 +151,13 @@ export const useAcademicStore = defineStore('academic', () => {
     return request
   }
 
+  // 冷启动快照：把缓存课表先放进 store，首页首帧即可渲染，网络刷新随后覆盖
+  function applySnapshotSchedule(data) {
+    if (!data || !Array.isArray(data.sessions)) return
+    schedule.value = data
+    if (data.term) currentTerm.value = data.term
+  }
+
   async function loadGrades(term = currentTerm.value) {
     const token = ++gradesToken
     const key = gradeCacheKey(term)
@@ -492,6 +499,7 @@ export const useAcademicStore = defineStore('academic', () => {
     initTerms,
     loadTerms,
     loadSchedule,
+    applySnapshotSchedule,
     loadGrades,
     loadAllGrades,
     loadEvaluations,

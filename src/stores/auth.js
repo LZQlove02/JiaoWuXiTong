@@ -77,6 +77,9 @@ export const useAuthStore = defineStore('auth', () => {
         const cached = zf.applySnapshot()
         if (cached) {
           applyZfSession(zf, cached)
+          // 快照课表同步写入 academic store：首页首帧直接显示缓存，不再等网络
+          const { useAcademicStore } = await import('./academic')
+          useAcademicStore().applySnapshotSchedule(zf.snapshotSchedule())
           // 先用快照渲染首屏，实时校验放到后台，避免启动被网络请求卡住
           refreshInBackground(zf)
           return true
@@ -106,7 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
       .then(async () => {
         const { useAcademicStore } = await import('./academic')
         const academic = useAcademicStore()
-        academic.reset()
+        // 保留快照课表，只把实时数据替换进来；不再 reset，避免首页清空后闪回加载态
         await academic.initTerms()
         await academic.loadSchedule()
       })

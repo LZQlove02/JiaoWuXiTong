@@ -631,6 +631,20 @@ export class ZfAcademicApi {
     return this.profile
   }
 
+  // 快照对应的课表视图：字段与 getSchedule 返回保持一致，供冷启动首帧直接渲染；
+  // 网络刷新失败时由 getSchedule 标记为 offline，这里先按正常数据显示，避免启动瞬间闪出「离线缓存」
+  snapshotSchedule() {
+    if (!this.schedule) return null
+    return {
+      ...this.schedule,
+      offline: false,
+      source: '教务系统（本机缓存）',
+      fetchedAt: this.fetchedAt,
+      rawPayload: '',
+      term: this.term
+    }
+  }
+
   // 统一处理网络失败、状态码、登录页 HTML 与 BOM；各业务方法只负责自己的结构校验
   async requestText(url, options = {}) {
     const { method = 'GET', body = '', label = '接口', allowHtml = false } = options

@@ -248,6 +248,21 @@ describe('小组件 payload：自定义节次时间', () => {
   })
 })
 
+describe('小组件 payload：更新时间口径', () => {
+  it('取课表抓取时间，不随当前时间变化', () => {
+    const withFetched = { ...schedule, fetchedAt: '2026-10-29T08:05:00' }
+    const payload = build({ schedule: withFetched })
+    expect(payload.updatedAtLabel).toBe('08:05')
+    expect(payload.updatedAt).toContain('T08:05:00')
+  })
+
+  it('无抓取时间或格式非法时回退当前时间', () => {
+    expect(build().updatedAtLabel).toBe('09:00')
+    const bad = { ...schedule, fetchedAt: 'invalid' }
+    expect(build({ schedule: bad }).updatedAtLabel).toBe('09:00')
+  })
+})
+
 describe('小组件 payload：成绩', () => {
   const single = {
     term: { label: '2025-2026 学年第二学期' },

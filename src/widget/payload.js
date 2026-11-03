@@ -26,6 +26,14 @@ function localIso(date) {
     + `${sign}${pad2(Math.floor(abs / 60))}:${pad2(abs % 60)}`
 }
 
+// 组件「更新于」取课表数据的抓取时间：App 单纯打开或回前台不应把时间刷新成当前时刻
+function dataFetchedAt(schedule) {
+  const fetchedAt = schedule?.fetchedAt
+  if (!fetchedAt) return null
+  const date = new Date(fetchedAt)
+  return Number.isFinite(date.getTime()) ? date : null
+}
+
 export function toMinutes(value) {
   const parts = String(value || '').split(':')
   if (parts.length !== 2) return null
@@ -185,8 +193,9 @@ function noticeView(notices) {
  */
 export function buildWidgetPayload(input = {}) {
   const now = input.now instanceof Date ? input.now : new Date()
-  const updatedAt = localIso(now)
-  const updatedAtLabel = clockOf(now)
+  const updatedTime = dataFetchedAt(input.schedule) || now
+  const updatedAt = localIso(updatedTime)
+  const updatedAtLabel = clockOf(updatedTime)
   const schema = WIDGET_SCHEMA
 
   if (!input.user) {
