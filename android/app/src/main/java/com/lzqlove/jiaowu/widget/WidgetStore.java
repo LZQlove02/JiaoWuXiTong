@@ -129,13 +129,35 @@ public final class WidgetStore {
         return normalizeStyle(prefs(context).getString(styleKey(appWidgetId), STYLE_GLASS));
     }
 
-    public static void clearStyles(Context context, int[] appWidgetIds) {
+    // 组件被移除时清掉这个实例的全部设置：样式 + 文字色
+    public static void clearInstanceSettings(Context context, int[] appWidgetIds) {
         if (appWidgetIds == null || appWidgetIds.length == 0) return;
         SharedPreferences.Editor editor = prefs(context).edit();
         for (int id : appWidgetIds) {
             editor.remove(styleKey(id));
+            editor.remove(textColorKey(id));
         }
         editor.apply();
+    }
+
+    // 文字颜色按组件实例保存，空串表示跟随主题（自动）
+    private static String textColorKey(int appWidgetId) {
+        return "textColor_" + appWidgetId;
+    }
+
+    public static void writeTextColor(Context context, int appWidgetId, String color) {
+        prefs(context).edit().putString(textColorKey(appWidgetId), normalizeTextColor(color)).apply();
+    }
+
+    public static String readTextColor(Context context, int appWidgetId) {
+        return normalizeTextColor(prefs(context).getString(textColorKey(appWidgetId), ""));
+    }
+
+    // 校验统一走 WidgetTheme.parseTextColor，这里只负责落盘成规范写法；
+    // 非法值一律视为「自动」，避免把解析不了的值写进组件
+    private static String normalizeTextColor(String value) {
+        if (WidgetTheme.parseTextColor(value) == 0) return "";
+        return value.trim().toUpperCase();
     }
 
     // 点一下「样式」按钮的循环顺序：玻璃 → 透明 → 不透明 → 玻璃

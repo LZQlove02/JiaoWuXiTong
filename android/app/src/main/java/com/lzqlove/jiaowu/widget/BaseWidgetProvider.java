@@ -30,8 +30,8 @@ public abstract class BaseWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onDeleted(Context context, int[] appWidgetIds) {
-        // 组件被移除时顺手清掉它的样式记录
-        WidgetStore.clearStyles(context, appWidgetIds);
+        // 组件被移除时顺手清掉它的样式与文字色记录
+        WidgetStore.clearInstanceSettings(context, appWidgetIds);
         super.onDeleted(context, appWidgetIds);
     }
 }

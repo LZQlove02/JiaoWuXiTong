@@ -52,6 +52,35 @@ public final class WidgetTheme {
         return isDark ? dark(style) : light(style);
     }
 
+    /**
+     * 用户自定义文字色：只用选中的颜色，二级/三级文字靠透明度保留层级。
+     * 空串或非法值返回自身，继续用主题默认色。
+     */
+    public WidgetTheme withTextColor(String hex) {
+        int color = parseTextColor(hex);
+        if (color == 0) return this;
+        return new WidgetTheme(dark, style, background, color,
+            withAlpha(color, 0xE6), withAlpha(color, 0xBF), border, accent);
+    }
+
+    // "#RRGGBB" -> 不透明 ARGB；非法或空返回 0（表示没设置）
+    public static int parseTextColor(String hex) {
+        if (hex == null) return 0;
+        String value = hex.trim();
+        if (value.length() != 7 || value.charAt(0) != '#') return 0;
+        int rgb = 0;
+        for (int i = 1; i < 7; i += 1) {
+            int digit = Character.digit(value.charAt(i), 16);
+            if (digit < 0) return 0;
+            rgb = (rgb << 4) | digit;
+        }
+        return 0xFF000000 | rgb;
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
+    }
+
     public boolean isOpaque() {
         return WidgetStore.STYLE_OPAQUE.equals(style);
     }

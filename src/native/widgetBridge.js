@@ -48,6 +48,12 @@ export async function setWidgetStyle(id, style) {
   return WidgetBridge.setWidgetStyle({ id, style })
 }
 
+// color 传 '' 表示恢复「自动」（跟随主题）
+export async function setWidgetTextColor(id, color) {
+  if (!widgetAvailable()) throw new Error('桌面组件仅在 App 内可用')
+  return WidgetBridge.setWidgetTextColor({ id, color: color || '' })
+}
+
 export async function refreshWidgets() {
   if (!widgetAvailable()) throw new Error('桌面组件仅在 App 内可用')
   return WidgetBridge.refreshWidgets()

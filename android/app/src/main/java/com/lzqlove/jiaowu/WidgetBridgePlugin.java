@@ -91,6 +91,7 @@ public class WidgetBridgePlugin extends Plugin {
             item.put("type", type);
             item.put("label", label);
             item.put("style", WidgetStore.readStyle(getContext(), id));
+            item.put("textColor", WidgetStore.readTextColor(getContext(), id));
             widgets.put(item);
         }
     }
@@ -110,6 +111,29 @@ public class WidgetBridgePlugin extends Plugin {
         WidgetStore.writeStyle(getContext(), id, style);
         WidgetUpdater.refreshAll(getContext());
         call.resolve();
+    }
+
+    /** 自定义文字色；color 传空串或非法值即恢复「自动」。 */
+    @PluginMethod
+    public void setWidgetTextColor(PluginCall call) {
+        Integer id = call.getInt("id");
+        String color = call.getString("color");
+        if (id == null || id <= 0) {
+            call.reject("WIDGET_COLOR_INVALID");
+            return;
+        }
+        if (!widgetExists(id)) {
+            call.reject("WIDGET_NOT_FOUND");
+            return;
+        }
+        WidgetStore.writeTextColor(getContext(), id, color == null ? "" : color);
+        // 回传实际落盘值：非法颜色被归一化成空串（自动），前端以它为准
+        String saved = WidgetStore.readTextColor(getContext(), id);
+        Log.i(TAG, "setWidgetTextColor id=" + id + " color=" + saved);
+        WidgetUpdater.refreshAll(getContext());
+        JSObject result = new JSObject();
+        result.put("color", saved);
+        call.resolve(result);
     }
 
     @PluginMethod

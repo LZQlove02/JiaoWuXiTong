@@ -44,10 +44,9 @@ public final class WidgetUpdater {
                                  WidgetPayload payload, String themeName) {
         int[] ids = ids(app, manager, NextClassWidgetProvider.class);
         for (int id : ids) {
-            String style = WidgetStore.readStyle(app, id);
-            WidgetTheme theme = WidgetTheme.resolve(app, themeName, style);
+            WidgetTheme theme = themeFor(app, id, themeName);
             safeUpdate(manager, id, NextClassWidgetBinder.build(app, payload, theme, id),
-                NextClassWidgetProvider.class.getSimpleName(), style);
+                NextClassWidgetProvider.class.getSimpleName(), theme.style);
         }
     }
 
@@ -55,10 +54,9 @@ public final class WidgetUpdater {
                                   WidgetPayload payload, String themeName) {
         int[] ids = ids(app, manager, TodayWidgetProvider.class);
         for (int id : ids) {
-            String style = WidgetStore.readStyle(app, id);
-            WidgetTheme theme = WidgetTheme.resolve(app, themeName, style);
+            WidgetTheme theme = themeFor(app, id, themeName);
             safeUpdate(manager, id, TodayWidgetBinder.build(app, payload, theme, id),
-                TodayWidgetProvider.class.getSimpleName(), style);
+                TodayWidgetProvider.class.getSimpleName(), theme.style);
         }
     }
 
@@ -66,11 +64,17 @@ public final class WidgetUpdater {
                                  WidgetPayload payload, String themeName) {
         int[] ids = ids(app, manager, WeekWidgetProvider.class);
         for (int id : ids) {
-            String style = WidgetStore.readStyle(app, id);
-            WidgetTheme theme = WidgetTheme.resolve(app, themeName, style);
+            WidgetTheme theme = themeFor(app, id, themeName);
             safeUpdate(manager, id, WeekWidgetBinder.build(app, payload, theme, id),
-                WeekWidgetProvider.class.getSimpleName(), style);
+                WeekWidgetProvider.class.getSimpleName(), theme.style);
         }
+    }
+
+    // 每个实例自己的样式 + 文字色：样式决定底色，文字色是用户手动覆盖
+    private static WidgetTheme themeFor(Context app, int id, String themeName) {
+        String style = WidgetStore.readStyle(app, id);
+        return WidgetTheme.resolve(app, themeName, style)
+            .withTextColor(WidgetStore.readTextColor(app, id));
     }
 
     private static int[] ids(Context app, AppWidgetManager manager, Class<?> provider) {

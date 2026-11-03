@@ -28,17 +28,60 @@
     <h2 class="section-title">桌面组件</h2>
     <section class="card settings">
       <template v-if="widgets.length">
-        <div v-for="widget in widgets" :key="widget.id" class="setting-row">
-          <span class="setting-left"><AppIcon name="calendar" />{{ widget.label }}</span>
-          <button class="widget-style" type="button" @click="cycleWidgetStyle(widget)">
-            {{ styleLabel(widget.style) }}
-          </button>
+        <div v-for="widget in widgets" :key="widget.id" class="widget-item">
+          <div class="setting-row">
+            <span class="setting-left"><AppIcon name="calendar" />{{ widget.label }}</span>
+            <span class="widget-actions">
+              <button class="widget-color" type="button" @click="toggleColorPanel(widget)">
+                <span
+                  class="color-dot"
+                  :class="{ 'is-auto': !widget.textColor }"
+                  :style="widget.textColor ? { background: widget.textColor } : null"
+                ></span>
+                {{ widget.textColor ? '文字色' : '自动' }}
+              </button>
+              <button class="widget-style" type="button" @click="cycleWidgetStyle(widget)">
+                {{ styleLabel(widget.style) }}
+              </button>
+            </span>
+          </div>
+          <div v-if="colorWidgetId === widget.id" class="color-panel">
+            <button
+              v-for="option in colorOptions"
+              :key="option.label"
+              class="color-option"
+              type="button"
+              :class="{ 'is-active': widget.textColor === option.value }"
+              :aria-pressed="widget.textColor === option.value"
+              @click="pickColor(widget, option.value)"
+            >
+              <span
+                class="color-dot"
+                :class="{ 'is-auto': !option.value }"
+                :style="option.value ? { background: option.value } : null"
+              ></span>
+              {{ option.label }}
+            </button>
+            <!-- 同值选择不会触发 change（Chromium 不会派发事件），这是平台限制，
+                 成功时统一用 toast 给出反馈 -->
+            <label class="color-option color-custom">
+              <input
+                type="color"
+                :value="widget.textColor || '#FFFFFF'"
+                @change="pickColor(widget, $event.target.value)"
+              />
+              自定义
+            </label>
+          </div>
         </div>
         <button class="setting-row" type="button" @click="onRefreshWidgets">
           <span class="setting-left">刷新全部组件</span>
           <AppIcon name="refresh" />
         </button>
-        <p class="setting-note">样式只影响对应组件实例；添加或删除请长按桌面空白处操作。</p>
+        <p class="setting-note">
+          样式与文字色只影响对应组件实例；「自动」跟随主题深浅色；4×4
+          课表网格内的课程块按填充色自带字色，不跟随此处设置。添加或删除请长按桌面空白处操作。
+        </p>
       </template>
       <p v-else class="setting-note">
         暂无桌面组件。长按桌面空白处添加「教务助手」组件后，可在这里统一调整样式和刷新。
@@ -70,7 +113,8 @@ import { getKeepAliveState, setKeepAlive as setKeepAliveNative } from '../api/na
 import {
   listWidgets,
   refreshWidgets as refreshWidgetsNative,
-  setWidgetStyle
+  setWidgetStyle,
+  setWidgetTextColor
 } from '../native/widgetBridge'
 import {
   KEEPALIVE_CLAUSES,
@@ -87,6 +131,13 @@ const toast = ref('')
 const keepAliveOpen = ref(false)
 const keepAliveEnabled = ref(false)
 const widgets = ref([])
+// 当前展开调色板的组件实例；0 = 全部收起
+const colorWidgetId = ref(0)
+const colorOptions = [
+  { label: '自动', value: '' },
+  { label: '白色', value: '#FFFFFF' },
+  { label: '黑色', value: '#000000' }
+]
 let widgetRetryTimer = null
 let appStateListener = null
 let disposed = false
@@ -166,6 +217,21 @@ async function cycleWidgetStyle(widget) {
     widget.style = next
   } catch (error) {
     showToast(error?.message || '组件样式修改失败')
+  }
+}
+
+function toggleColorPanel(widget) {
+  colorWidgetId.value = colorWidgetId.value === widget.id ? 0 : widget.id
+}
+
+async function pickColor(widget, color) {
+  try {
+    // 以原生归一化后的值为准：非法颜色会被降级成空串（自动）
+    const result = await setWidgetTextColor(widget.id, color || '')
+    widget.textColor = result?.color || ''
+    showToast(widget.textColor ? `文字色已设为 ${widget.textColor}` : '文字色已恢复自动')
+  } catch (error) {
+    showToast(error?.message || '组件文字色修改失败')
   }
 }
 
@@ -282,6 +348,91 @@ onBeforeUnmount(() => {
   background: var(--brand-soft);
   color: var(--brand);
   font-size: 12px;
+}
+
+/* 每个组件实例一块：分隔线挂在外层，调色板展开时不重复画线 */
+.widget-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.widget-item:last-of-type {
+  border-bottom: none;
+}
+
+.widget-item .setting-row {
+  border-bottom: none;
+}
+
+.widget-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--card-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.color-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+/* 「自动」用黑白对角表示跟随主题 */
+.color-dot.is-auto {
+  background: linear-gradient(135deg, var(--text) 50%, var(--card) 50%);
+}
+
+.color-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 2px 0 14px;
+}
+
+/* 每行两项、44px 高：选项太挤时手指容易点空 */
+.color-option {
+  flex: 1 1 40%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--card-muted);
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.color-option.is-active {
+  color: var(--brand);
+  outline: 1.5px solid var(--brand);
+}
+
+.color-custom {
+  position: relative;
+  cursor: pointer;
+}
+
+.color-custom input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
 }
 
 .footnote {
