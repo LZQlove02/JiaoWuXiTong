@@ -3,7 +3,9 @@ import {
   KEEPALIVE_CLAUSES,
   KEEPALIVE_CONSENT_VERSION,
   acceptKeepAliveConsent,
+  declineKeepAliveConsent,
   isKeepAliveConsentAccepted,
+  isKeepAliveConsentDeclined,
   revokeKeepAliveConsent
 } from '../src/utils/keepAliveConsent'
 
@@ -22,6 +24,24 @@ describe('保持登录说明同意状态', () => {
     expect(isKeepAliveConsentAccepted()).toBe(true)
     revokeKeepAliveConsent()
     expect(isKeepAliveConsentAccepted()).toBe(false)
+  })
+
+  it('关闭后记录拒绝状态，同意后清除拒绝', () => {
+    expect(declineKeepAliveConsent()).toBe(true)
+    expect(localStorage.getItem('jiaowu.keepalive.declined')).toBe(KEEPALIVE_CONSENT_VERSION)
+    expect(isKeepAliveConsentDeclined()).toBe(true)
+    expect(isKeepAliveConsentAccepted()).toBe(false)
+
+    acceptKeepAliveConsent()
+    expect(isKeepAliveConsentAccepted()).toBe(true)
+    expect(isKeepAliveConsentDeclined()).toBe(false)
+  })
+
+  it('撤回说明同意时同时清除拒绝状态', () => {
+    declineKeepAliveConsent()
+    revokeKeepAliveConsent()
+    expect(isKeepAliveConsentAccepted()).toBe(false)
+    expect(isKeepAliveConsentDeclined()).toBe(false)
   })
 
   it('说明条目完整且覆盖关闭方式', () => {

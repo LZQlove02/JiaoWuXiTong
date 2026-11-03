@@ -36,7 +36,7 @@ public class SsoLoginPlugin extends Plugin {
         call.resolve();
     }
 
-    /** 设置页「保持登录」开关：默认关闭，开启后约每 30 分钟后台维持一次会话。 */
+    /** 设置页「保持登录」开关：首次登录说明同意后默认开启，约每 30 分钟后台维持一次会话。 */
     @PluginMethod
     public void setKeepAlive(PluginCall call) {
         Boolean enabled = call.getBoolean("enabled");

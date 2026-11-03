@@ -18,8 +18,8 @@
         </button>
       </div>
       <p class="setting-note">
-        开启后由应用约每 30
-        分钟在后台维持一次教务会话，减少长时间不打开后的重新登录与短信验证。默认关闭；系统省电策略可能造成延迟，学校会话到期后仍需重新登录。
+        默认开启，可随时关闭；开启后由应用约每 30
+        分钟在后台维持一次教务会话，减少长时间不打开后的重新登录与短信验证。系统省电策略可能造成延迟，学校会话到期后仍需重新登录。
       </p>
     </section>
 
@@ -76,6 +76,7 @@ import {
   KEEPALIVE_CLAUSES,
   KEEPALIVE_CONSENT_VERSION,
   acceptKeepAliveConsent,
+  declineKeepAliveConsent,
   isKeepAliveConsentAccepted
 } from '../utils/keepAliveConsent'
 import AppIcon from '../components/AppIcon.vue'
@@ -132,6 +133,9 @@ async function applyKeepAlive(enabled) {
   try {
     const state = await setKeepAliveNative(enabled)
     keepAliveEnabled.value = Boolean(state?.enabled)
+    // 手动开启视为同意说明，手动关闭记录为主动拒绝，默认开启策略不再自动恢复
+    if (enabled) acceptKeepAliveConsent()
+    else declineKeepAliveConsent()
     showToast(enabled ? '已开启保持登录' : '已关闭保持登录')
   } catch (error) {
     showToast(error?.message || '保持登录设置失败')
@@ -145,6 +149,7 @@ async function onKeepAliveAccept() {
 }
 
 function onKeepAliveDecline() {
+  declineKeepAliveConsent()
   keepAliveOpen.value = false
 }
 

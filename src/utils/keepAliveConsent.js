@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'jiaowu.keepalive.consent'
+const DECLINED_KEY = 'jiaowu.keepalive.declined'
 
 // 保活范围或频率变化时同步 +1，重新向用户说明
 export const KEEPALIVE_CONSENT_VERSION = '1'
@@ -18,7 +19,7 @@ export const KEEPALIVE_CLAUSES = [
   },
   {
     title: '关闭方式',
-    text: '可随时在设置页关闭「保持登录」；退出登录、清除本机个人数据或撤回隐私同意后会自动停止后台保活。'
+    text: '本功能默认开启，可随时在设置页关闭「保持登录」；退出登录、清除本机个人数据或撤回隐私同意后会自动停止后台保活。'
   }
 ]
 
@@ -33,6 +34,25 @@ export function isKeepAliveConsentAccepted() {
 export function acceptKeepAliveConsent() {
   try {
     localStorage.setItem(STORAGE_KEY, KEEPALIVE_CONSENT_VERSION)
+    localStorage.removeItem(DECLINED_KEY)
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
+// 用户明确关闭时记录，避免每次启动重复弹说明；同意后清除
+export function isKeepAliveConsentDeclined() {
+  try {
+    return localStorage.getItem(DECLINED_KEY) === KEEPALIVE_CONSENT_VERSION
+  } catch (error) {
+    return false
+  }
+}
+
+export function declineKeepAliveConsent() {
+  try {
+    localStorage.setItem(DECLINED_KEY, KEEPALIVE_CONSENT_VERSION)
     return true
   } catch (error) {
     return false
@@ -42,6 +62,7 @@ export function acceptKeepAliveConsent() {
 export function revokeKeepAliveConsent() {
   try {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(DECLINED_KEY)
   } catch (error) {
     // 存储不可用时无需处理
   }

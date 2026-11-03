@@ -28,6 +28,17 @@
     </main>
     <TabBar v-if="showTabBar" />
     <UpdateDialog v-if="update.dialogOpen" />
+    <ConsentGate
+      v-if="keepAlivePromptOpen"
+      :clauses="KEEPALIVE_CLAUSES"
+      title="保持登录"
+      subtitle="教务助手 · 后台会话保活说明"
+      :version-text="`说明版本 v${KEEPALIVE_CONSENT_VERSION}`"
+      primary-text="保持开启"
+      decline-text="关闭"
+      @accept="onKeepAliveAccept"
+      @decline="onKeepAliveDecline"
+    />
   </div>
 </template>
 
@@ -49,7 +60,14 @@ import { useUiStore } from './stores/ui'
 import { useUpdateStore } from './stores/update'
 import { setKeepAlive } from './api/nativeHttp'
 import { isBackgroundConsentAccepted } from './utils/backgroundConsent'
-import { isKeepAliveConsentAccepted } from './utils/keepAliveConsent'
+import {
+  KEEPALIVE_CLAUSES,
+  KEEPALIVE_CONSENT_VERSION,
+  acceptKeepAliveConsent,
+  declineKeepAliveConsent,
+  isKeepAliveConsentAccepted,
+  isKeepAliveConsentDeclined
+} from './utils/keepAliveConsent'
 import {
   DISCLAIMER_CLAUSES,
   DISCLAIMER_DATE,
@@ -91,6 +109,7 @@ function initialStage() {
 const stage = ref(initialStage())
 const consented = computed(() => stage.value === 'ready')
 const declined = ref(false)
+const keepAlivePromptOpen = ref(false)
 let nativeReady = false
 
 // 内容区独立滚动：记下离开页面的位置，返回时恢复；新页面从顶部开始
@@ -321,6 +340,45 @@ async function enforceSubConsents() {
     }
   }
 }
+
+// 保持登录默认开启：已同意且未手动关闭时登录后自动恢复；未同意且未拒绝过时首次登录展示说明
+function syncKeepAliveDefault() {
+  if (stage.value !== 'ready' || auth.restoring || !auth.isLoggedIn) return
+  if (isKeepAliveConsentDeclined()) return
+  if (isKeepAliveConsentAccepted()) {
+    setKeepAlive(true).catch(() => {
+      // 原生开启失败时保持关闭，用户可在账号与设备页重试
+    })
+    return
+  }
+  keepAlivePromptOpen.value = true
+}
+
+async function onKeepAliveAccept() {
+  acceptKeepAliveConsent()
+  keepAlivePromptOpen.value = false
+  try {
+    await setKeepAlive(true)
+  } catch (error) {
+    // 原生开启失败时保持关闭，用户可在账号与设备页重试
+  }
+}
+
+async function onKeepAliveDecline() {
+  declineKeepAliveConsent()
+  keepAlivePromptOpen.value = false
+  try {
+    await setKeepAlive(false)
+  } catch (error) {
+    // 原生取消失败时由接收器在无会话场景下兜底
+  }
+}
+
+watch(
+  [() => auth.isLoggedIn, () => auth.restoring, stage],
+  () => syncKeepAliveDefault(),
+  { immediate: true }
+)
 
 onMounted(() => {
   ui.initTheme()
