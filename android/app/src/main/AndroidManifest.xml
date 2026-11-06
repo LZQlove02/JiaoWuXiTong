@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 课表变更提醒（Android 13+ 运行时申请） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 「后台稳定运行」：用户主动确认后加入电池优化白名单，保证保持登录的闹钟不被深睡冻结 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".JiaowuApplication"
@@ -124,10 +126,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- 保持登录：约每 30 分钟后台维持一次教务会话 -->
+        <!-- 保持登录：约每 30 分钟后台维持一次教务会话；开机 / 覆盖安装后补排闹钟链 -->
         <receiver
             android:name=".keepalive.SessionKeepAliveReceiver"
-            android:exported="false" />
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".SsoLoginActivity"

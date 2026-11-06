@@ -1,8 +1,12 @@
 package com.lzqlove.jiaowu;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.webkit.CookieManager;
 
 import androidx.activity.result.ActivityResult;
@@ -52,6 +56,49 @@ public class SsoLoginPlugin extends Plugin {
     @PluginMethod
     public void getKeepAliveState(PluginCall call) {
         call.resolve(keepAliveState());
+    }
+
+    /** 查询系统是否已把本应用列入电池优化白名单（部分 ROM 深睡时会冻结闹钟）。 */
+    @PluginMethod
+    public void getBatteryOptimizationState(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("ignoring", isIgnoringBatteryOptimizations());
+        call.resolve(result);
+    }
+
+    /** 打开系统的电池优化白名单申请页；是否真正放行由用户在系统弹窗中确认。 */
+    @PluginMethod
+    public void requestBatteryOptimizationExemption(PluginCall call) {
+        if (isIgnoringBatteryOptimizations()) {
+            call.resolve(batteryState(true));
+            return;
+        }
+        Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("当前没有可用的界面");
+            return;
+        }
+        Intent intent = new Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:" + getContext().getPackageName()));
+        try {
+            activity.startActivity(intent);
+            call.resolve(batteryState(false));
+        } catch (RuntimeException error) {
+            call.reject("系统不支持直接申请，请在设置中手动允许后台运行");
+        }
+    }
+
+    private JSObject batteryState(boolean ignoring) {
+        JSObject result = new JSObject();
+        result.put("ignoring", ignoring);
+        return result;
+    }
+
+    private boolean isIgnoringBatteryOptimizations() {
+        PowerManager power = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+        if (power == null) return false;
+        return power.isIgnoringBatteryOptimizations(getContext().getPackageName());
     }
 
     private JSObject keepAliveState() {

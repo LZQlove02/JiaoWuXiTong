@@ -653,6 +653,13 @@ export class ZfAcademicApi {
       response = method === 'POST' ? await authPost(url, body) : await authGet(url)
     } catch (error) {
       const message = String(error?.message || '')
+      // 本机会话解密暂时失败（Keystore 未就绪）不是会话失效，按临时故障处理，
+      // 由调用方回退快照保持登录态，绝不在这里清空本地 Cookie
+      if (message.includes('SESSION_STORE_UNAVAILABLE')) {
+        const failure = new Error('会话读取暂时失败')
+        failure.network = true
+        throw failure
+      }
       // 未登录时教务系统会 302 到 http 登录页，被网络策略拦截，应判定为会话失效
       if (message.includes('仅允许 HTTPS 请求')) {
         const failure = new Error('登录会话已失效')
@@ -671,7 +678,9 @@ export class ZfAcademicApi {
     }
     const raw = String(response.body || '').replace(/^\uFEFF/, '')
     if (/^\s*</.test(raw)) {
-      const expired = /login_slogin|统一身份认证|authserver/i.test(raw)
+      // 只认教务登录页自身的明确特征，避免正常业务页出现「统一身份认证」
+      // 或 authserver 链接时被误判为会话失效并清空本地会话
+      const expired = /login_slogin|name="yhm"/i.test(raw)
       if (expired) {
         const failure = new Error('登录会话已失效')
         failure.sessionExpired = true

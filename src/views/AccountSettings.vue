@@ -17,6 +17,14 @@
           <span class="switch-dot"></span>
         </button>
       </div>
+      <div v-if="keepAliveEnabled && batteryExempted === false" class="setting-row">
+        <span class="setting-left"><AppIcon name="refresh" />后台稳定运行</span>
+        <button class="widget-style" type="button" @click="allowBackground">去允许</button>
+      </div>
+      <p v-if="keepAliveEnabled && batteryExempted === false" class="setting-note">
+        系统当前会限制本应用的后台运行，深睡期间可能推迟会话保活。允许后台稳定运行后，保持登录更可靠。小米 / 红米 / vivo
+        还需在系统设置中把本应用的省电策略设为「无限制」，并允许「自启动」与「后台高耗电」；若开启了夜间睡眠模式，夜间会断网，仍可能掉线。
+      </p>
       <p class="setting-note">
         默认开启，可随时关闭；开启后由应用约每 30
         分钟在后台维持一次教务会话，减少长时间不打开后的重新登录与短信验证。系统省电策略可能造成延迟，学校会话到期后仍需重新登录。
@@ -109,7 +117,12 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { App as CapApp } from '@capacitor/app'
-import { getKeepAliveState, setKeepAlive as setKeepAliveNative } from '../api/nativeHttp'
+import {
+  getBatteryOptimizationState,
+  getKeepAliveState,
+  requestBatteryOptimizationExemption,
+  setKeepAlive as setKeepAliveNative
+} from '../api/nativeHttp'
 import {
   listWidgets,
   refreshWidgets as refreshWidgetsNative,
@@ -130,6 +143,8 @@ import ConsentGate from '../components/ConsentGate.vue'
 const toast = ref('')
 const keepAliveOpen = ref(false)
 const keepAliveEnabled = ref(false)
+// null 表示还没查到，避免未就绪时误显示「去允许」
+const batteryExempted = ref(null)
 const widgets = ref([])
 // 当前展开调色板的组件实例；0 = 全部收起
 const colorWidgetId = ref(0)
@@ -165,6 +180,26 @@ async function loadKeepAlive() {
     keepAliveEnabled.value = Boolean(state?.enabled)
   } catch (error) {
     keepAliveEnabled.value = false
+  }
+  await loadBatteryState()
+}
+
+async function loadBatteryState() {
+  try {
+    const state = await getBatteryOptimizationState()
+    batteryExempted.value = Boolean(state?.ignoring)
+  } catch (error) {
+    // 查询失败时不展示引导，避免误导
+    batteryExempted.value = null
+  }
+}
+
+async function allowBackground() {
+  try {
+    await requestBatteryOptimizationExemption()
+    showToast('请在系统弹窗中允许后台运行')
+  } catch (error) {
+    showToast(error?.message || '无法打开系统设置')
   }
 }
 
@@ -252,7 +287,11 @@ onMounted(async () => {
   widgetRetryTimer = setTimeout(loadWidgets, 800)
   try {
     const listener = await CapApp.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) loadWidgets()
+      if (isActive) {
+        loadWidgets()
+        // 从系统白名单弹窗返回后重新读取，及时隐藏引导
+        loadBatteryState()
+      }
     })
     // 页面在监听注册完成前已卸载时立即移除，避免泄漏
     if (disposed) {

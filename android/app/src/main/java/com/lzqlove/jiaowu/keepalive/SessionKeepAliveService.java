@@ -57,8 +57,14 @@ public final class SessionKeepAliveService {
     static Result checkNow(Context context) {
         String cookie = AuthCookieStore.load(context);
         if (cookie == null || cookie.isEmpty()) {
-            SessionKeepAliveScheduler.cancel(context);
-            return Result.EXPIRED;
+            // 区分两种 null：本机确实没有会话 → 取消闹钟；
+            // Keystore 临时不可用导致解密失败 → 保留闹钟链，下一个周期重试。
+            // 小米等 ROM 在深睡时偶发 Keystore 不可用，误判会永久砍断保活。
+            if (!AuthCookieStore.hasStoredCookie(context)) {
+                SessionKeepAliveScheduler.cancel(context);
+                return Result.EXPIRED;
+            }
+            return Result.FAILED;
         }
         HttpUrl start = HttpUrl.parse(ENDPOINT);
         if (start == null) return Result.FAILED;

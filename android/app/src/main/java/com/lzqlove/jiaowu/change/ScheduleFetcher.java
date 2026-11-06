@@ -73,7 +73,11 @@ final class ScheduleFetcher {
 
     static Result fetch(Context context, TermInfo term) {
         String cookie = AuthCookieStore.load(context);
-        if (cookie == null || cookie.isEmpty()) return Result.expired();
+        if (cookie == null || cookie.isEmpty()) {
+            // 本机确实没有会话才判定失效；Keystore 临时不可用时按失败处理，
+            // 避免深睡唤醒时误发「登录已失效」通知。
+            return AuthCookieStore.hasStoredCookie(context) ? Result.failed() : Result.expired();
+        }
 
         HttpUrl base = HttpUrl.parse(SCHEDULE_ENDPOINT);
         if (base == null) return Result.failed();

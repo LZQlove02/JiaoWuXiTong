@@ -67,6 +67,18 @@ export async function getKeepAliveState() {
   return SsoLogin.getKeepAliveState()
 }
 
+// 系统是否已允许本应用在后台稳定运行（电池优化白名单）
+export async function getBatteryOptimizationState() {
+  if (!Capacitor.isNativePlatform()) return { ignoring: true }
+  return SsoLogin.getBatteryOptimizationState()
+}
+
+// 打开系统电池优化白名单申请页；部分 ROM 深睡时会冻结后台闹钟
+export async function requestBatteryOptimizationExemption() {
+  if (!Capacitor.isNativePlatform()) return { ignoring: true }
+  return SsoLogin.requestBatteryOptimizationExemption()
+}
+
 export async function setAuthCookies(cookie) {
   if (!Capacitor.isNativePlatform()) {
     throw new Error('原生 HTTP 插件仅在 App 内可用')

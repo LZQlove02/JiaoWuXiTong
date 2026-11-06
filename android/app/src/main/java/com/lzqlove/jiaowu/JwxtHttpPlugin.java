@@ -46,6 +46,8 @@ public class JwxtHttpPlugin extends Plugin {
             "zip", "rar", "7z", "txt", "jpg", "jpeg", "png"));
 
     private static final String DEBUG_TAG = "JwxtHttp";
+    /** 本机会话存在但 Keystore 暂时无法解密时返回给 JS 的错误码，前端按临时故障处理。 */
+    private static final String SESSION_STORE_UNAVAILABLE = "SESSION_STORE_UNAVAILABLE";
     /** debug 日志只保留能定位接口的参数值，其余查询值一律脱敏。 */
     private static final Set<String> SAFE_QUERY_KEYS = new HashSet<>(Arrays.asList(
             "gnmkdm", "doType", "xnm", "xqm", "type", "pageNum", "pageSize"));
@@ -426,6 +428,8 @@ public class JwxtHttpPlugin extends Plugin {
         if (!value.isEmpty()) {
             AuthCookieStore.save(getContext(), value);
             SessionKeepAliveScheduler.resumeIfEnabled(getContext());
+        } else {
+            Log.w(DEBUG_TAG, "setAuthCookies: empty cookie, not saving");
         }
         call.resolve();
     }
@@ -434,6 +438,7 @@ public class JwxtHttpPlugin extends Plugin {
     public void loadAuthCookies(PluginCall call) {
         String cookie = AuthCookieStore.load(getContext());
         boolean restored = cookie != null && !cookie.isEmpty();
+        Log.i(DEBUG_TAG, "loadAuthCookies: restored=" + restored);
         JSObject result = new JSObject();
         result.put("restored", restored);
         call.resolve(result);
@@ -457,6 +462,12 @@ public class JwxtHttpPlugin extends Plugin {
             return;
         }
         String cookie = AuthCookieStore.load(getContext());
+        // 本机存有会话但解密失败（Keystore 尚未就绪）时不能发无 Cookie 请求：
+        // 服务端会跳转登录页，前端将误判会话失效并永久清空本地 Cookie。
+        if ((cookie == null || cookie.isEmpty()) && AuthCookieStore.hasStoredCookie(getContext())) {
+            call.reject(SESSION_STORE_UNAVAILABLE);
+            return;
+        }
 
         final Request request;
         try {
@@ -513,6 +524,11 @@ public class JwxtHttpPlugin extends Plugin {
                 body == null ? "" : body,
                 MediaType.parse("application/x-www-form-urlencoded; charset=UTF-8"));
         String cookie = AuthCookieStore.load(getContext());
+        // 同 authGet：解密失败时不能发无 Cookie 请求，避免误判会话失效
+        if ((cookie == null || cookie.isEmpty()) && AuthCookieStore.hasStoredCookie(getContext())) {
+            call.reject(SESSION_STORE_UNAVAILABLE);
+            return;
+        }
         final Request request;
         try {
             Request.Builder builder = new Request.Builder()

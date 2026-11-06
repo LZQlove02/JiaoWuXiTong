@@ -101,6 +101,14 @@ describe('ZfAcademicApi 离线快照', () => {
     await expect(api.restoreSession()).rejects.toMatchObject({ sessionExpired: true })
   })
 
+  it('会话解密暂时失败时按网络故障处理并保留登录态', async () => {
+    authGet.mockRejectedValue(new Error('SESSION_STORE_UNAVAILABLE'))
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
+    const api = new ZfAcademicApi()
+    const profile = await api.restoreSession()
+    expect(profile.id).toBe('test-student-1')
+  })
+
   it('clearScheduleSnapshot 清除快照', () => {
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot))
     clearScheduleSnapshot()

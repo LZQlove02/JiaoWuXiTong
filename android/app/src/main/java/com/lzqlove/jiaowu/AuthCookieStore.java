@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
+import android.util.Log;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
@@ -30,6 +31,7 @@ public final class AuthCookieStore {
     private static final String KEY = "cookie";
     private static final String ALIAS = "jwxt_auth_cookie_key";
     private static final int IV_LENGTH = 12;
+    private static final String TAG = "AuthCookieStore";
 
     private static String cached;
     private static boolean loaded;
@@ -52,7 +54,10 @@ public final class AuthCookieStore {
                     .apply();
             cached = value;
             loaded = true;
-        } catch (Exception ignored) {
+            Log.i(TAG, "save ok, length=" + value.length());
+        } catch (Exception error) {
+            Log.e(TAG, "save failed: " + error.getClass().getSimpleName()
+                    + " " + error.getMessage());
         }
     }
 
@@ -61,29 +66,69 @@ public final class AuthCookieStore {
         try {
             String stored = prefs(context).getString(KEY, null);
             if (stored == null) {
+                Log.i(TAG, "load: no stored cookie");
                 cached = null;
                 loaded = true;
                 return null;
             }
             byte[] combined = Base64.decode(stored, Base64.NO_WRAP);
             if (combined.length <= IV_LENGTH) {
+                Log.w(TAG, "load: stored cookie too short (" + combined.length + " bytes)");
                 cached = null;
                 loaded = true;
                 return null;
             }
-            byte[] iv = new byte[IV_LENGTH];
-            System.arraycopy(combined, 0, iv, 0, IV_LENGTH);
-            byte[] encrypted = new byte[combined.length - IV_LENGTH];
-            System.arraycopy(combined, IV_LENGTH, encrypted, 0, encrypted.length);
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, getKey(), new GCMParameterSpec(128, iv));
-            cached = new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
+            // 小米等 ROM 在闹钟唤醒进程时 Keystore 服务可能尚未就绪，
+            // 首次解密偶发失败时短暂等待后重试一次，避免把临时故障当成无会话。
+            String decrypted = decryptWithRetry(combined);
+            if (decrypted == null) {
+                // 仍失败：不写入缓存，下一次调用重试；调用方需用 hasStoredCookie 判断是否真无会话
+                return null;
+            }
+            cached = decrypted;
             loaded = true;
+            Log.i(TAG, "load ok, length=" + decrypted.length());
             return cached;
-        } catch (Exception ignored) {
-            // 解密失败（如 Keystore 暂时不可用）不写入缓存，下一次调用重试
+        } catch (Exception error) {
+            Log.e(TAG, "load failed: " + error.getClass().getSimpleName()
+                    + " " + error.getMessage());
             return null;
         }
+    }
+
+    private static String decryptWithRetry(byte[] combined) {
+        for (int attempt = 0; attempt < 2; attempt += 1) {
+            try {
+                byte[] iv = new byte[IV_LENGTH];
+                System.arraycopy(combined, 0, iv, 0, IV_LENGTH);
+                byte[] encrypted = new byte[combined.length - IV_LENGTH];
+                System.arraycopy(combined, IV_LENGTH, encrypted, 0, encrypted.length);
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                cipher.init(Cipher.DECRYPT_MODE, getKey(), new GCMParameterSpec(128, iv));
+                return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
+            } catch (Exception error) {
+                Log.w(TAG, "decrypt attempt " + (attempt + 1) + " failed: "
+                        + error.getClass().getSimpleName() + " " + error.getMessage());
+                if (attempt == 0) {
+                    try {
+                        Thread.sleep(300);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return null;
+                    }
+                }
+            }
+        }
+        Log.e(TAG, "decrypt failed after 2 attempts");
+        return null;
+    }
+
+    /**
+     * 不解密，只判断是否存过 Cookie。用于区分「本机确实没有会话」和
+     * 「Keystore 临时不可用导致解密失败」两种 null，避免后者误取消后台保活闹钟。
+     */
+    public static synchronized boolean hasStoredCookie(Context context) {
+        return prefs(context).contains(KEY);
     }
 
     static synchronized void clear(Context context) {
@@ -141,8 +186,11 @@ public final class AuthCookieStore {
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
         if (keyStore.containsAlias(ALIAS)) {
-            return (SecretKey) keyStore.getKey(ALIAS, null);
+            SecretKey key = (SecretKey) keyStore.getKey(ALIAS, null);
+            if (key == null) Log.w(TAG, "getKey: alias exists but key is null");
+            return key;
         }
+        Log.i(TAG, "getKey: generating new key");
         KeyGenerator generator = KeyGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
         generator.init(new KeyGenParameterSpec.Builder(
@@ -151,6 +199,8 @@ public final class AuthCookieStore {
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .build());
-        return generator.generateKey();
+        SecretKey key = generator.generateKey();
+        Log.i(TAG, "getKey: new key generated");
+        return key;
     }
 }

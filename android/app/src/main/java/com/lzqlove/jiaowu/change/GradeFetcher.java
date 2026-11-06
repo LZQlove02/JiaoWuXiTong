@@ -74,7 +74,10 @@ final class GradeFetcher {
 
     static Result fetch(Context context, TermInfo term) {
         String cookie = AuthCookieStore.load(context);
-        if (cookie == null || cookie.isEmpty()) return Result.expired();
+        if (cookie == null || cookie.isEmpty()) {
+            // 同 ScheduleFetcher：Keystore 临时不可用不判定为会话失效
+            return AuthCookieStore.hasStoredCookie(context) ? Result.failed() : Result.expired();
+        }
         if (term == null || !term.isValid()) return Result.failed();
 
         List<GradeRecord> records = new ArrayList<>();
