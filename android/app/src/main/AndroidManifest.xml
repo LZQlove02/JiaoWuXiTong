@@ -126,9 +126,14 @@
             </intent-filter>
         </receiver>
 
-        <!-- 保持登录：约每 30 分钟后台维持一次教务会话；开机 / 覆盖安装后补排闹钟链 -->
+        <!-- 保持登录：约每 30 分钟后台维持一次教务会话，仅接受本应用自己的闹钟广播 -->
         <receiver
             android:name=".keepalive.SessionKeepAliveReceiver"
+            android:exported="false" />
+
+        <!-- 保持登录：开机 / 覆盖安装后补排闹钟链，只做本地排程，不发网络请求 -->
+        <receiver
+            android:name=".keepalive.SessionKeepAliveBootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

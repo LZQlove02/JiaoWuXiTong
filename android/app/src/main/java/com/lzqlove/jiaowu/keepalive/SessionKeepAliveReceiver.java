@@ -8,7 +8,7 @@ import android.util.Log;
 /**
  * 会话保活闹钟。先排下一次，再起后台线程做一次轻量请求，
  * goAsync 保证进程不会在请求完成前被回收。会话是否仍存在由工作线程判断。
- * 同时负责开机 / 覆盖安装后把丢失的闹钟链补回来。
+ * 只接受本应用自己排的闹钟广播；开机与覆盖安装后的补排由 SessionKeepAliveBootReceiver 负责。
  */
 public class SessionKeepAliveReceiver extends BroadcastReceiver {
 
@@ -16,16 +16,10 @@ public class SessionKeepAliveReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (intent == null || !ACTION_CHECK.equals(intent.getAction())) return;
         final Context app = context.getApplicationContext();
         if (!SessionKeepAliveStore.isEnabled(app)) {
             SessionKeepAliveScheduler.cancel(app);
-            return;
-        }
-        String action = intent == null ? null : intent.getAction();
-        // 开机 / 覆盖安装后系统会清空闹钟，这里只补排，不做网络请求
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action)
-                || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
-            SessionKeepAliveScheduler.scheduleNext(app);
             return;
         }
         // 先续上闹钟链，单次网络失败不会导致保活永久停止

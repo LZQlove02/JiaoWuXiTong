@@ -438,9 +438,13 @@ public class JwxtHttpPlugin extends Plugin {
     public void loadAuthCookies(PluginCall call) {
         String cookie = AuthCookieStore.load(getContext());
         boolean restored = cookie != null && !cookie.isEmpty();
-        Log.i(DEBUG_TAG, "loadAuthCookies: restored=" + restored);
+        // 本机存有会话但本次解密失败：交给前端保留快照登录态并重试，
+        // 直接回 restored=false 会让冷启动误跳登录页
+        boolean pending = !restored && AuthCookieStore.hasStoredCookie(getContext());
+        Log.i(DEBUG_TAG, "loadAuthCookies: restored=" + restored + ", pending=" + pending);
         JSObject result = new JSObject();
         result.put("restored", restored);
+        result.put("pending", pending);
         call.resolve(result);
     }
 

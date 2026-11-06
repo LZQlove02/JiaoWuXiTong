@@ -17,6 +17,8 @@ import { clearDataCaches } from '../utils/dataCache'
 import { clearPortalCache } from '../utils/portalCache'
 
 const RESTORE_TIMEOUT_MS = 15000
+// 本机存有会话但解密暂时失败时，给 Keystore 一次重试机会
+const SESSION_PENDING_RETRY_MS = 600
 
 // 冷启动恢复会话最多等待 15 秒，避免弱网时首屏长时间停在启动页
 function restoreWithTimeout(api) {
@@ -36,6 +38,18 @@ function restoreWithTimeout(api) {
         reject(error)
       }
     )
+  })
+}
+
+// 解密失败时延迟重读一次；仍读不出返回 null，由调用方保留原登录态
+function retryPendingSession() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      loadAuthCookies().then(
+        (state) => resolve(state?.restored ? state : null),
+        () => resolve(null)
+      )
+    }, SESSION_PENDING_RETRY_MS)
   })
 }
 
@@ -87,8 +101,27 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function restoreSession() {
     try {
-      const restored = await loadAuthCookies()
-      if (restored && restored.restored) {
+      let state = await loadAuthCookies()
+      if (state?.pending) {
+        // 本机存有会话但解密暂时失败：先用快照保持登录态，避免冷启动被踢回登录页
+        const snapshotApi = new ZfAcademicApi()
+        const cached = snapshotApi.applySnapshot()
+        if (cached) {
+          applyZfSession(snapshotApi, cached)
+          // 快照课表同步写入 academic store：首页首帧直接显示缓存，不再等网络
+          const { useAcademicStore } = await import('./academic')
+          useAcademicStore().applySnapshotSchedule(snapshotApi.snapshotSchedule())
+          // 稍后补读一次会话，成功就静默补上实时数据；仍失败保持离线快照
+          retryPendingSession().then((retried) => {
+            if (retried) refreshInBackground(snapshotApi)
+          })
+          return true
+        }
+        // 没有可用快照时再等一次，仍读不出才判定未登录（不清空本地会话）
+        state = await retryPendingSession()
+        if (!state) return false
+      }
+      if (state && state.restored) {
         const zf = new ZfAcademicApi()
         const cached = zf.applySnapshot()
         if (cached) {
