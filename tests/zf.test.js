@@ -116,6 +116,35 @@ describe('ZfAcademicApi 离线快照', () => {
   })
 })
 
+describe('登录页判定规则', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    authGet.mockReset()
+  })
+
+  it('教务登录页仍判定为会话失效', async () => {
+    authGet.mockResolvedValue({
+      status: 200,
+      body: '<html><body><form>login_slogin</form></body></html>'
+    })
+    const api = new ZfAcademicApi()
+    await expect(api.restoreSession()).rejects.toMatchObject({ sessionExpired: true })
+  })
+
+  it('正常业务页含「统一身份认证」或 authserver 字样不判定失效', async () => {
+    authGet.mockResolvedValue({
+      status: 200,
+      body:
+        '<html><body>统一身份认证使用说明，'
+        + '<a href="https://authserver.lzzy.net/help">帮助</a></body></html>'
+    })
+    const api = new ZfAcademicApi()
+    const error = await api.restoreSession().catch((failure) => failure)
+    expect(error.parseError).toBe(true)
+    expect(error.sessionExpired).toBeUndefined()
+  })
+})
+
 describe('课表解析与响应校验', () => {
   beforeEach(() => {
     authGet.mockReset()

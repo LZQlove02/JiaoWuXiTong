@@ -1,8 +1,8 @@
 const STORAGE_KEY = 'jiaowu.privacy.accepted'
 
 // 规则修订时同步 +1，老用户下次启动会重新看到并重新同意
-export const PRIVACY_VERSION = '3'
-export const PRIVACY_DATE = '2026-11-03'
+export const PRIVACY_VERSION = '4'
+export const PRIVACY_DATE = '2026-11-06'
 export const PRIVACY_CONTACT = '3507924962@qq.com'
 
 export const PRIVACY_SECTIONS = [
@@ -25,6 +25,11 @@ export const PRIVACY_SECTIONS = [
     id: 'background',
     title: '后台检查',
     text: '课表变更提醒、成绩提醒、通知与消息提醒默认关闭。开启后，应用会在你设定的每天两个时段（默认 07:10、12:50）在后台访问教务系统，仅检查课表变更、不及格成绩和新通知/新消息；结果保存在本机应用私有目录，不上传服务器，锁屏通知只显示通用摘要。「保持登录」默认开启，首次登录时会单独展示说明，确认后应用约每 30 分钟在后台访问一次教务系统轻量接口，仅携带本机加密保存的登录会话维持登录状态，不读取或保存响应内容。以上功能均可随时在设置中关闭。'
+  },
+  {
+    id: 'battery',
+    title: '电池优化白名单',
+    text: '为减少系统深睡对后台保活的冻结，「我的 → 账号与设备」提供「后台稳定运行」入口。你主动点击后，系统会把本应用加入电池优化白名单（对应 Android 的 REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 权限），仅用于让「保持登录」的定时任务按时执行；该权限不读取任何个人信息。是否允许由你在系统弹窗中决定，可随时在系统设置中撤销；关闭「保持登录」、清除本机数据或卸载应用后不再使用。'
   },
   {
     id: 'storage',

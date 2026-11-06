@@ -57,6 +57,7 @@ describe('会话解密暂时失败时的冷启动恢复', () => {
     loadAuthCookies.mockResolvedValue({ restored: false, pending: false })
     clearAuthCookies.mockClear()
     state.hasSnapshot = true
+    localStorage.clear()
   })
 
   it('有快照时保留登录态且不清空本地会话', async () => {
@@ -93,5 +94,22 @@ describe('会话解密暂时失败时的冷启动恢复', () => {
     await vi.advanceTimersByTimeAsync(700)
     await expect(booting).resolves.toBe(true)
     expect(auth.isLoggedIn).toBe(true)
+  })
+
+  it('连续多次解密失败后按不可用处理，避免永久停在离线快照', async () => {
+    localStorage.setItem('jiaowu.session.pendingFailures', '3')
+    loadAuthCookies.mockResolvedValue({ restored: false, pending: true })
+    const auth = useAuthStore()
+    await expect(auth.bootstrap()).resolves.toBe(false)
+    expect(auth.isLoggedIn).toBe(false)
+    expect(clearAuthCookies).not.toHaveBeenCalled()
+  })
+
+  it('恢复成功后清零失败计数', async () => {
+    localStorage.setItem('jiaowu.session.pendingFailures', '2')
+    loadAuthCookies.mockResolvedValue({ restored: true, pending: false })
+    const auth = useAuthStore()
+    await auth.bootstrap()
+    expect(localStorage.getItem('jiaowu.session.pendingFailures')).toBeNull()
   })
 })

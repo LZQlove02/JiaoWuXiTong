@@ -19,6 +19,26 @@ import { clearPortalCache } from '../utils/portalCache'
 const RESTORE_TIMEOUT_MS = 15000
 // 本机存有会话但解密暂时失败时，给 Keystore 一次重试机会
 const SESSION_PENDING_RETRY_MS = 600
+// 连续多少次冷启动都读不出会话后，按不可用处理，避免永久停在离线快照
+const MAX_PENDING_FAILURES = 3
+const PENDING_FAILURES_KEY = 'jiaowu.session.pendingFailures'
+
+function readPendingFailures() {
+  try {
+    return Number(localStorage.getItem(PENDING_FAILURES_KEY)) || 0
+  } catch (error) {
+    return 0
+  }
+}
+
+function writePendingFailures(value) {
+  try {
+    if (value <= 0) localStorage.removeItem(PENDING_FAILURES_KEY)
+    else localStorage.setItem(PENDING_FAILURES_KEY, String(value))
+  } catch (error) {
+    // 存储不可用时按无计数处理，不影响本次恢复流程
+  }
+}
 
 // 冷启动恢复会话最多等待 15 秒，避免弱网时首屏长时间停在启动页
 function restoreWithTimeout(api) {
@@ -84,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
     resetAcademicApi()
     user.value = null
     justLoggedIn.value = false
+    writePendingFailures(0)
   }
 
   // 会话失效统一出口：任一业务请求判定 401/登录页后，只清理一次并回登录页
@@ -103,6 +124,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       let state = await loadAuthCookies()
       if (state?.pending) {
+        // 连续多次冷启动都读不出会话时不再沿用快照，交给用户重新登录
+        const failures = readPendingFailures() + 1
+        writePendingFailures(failures)
+        if (failures > MAX_PENDING_FAILURES) return false
         // 本机存有会话但解密暂时失败：先用快照保持登录态，避免冷启动被踢回登录页
         const snapshotApi = new ZfAcademicApi()
         const cached = snapshotApi.applySnapshot()
@@ -113,7 +138,9 @@ export const useAuthStore = defineStore('auth', () => {
           useAcademicStore().applySnapshotSchedule(snapshotApi.snapshotSchedule())
           // 稍后补读一次会话，成功就静默补上实时数据；仍失败保持离线快照
           retryPendingSession().then((retried) => {
-            if (retried) refreshInBackground(snapshotApi)
+            if (!retried) return
+            writePendingFailures(0)
+            refreshInBackground(snapshotApi)
           })
           return true
         }
@@ -122,6 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (!state) return false
       }
       if (state && state.restored) {
+        writePendingFailures(0)
         const zf = new ZfAcademicApi()
         const cached = zf.applySnapshot()
         if (cached) {
@@ -191,6 +219,7 @@ export const useAuthStore = defineStore('auth', () => {
       await resetAcademic()
       user.value = profile
       justLoggedIn.value = true
+      writePendingFailures(0)
       return profile
     } catch (error) {
       // 登录后校验未通过时丢弃这次无效会话，避免把坏 Cookie 留到下次启动

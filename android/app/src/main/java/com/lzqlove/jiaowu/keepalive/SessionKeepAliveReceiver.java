@@ -8,7 +8,7 @@ import android.util.Log;
 /**
  * 会话保活闹钟。先排下一次，再起后台线程做一次轻量请求，
  * goAsync 保证进程不会在请求完成前被回收。会话是否仍存在由工作线程判断。
- * 只接受本应用自己排的闹钟广播；开机与覆盖安装后的补排由 SessionKeepAliveBootReceiver 负责。
+ * 只接受本应用自己排的闹钟广播；开机与覆盖安装后的补排由 change.ScheduleBootReceiver 负责。
  */
 public class SessionKeepAliveReceiver extends BroadcastReceiver {
 
