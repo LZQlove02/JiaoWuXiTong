@@ -227,8 +227,9 @@ public final class WidgetBitmapRenderer {
         return merged;
     }
 
-    // 课程名排版：两节以上折两行（每行 2 字），单节块一行 4 字。
-    // 高块（三节以上）把校名贴顶、教室紧跟在下面，不再是「标题浮在块中间、下面一大片空」。
+    // 课程名排版：按课程块的真实宽高枚举 1~3 行 × 每行 2~4 字的折法，
+    // 在「字号不低于可读下限」的方案里选显示字数最多的一种（同字数取字号更大的），
+    // 放不下的部分截断并补「…」；教室行始终保留（《小组件执行方案》§7.3 硬约束）。
     private static void drawLabel(Canvas canvas, String name, String room, RectF block,
                                   int ink, float unit, Paint text) {
         if (name == null || name.isEmpty()) return;
@@ -237,92 +238,115 @@ public final class WidgetBitmapRenderer {
         float maxH = block.height() - unit * 1.2f;
         if (maxW <= 0 || maxH <= 0) return;
 
+        String roomLabel = compactRoom(room);
+        boolean hasRoom = !roomLabel.isEmpty();
+        // 可读下限：低于这个字号宁可少显示字，也不把课名压成小字
+        float floorSize = unit * 2.8f;
+
         boolean cjk = isCjk(name.charAt(0));
         float size;
         String[] parts;
         if (cjk) {
-            boolean tall = block.height() >= unit * 7.2f && name.length() > 2;
-            int maxLines = tall ? 2 : 1;
-            int perLine = tall ? 2 : 4;
-            size = Math.min(maxW / (perLine + 0.3f), maxH / (maxLines * 1.12f));
-            size = Math.min(size, unit * (maxLines == 2 ? 5.6f : 5.2f));
-            if (size < unit * 1.6f) return;
-            int capacity = perLine * maxLines;
-            String label = name.length() > capacity ? name.substring(0, capacity) : name;
-            int count = Math.min(maxLines, (int) Math.ceil(label.length() / (double) perLine));
+            int bestPerLine = Math.min(4, Math.max(1, name.length()));
+            int bestLines = 1;
+            float bestSize = 0f;
+            int bestVisible = -1;
+            for (int perLine = 4; perLine >= 2; perLine -= 1) {
+                int lines = Math.min(3, Math.max(1,
+                    (int) Math.ceil(name.length() / (double) perLine)));
+                float candidate = nameSizeFor(lines, perLine, maxW, maxH, unit, hasRoom);
+                if (candidate < floorSize) continue;
+                int capacity = lines * perLine;
+                // 名字超过容量时要给省略号留一格，实际可见字数再少一个
+                int visible = name.length() > capacity ? capacity - 1 : name.length();
+                if (visible > bestVisible || (visible == bestVisible && candidate > bestSize)) {
+                    bestVisible = visible;
+                    bestSize = candidate;
+                    bestPerLine = perLine;
+                    bestLines = lines;
+                }
+            }
+            if (bestSize <= 0f) {
+                // 块太矮，所有方案都低于下限：退回单行最小字号，由后面的收缩兜底
+                bestSize = floorSize;
+                bestPerLine = Math.max(1, Math.min(4, name.length()));
+                bestLines = 1;
+            }
+            size = bestSize;
+            int capacity = bestLines * bestPerLine;
+            boolean truncated = name.length() > capacity;
+            String label = truncated
+                ? name.substring(0, Math.max(1, capacity - 1))
+                : name;
+            // 省略号也算一格；按总格数均分到各行，避免出现「最后一行只剩一个字」
+            int glyphs = label.length() + (truncated ? 1 : 0);
+            int count = Math.min(bestLines, Math.max(1, (int) Math.ceil(
+                glyphs / (double) bestPerLine)));
             parts = new String[count];
+            int base = glyphs / count;
+            int extra = glyphs % count;
+            int at = 0;
             for (int i = 0; i < count; i += 1) {
-                int from = i * perLine;
-                parts[i] = label.substring(from, Math.min(label.length(), from + perLine));
+                int take = base + (i < extra ? 1 : 0);
+                if (truncated && i == count - 1) take -= 1;   // 最后一格让给「…」
+                int from = Math.min(at, label.length());
+                int to = Math.min(label.length(), from + Math.max(0, take));
+                parts[i] = label.substring(from, to);
+                at = to;
+                if (truncated && i == count - 1) parts[i] = parts[i] + "…";
             }
         } else {
             // 英文（或中英混排）按真实字宽算字号：拉丁字符约 0.55em，
             // 套汉字「每行几个字」的算法会把字压到一半。
-            // 1~3 行里选字号最大的折法：长名字多折一行，字号就能拉回来。
+            // 名字切成「拉丁单词 / 单个汉字」小块后折行，没有空格的长名字
+            // （如 Vue.Js前端框架技术）也能在汉字间断开，不会整块留白。
             String trimmed = name.trim();
-            String[] words = trimmed.split("\\s+");
+            List<String> tokens = splitTokens(trimmed);
             float ref = 100f;
             text.setTypeface(Typeface.DEFAULT_BOLD);
             text.setTextSize(ref);
             String[] best = new String[]{trimmed};
             float bestSize = 0f;
-            int maxLines = Math.min(3, Math.max(1, words.length));
+            int maxLines = Math.min(3, Math.max(1, tokens.size()));
             for (int lineCount = 1; lineCount <= maxLines; lineCount += 1) {
-                if (lineCount * unit * 1.9f > maxH) break;
-                String[] candidate = partitionWords(words, lineCount, text);
+                // 行高至少要装得下下限字号，否则这个折法不可读
+                if (lineCount * floorSize * 1.12f > maxH) break;
+                String[] candidate = partitionTokens(tokens, lineCount, text);
                 float widest = 0f;
                 for (String line : candidate) widest = Math.max(widest, text.measureText(line));
                 if (widest <= 0f) continue;
-                float candidateSize = Math.min(
-                    maxW * 0.96f * ref / widest,
-                    Math.min(maxH / (lineCount * 1.12f), unit * 5.2f));
+                float candidateSize = mixedSize(widest, ref, maxW, maxH, lineCount, unit, hasRoom);
                 if (candidateSize > bestSize) {
                     bestSize = candidateSize;
                     best = candidate;
                 }
             }
-            if (bestSize <= 0f) return;
-            size = bestSize;
+            if (bestSize <= 0f) bestSize = floorSize;
+            size = Math.max(bestSize, floorSize);
             parts = best;
-            text.setTextSize(size);
-            float target = maxW * 0.96f;
-            for (int i = 0; i < parts.length; i += 1) {
-                String part = parts[i];
-                while (part.length() > 1 && text.measureText(part) > target) {
-                    part = part.substring(0, part.length() - 1);
-                }
-                parts[i] = part;
-            }
-            if (size < unit * 1.4f) return;
         }
 
-        // 课名 + 教室必须同时显示（《小组件执行方案》§7.3 硬约束）：
-        // 只剩很窄的块时逐档缩字号，直到两行都装得下，绝不省略教室
-        String roomLabel = compactRoom(room);
-        boolean hasRoom = !roomLabel.isEmpty();
-        // 教室字号只由「块宽」决定，不跟课名字号走：否则大块里教室会被放大到宽度放不下
-        float roomSize = unit * 2.6f;
-        text.setTypeface(Typeface.DEFAULT);
-        text.setTextSize(roomSize);
-        int guard = 0;
-        while (hasRoom && roomSize > unit * 1.1f && text.measureText(roomLabel) > maxW * 0.98f && guard < 40) {
-            roomSize *= 0.9f;
-            text.setTextSize(roomSize);
-            guard += 1;
-        }
+        // 课名 + 教室必须同时显示（§7.3 硬约束）：
+        // 教室字号跟课名联动，块太矮时先缩课名，直到课名与教室都装得下
+        float roomSize = hasRoom ? roomSizeFor(size, unit) : 0f;
         float roomGap = roomSize * 0.45f;
         int lineCount = parts.length;
-
-        for (int attempt = 0; attempt < 12 && hasRoom; attempt += 1) {
-            float needH = size * 1.12f * lineCount + roomGap + roomSize;
-            if (needH <= maxH) break;
-            size *= 0.9f;
-            if (size < unit * 1.2f) break;
-        }
-
-        // 教室字号再跟课名收一档：单节块里课名被压小后，教室不能反而比课名还大
         if (hasRoom) {
-            roomSize = Math.min(roomSize, Math.max(unit * 1.1f, size * 0.62f));
+            roomSize = roomSizeForWidth(roomLabel, roomSize, maxW, unit, text);
+            // 宽度能容纳的字号是上限：下面缩课名时不能把教室字号放大回去
+            float roomMaxByWidth = roomSize;
+            roomGap = roomSize * 0.45f;
+            for (int attempt = 0; attempt < 12; attempt += 1) {
+                float needH = size * 1.12f * lineCount + roomGap + roomSize;
+                if (needH <= maxH) break;
+                size *= 0.9f;
+                roomSize = Math.min(roomSizeFor(size, unit), roomMaxByWidth);
+                roomGap = roomSize * 0.45f;
+                text.setTextSize(roomSize);
+                if (size < unit * 1.2f) break;
+            }
+            // 缩课名后再校一次宽度，保证教室行始终不出块
+            roomSize = roomSizeForWidth(roomLabel, roomSize, maxW, unit, text);
             roomGap = roomSize * 0.45f;
         }
 
@@ -336,16 +360,40 @@ public final class WidgetBitmapRenderer {
         text.setTypeface(Typeface.DEFAULT_BOLD);
         text.setTextAlign(Paint.Align.CENTER);
         text.setColor(ink);
-        // 块是半透明的，字压在浅色块上，弱阴影足够；别太重，小字号会糊
-        text.setShadowLayer(Math.max(1f, unit * 0.45f), 0f, unit * 0.14f, 0x40000000);
+        // 不加描边/阴影：小字号下阴影会糊成一圈明显的轮廓，看起来像描边
+        text.clearShadowLayer();
+
+        // 超出块宽的行逐字截断；混排名字在最后一行补「…」，提示还有内容
+        boolean cut = false;
+        for (int i = 0; i < parts.length; i += 1) {
+            String part = parts[i];
+            if (part == null) continue;
+            if (text.measureText(part) > maxW) {
+                while (part.length() > 1 && text.measureText(part) > maxW) {
+                    part = part.substring(0, part.length() - 1);
+                }
+                parts[i] = part;
+                cut = true;
+            }
+        }
+        if (!cjk && cut) {
+            for (int i = parts.length - 1; i >= 0; i -= 1) {
+                String part = parts[i] == null ? "" : parts[i];
+                if (part.isEmpty() && i > 0) continue;
+                String marked = part + "…";
+                while (!part.isEmpty() && text.measureText(marked) > maxW) {
+                    part = part.substring(0, part.length() - 1);
+                    marked = part + "…";
+                }
+                parts[i] = marked;
+                break;
+            }
+        }
 
         float baselineOffset = (text.ascent() + text.descent()) / 2f;
         for (int i = 0; i < parts.length; i += 1) {
             String part = parts[i];
             if (part == null || part.isEmpty()) continue;
-            while (part.length() > 1 && text.measureText(part) > maxW) {
-                part = part.substring(0, part.length() - 1);
-            }
             float baseline = textTop + lineH * (i + 0.5f) - baselineOffset;
             canvas.drawText(part, block.centerX(), baseline, text);
         }
@@ -354,14 +402,63 @@ public final class WidgetBitmapRenderer {
             text.setTextSize(roomSize);
             text.setTypeface(Typeface.DEFAULT);
             text.setColor((ink & 0x00FFFFFF) | 0xB3000000);   // 教室行：同一字色的 70%
-            String part = roomLabel;
-            while (part.length() > 1 && text.measureText(part) > maxW) {
-                part = part.substring(0, part.length() - 1);
+            // 教室号仍超出块宽（如带括号说明的长教室名）时逐字截断，保留楼栋号前缀
+            String roomText = roomLabel;
+            while (roomText.length() > 1 && text.measureText(roomText) > maxW) {
+                roomText = roomText.substring(0, roomText.length() - 1);
             }
             float centerY = textTop + nameH + roomGap + roomSize * 0.5f;
             float baseline = centerY - (text.ascent() + text.descent()) / 2f;
-            canvas.drawText(part, block.centerX(), baseline, text);
+            canvas.drawText(roomText, block.centerX(), baseline, text);
         }
+    }
+
+    // 汉字课名：给定行数 / 每行字数，算能放下的最大字号（含教室行预留）
+    private static float nameSizeFor(int lines, int perLine, float maxW, float maxH,
+                                     float unit, boolean hasRoom) {
+        float size = Math.min(maxW / (perLine + 0.3f), maxH / (lines * 1.12f));
+        size = Math.min(size, unit * (lines > 1 ? 5.6f : 5.2f));
+        if (hasRoom) {
+            for (int round = 0; round < 3; round += 1) {
+                float cap = maxH - roomSizeFor(size, unit) * 1.45f;
+                if (cap <= 0f) return 0f;
+                size = Math.min(size, cap / (lines * 1.12f));
+            }
+        }
+        return size;
+    }
+
+    // 混排名字：按实测最宽一行的字宽算最大字号（含教室行预留）
+    private static float mixedSize(float widest, float ref, float maxW, float maxH,
+                                   int lines, float unit, boolean hasRoom) {
+        float size = Math.min(maxW * 0.96f * ref / widest, unit * 5.2f);
+        for (int round = 0; round < 3; round += 1) {
+            float cap = maxH;
+            if (hasRoom) {
+                cap -= roomSizeFor(size, unit) * 1.45f;
+            }
+            if (cap <= 0f) return 0f;
+            size = Math.min(size, cap / (lines * 1.12f));
+        }
+        return size;
+    }
+
+    // 教室字号跟课名字号联动（上限 2.6×unit），保证教室不会比课名还大
+    private static float roomSizeFor(float nameSize, float unit) {
+        return Math.min(unit * 2.6f, Math.max(unit * 1.1f, nameSize * 0.62f));
+    }
+
+    // 按块宽收敛教室字号：文本超宽就逐档缩小，最低到 1.1×unit
+    private static float roomSizeForWidth(String label, float size, float maxW, float unit, Paint text) {
+        text.setTypeface(Typeface.DEFAULT);
+        text.setTextSize(size);
+        int guard = 0;
+        while (size > unit * 1.1f && text.measureText(label) > maxW * 0.98f && guard < 40) {
+            size *= 0.9f;
+            text.setTextSize(size);
+            guard += 1;
+        }
+        return size;
     }
 
     // 冷色三档按课程名哈希固定分配：同一门课每次刷新、每个尺寸都落在同一档
@@ -386,46 +483,75 @@ public final class WidgetBitmapRenderer {
         return text;
     }
 
-    // 按词把名字均分成 lines 行，保持词序；尽量让每行宽度接近
-    private static String[] partitionWords(String[] words, int lines, Paint paint) {
-        if (lines <= 1) {
-            StringBuilder all = new StringBuilder();
-            for (String word : words) {
-                if (all.length() > 0) all.append(' ');
-                all.append(word);
-            }
-            return new String[]{all.toString()};
-        }
-        float total = 0f;
-        for (String word : words) {
-            total += paint.measureText(word) + paint.measureText(" ");
-        }
-        float target = total / lines;
-        String[] out = new String[lines];
-        int index = 0;
-        StringBuilder current = new StringBuilder();
-        for (String word : words) {
-            String next = current.length() == 0 ? word : current + " " + word;
-            if (index < lines - 1 && current.length() > 0 && paint.measureText(next) > target) {
-                out[index] = current.toString();
-                index += 1;
-                current.setLength(0);
-                current.append(word);
+    // 名字切成可折行的最小块：拉丁单词整体一块、空白丢弃、汉字逐字一块。
+    // 「Vue.Js前端框架技术」没有空格，也能按汉字断成多行。
+    private static List<String> splitTokens(String name) {
+        List<String> tokens = new ArrayList<>();
+        StringBuilder word = new StringBuilder();
+        for (int i = 0; i < name.length(); i += 1) {
+            char c = name.charAt(i);
+            if (isCjk(c)) {
+                if (word.length() > 0) {
+                    tokens.add(word.toString());
+                    word.setLength(0);
+                }
+                tokens.add(String.valueOf(c));
+            } else if (Character.isWhitespace(c)) {
+                if (word.length() > 0) {
+                    tokens.add(word.toString());
+                    word.setLength(0);
+                }
             } else {
-                current.setLength(0);
-                current.append(next);
+                word.append(c);
             }
         }
-        if (current.length() > 0) {
-            out[Math.min(index, lines - 1)] = current.toString();
+        if (word.length() > 0) tokens.add(word.toString());
+        return tokens;
+    }
+
+    // 汉字之间连写，相邻两个拉丁块之间补回一个空格（原来的空白在切块时已丢弃）
+    private static String joinTokens(List<String> tokens, int from, int to) {
+        StringBuilder line = new StringBuilder();
+        boolean prevLatin = false;
+        for (int i = from; i < to; i += 1) {
+            String token = tokens.get(i);
+            boolean latin = !isCjk(token.charAt(0));
+            if (line.length() > 0 && latin && prevLatin) line.append(' ');
+            line.append(token);
+            prevLatin = latin;
         }
-        int count = 0;
-        for (String line : out) if (line != null && !line.isEmpty()) count += 1;
-        String[] result = new String[count];
-        int at = 0;
-        for (String line : out) {
-            if (line != null && !line.isEmpty()) result[at++] = line;
+        return line.toString();
+    }
+
+    // 按块把名字均分成 lines 行，保持块序；尽量让每行宽度接近 total / lines
+    private static String[] partitionTokens(List<String> tokens, int lines, Paint paint) {
+        if (tokens.isEmpty()) return new String[0];
+        if (lines <= 1) return new String[]{joinTokens(tokens, 0, tokens.size())};
+        float[] widths = new float[tokens.size()];
+        float total = 0f;
+        for (int i = 0; i < tokens.size(); i += 1) {
+            widths[i] = paint.measureText(tokens.get(i));
+            total += widths[i];
         }
-        return result;
+        float space = paint.measureText(" ");
+        float target = total / lines;
+        List<String> out = new ArrayList<>();
+        int start = 0;
+        int placed = 0;
+        float current = 0f;
+        for (int i = 0; i < tokens.size() && placed < lines - 1; i += 1) {
+            boolean latin = !isCjk(tokens.get(i).charAt(0));
+            boolean gap = i > start && latin && !isCjk(tokens.get(i - 1).charAt(0));
+            float next = widths[i] + (gap ? space : 0f);
+            if (i > start && current + next > target) {
+                out.add(joinTokens(tokens, start, i));
+                start = i;
+                placed += 1;
+                current = 0f;
+            }
+            current += next;
+        }
+        out.add(joinTokens(tokens, start, tokens.size()));
+        return out.toArray(new String[0]);
     }
 }

@@ -1,32 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  深色「液态玻璃」卡片（A2 + B）：
-  20dp 圆角 + 顶部一层白光擦亮 + 内描边 + 外描边。
-  黑色渐变本身做不了「顶边高光」，所以单独叠一层只在上沿可见的白光。
+  深色「液态玻璃」卡片（参考 D:\桌面\液态玻璃.html）：
+  深色半透明底（参考的 rgba(20,20,25,0.4) 在浅壁纸下对比度不够，这里加深到约 70%）+
+  顶部内发光 + 左边缘高光 + 15% 白外描边。
+  组件拿不到壁纸做实时模糊，这里用半透明叠加与亮边渐变近似磨砂玻璃的厚度感。
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 1. 玻璃本体：深色半透明，顶部略亮、底部略暗，模拟玻璃厚度。
+         参考图本身压深色背景，壁纸亮度不可控，这里提高不透明度保证白字对比度。 -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:endColor="#14000000"
-                android:startColor="#3D000000"
+                android:centerColor="#C214171D"
+                android:centerY="0.45"
+                android:endColor="#B812151A"
+                android:startColor="#D61A1D24"
                 android:type="linear" />
             <corners android:radius="20dp" />
         </shape>
     </item>
+    <!-- 2. 顶部内发光（对应参考的 inset 0 20px 30px -20px 白光） -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:centerColor="#00FFFFFF"
-                android:centerY="0.18"
+                android:centerColor="#14FFFFFF"
+                android:centerY="0.16"
                 android:endColor="#00FFFFFF"
-                android:startColor="#2AFFFFFF"
+                android:startColor="#66FFFFFF"
                 android:type="linear" />
             <corners android:radius="20dp" />
         </shape>
     </item>
+    <!-- 3. 左边缘高光（对应参考的 border-left 30% 白） -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:centerColor="#0AFFFFFF"
+                android:centerX="0.055"
+                android:endColor="#00FFFFFF"
+                android:startColor="#4DFFFFFF"
+                android:type="linear" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <!-- 4. 内描边：1dp，15% 白 -->
     <item
         android:bottom="1dp"
         android:left="1dp"
@@ -35,15 +55,16 @@
         <shape android:shape="rectangle">
             <stroke
                 android:width="1dp"
-                android:color="#1FFFFFFF" />
+                android:color="#26FFFFFF" />
             <corners android:radius="19dp" />
         </shape>
     </item>
+    <!-- 5. 外描边：1dp，15% 白 -->
     <item>
         <shape android:shape="rectangle">
             <stroke
                 android:width="1dp"
-                android:color="#2EFFFFFF" />
+                android:color="#26FFFFFF" />
             <corners android:radius="20dp" />
         </shape>
     </item>
