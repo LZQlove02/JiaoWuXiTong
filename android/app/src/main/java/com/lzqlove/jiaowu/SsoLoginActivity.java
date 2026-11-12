@@ -3,10 +3,14 @@ package com.lzqlove.jiaowu;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.net.http.SslCertificate;
 import android.net.http.SslError;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.SslErrorHandler;
@@ -40,6 +44,13 @@ import okhttp3.Response;
  * 登录成功后回传 Cookie 并立即销毁 WebView。
  */
 public class SsoLoginActivity extends Activity {
+
+    static final String EXTRA_SILENT = "silent";
+    static final String EXTRA_TIMEOUT_MS = "timeoutMs";
+    static final String EXTRA_REASON = "reason";
+    private static final int DEFAULT_SILENT_TIMEOUT_MS = 4000;
+    private static final int MIN_SILENT_TIMEOUT_MS = 1500;
+    private static final int MAX_SILENT_TIMEOUT_MS = 10000;
 
     private static final String AUTH_SERVER_HOST = "authserver.lzzy.net";
     private static final String SSO_PREFS = "jiaowu_sso";
@@ -112,21 +123,45 @@ public class SsoLoginActivity extends Activity {
     private boolean finished;
     private boolean sslDialogShown;
     private boolean preflightRunning;
+    private boolean silent;
+    private int silentTimeoutMs;
+    private String silentReason = "canceled";
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable silentTimeout = new Runnable() {
+        @Override
+        public void run() {
+            finishSilent("timeout");
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        silent = getIntent().getBooleanExtra(EXTRA_SILENT, false);
+        silentTimeoutMs = Math.min(Math.max(
+                getIntent().getIntExtra(EXTRA_TIMEOUT_MS, DEFAULT_SILENT_TIMEOUT_MS),
+                MIN_SILENT_TIMEOUT_MS), MAX_SILENT_TIMEOUT_MS);
         super.onCreate(savedInstanceState);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
 
-        status = new TextView(this);
-        status.setText("柳州职业技术大学统一认证");
-        status.setTextSize(16);
-        status.setPadding(32, 28, 32, 16);
-        root.addView(status);
+        if (!silent) {
+            status = new TextView(this);
+            status.setText("柳州职业技术大学统一认证");
+            status.setTextSize(16);
+            status.setPadding(32, 28, 32, 16);
+            root.addView(status);
+        }
 
         webView = new WebView(this);
+        if (silent) {
+            // 静默模式不显示任何界面：透明主题 + 近似全透明的 WebView，
+            // 仅用于让 WebView 完成 CAS 跳转并读取 Cookie。
+            webView.setAlpha(0.01f);
+            webView.setBackgroundColor(Color.TRANSPARENT);
+            webView.setFocusable(false);
+            webView.setClickable(false);
+        }
         root.addView(webView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
@@ -163,11 +198,20 @@ public class SsoLoginActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                if (finished) return;
                 Uri uri = Uri.parse(url);
-                if (!"zfjw.lzzy.net".equals(uri.getHost())) return;
+                String host = uri.getHost();
                 String path = uri.getPath() == null ? "" : uri.getPath();
-                if (path.startsWith("/xtgl/") && !path.contains("login_slogin")) {
-                    finishWithCookies();
+                if ("zfjw.lzzy.net".equals(host)) {
+                    if (path.startsWith("/xtgl/") && !path.contains("login_slogin")) {
+                        finishWithCookies();
+                    }
+                    return;
+                }
+                // 静默模式停在统一认证登录表单，说明 CASTGC 已不可用，
+                // 立即按 login-form 失败，不把表单或验证码页展示给用户。
+                if (silent && AUTH_SERVER_HOST.equals(host)) {
+                    detectSilentLoginForm(view);
                 }
             }
         });
@@ -184,7 +228,22 @@ public class SsoLoginActivity extends Activity {
                     .putBoolean(KEY_COOKIE_RESET, true)
                     .apply();
         }
+        if (silent) handler.postDelayed(silentTimeout, silentTimeoutMs);
         startSso();
+    }
+
+    /**
+     * 静默模式用 DOM 查询判断是否停在登录表单（存在密码框或工号/学号输入框）。
+     * 只由 App 主动执行，不向页面暴露任何 JS 接口。
+     */
+    private void detectSilentLoginForm(WebView view) {
+        view.evaluateJavascript(
+                "(function(){try{return document.querySelector("
+                        + "'input[type=\"password\"],input[name=\"yhm\"]')?'1':'0'"
+                        + "}catch(e){return '0'}})()",
+                value -> {
+                    if (!finished && "\"1\"".equals(value)) finishSilent("login-form");
+                });
     }
 
     /**
@@ -196,7 +255,7 @@ public class SsoLoginActivity extends Activity {
     private void startSso() {
         if (preflightRunning) return;
         preflightRunning = true;
-        status.setText("正在校验统一认证服务器证书…");
+        if (status != null) status.setText("正在校验统一认证服务器证书…");
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -205,16 +264,21 @@ public class SsoLoginActivity extends Activity {
                     @Override
                     public void run() {
                         preflightRunning = false;
-                        if (webView == null || isFinishing()) return;
+                        if (webView == null || isFinishing() || finished) return;
                         if (result.ok) {
-                            status.setText("正在加载统一认证登录页…");
+                            if (status != null) status.setText("正在加载统一认证登录页…");
                             webView.postDelayed(new Runnable() {
                                 @Override
                                 public void run() {
                                     // 用户可能在这 300ms 内退出登录页，WebView 已在 onDestroy 置空
-                                    if (webView != null) webView.loadUrl(LOGIN_URL);
+                                    if (webView != null && !finished) webView.loadUrl(LOGIN_URL);
                                 }
                             }, 300);
+                            return;
+                        }
+                        if (silent) {
+                            // 静默模式不弹任何对话框，把失败原因回传给 JS 统一降级
+                            finishSilent(result.certError ? "cert" : "network");
                             return;
                         }
                         if (result.certError) {
@@ -299,7 +363,10 @@ public class SsoLoginActivity extends Activity {
      * 避免明文加载，同时保留 ticket 参数。
      */
     private boolean handleUrl(WebView view, Uri uri) {
-        if (!isAllowed(uri)) return true;
+        if (!isAllowed(uri)) {
+            if (silent) finishSilent("blocked");
+            return true;
+        }
         if ("http".equals(uri.getScheme())) {
             view.loadUrl(uri.buildUpon().scheme("https").build().toString());
             return true;
@@ -308,6 +375,12 @@ public class SsoLoginActivity extends Activity {
     }
 
     private void handleSslError(SslErrorHandler handler, SslError error) {
+        if (silent) {
+            // 静默模式失败关闭：不展示任何证书/网络对话框
+            handler.cancel();
+            finishSilent("cert");
+            return;
+        }
         Uri uri = Uri.parse(error.getUrl());
         if (!AUTH_SERVER_HOST.equals(uri.getHost())) {
             blockSsl(handler, "证书校验失败", "zfjw.lzzy.net 的证书无法通过系统校验，已停止登录。");
@@ -406,7 +479,6 @@ public class SsoLoginActivity extends Activity {
 
     private void finishWithCookies() {
         if (finished) return;
-        finished = true;
 
         // 只回传教务系统自身的会话 Cookie；统一认证侧的票据 Cookie 不得跨域发送。
         Map<String, String> cookies = new LinkedHashMap<>();
@@ -418,6 +490,14 @@ public class SsoLoginActivity extends Activity {
             header.append(entry.getKey()).append('=').append(entry.getValue());
         }
 
+        if (header.length() == 0) {
+            finishSilent("no-cookie");
+            return;
+        }
+
+        finished = true;
+        handler.removeCallbacks(silentTimeout);
+        if (silent) Log.i("SsoSilent", "finish ok, cookies=" + cookies.size());
         final Intent data = new Intent();
         data.putExtra("cookieHeader", header.toString());
         data.putExtra("finalUrl", webView.getUrl());
@@ -425,6 +505,24 @@ public class SsoLoginActivity extends Activity {
             @Override
             public void run() {
                 setResult(RESULT_OK, data);
+                finish();
+            }
+        });
+    }
+
+    /** 静默失败统一出口：回传 reason，由前端决定是否降级到手动登录。 */
+    private void finishSilent(String reason) {
+        if (finished) return;
+        finished = true;
+        silentReason = reason == null ? "canceled" : reason;
+        Log.i("SsoSilent", "finish failed, reason=" + silentReason);
+        handler.removeCallbacks(silentTimeout);
+        clearSessionData(new Runnable() {
+            @Override
+            public void run() {
+                Intent data = new Intent();
+                data.putExtra(EXTRA_REASON, silentReason);
+                setResult(RESULT_CANCELED, data);
                 finish();
             }
         });
@@ -464,7 +562,12 @@ public class SsoLoginActivity extends Activity {
 
     private void cancel() {
         if (finished) return;
+        if (silent) {
+            finishSilent("canceled");
+            return;
+        }
         finished = true;
+        handler.removeCallbacks(silentTimeout);
         clearSessionData(new Runnable() {
             @Override
             public void run() {
@@ -481,6 +584,7 @@ public class SsoLoginActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        handler.removeCallbacks(silentTimeout);
         if (webView != null) {
             webView.loadUrl("about:blank");
             webView.destroy();

@@ -1,4 +1,11 @@
-import { authGet, authPost, isDebugBuild, loginWithSso as nativeSsoLogin, setAuthCookies } from './nativeHttp'
+import {
+  authGet,
+  authPost,
+  isDebugBuild,
+  loginWithSso as nativeSsoLogin,
+  setAuthCookies,
+  silentRelogin
+} from './nativeHttp'
 import { probeZfjwEndpoints } from './probe'
 import { buildTerm, termCandidatesFor, termParamsFor } from '../utils/term'
 
@@ -484,6 +491,7 @@ export function parsePortalNoticeList(payload) {
   }
   return {
     total: resolvedTotal,
+    totalKnown: Number.isFinite(total),
     items,
     source: '教务系统（学生门户）',
     fetchedAt: new Date().toISOString()
@@ -565,10 +573,16 @@ export function parsePortalNoticeDetail(html, pageUrl = '') {
   }
 }
 
-function messageId(item) {
+// 兜底 id 只在缺少服务端主键时使用。同一页里「同标题 + 同创建时间」的消息很常见
+// （批量下发/模板通知），纯哈希会把它们合并成一条；用响应内出现序号保证唯一，
+// 同时保留「同一条消息被重复下发时仍可去重」的收益。
+function messageId(item, occurrences) {
   const explicit = String(item?.zjxx || item?.id || item?.w_id || '').trim()
   if (explicit) return explicit
-  return `msg_${hashString(`${item?.xxbt || ''}|${item?.cjsj || ''}`)}`
+  const base = `msg_${hashString(`${item?.xxbt || ''}|${item?.cjsj || ''}`)}`
+  const count = (occurrences.get(base) || 0) + 1
+  occurrences.set(base, count)
+  return count > 1 ? `${base}#${count}` : base
 }
 
 export function parseMessages(payload) {
@@ -576,9 +590,10 @@ export function parseMessages(payload) {
     throw parseFailure('消息数据缺少 items')
   }
   const rawItems = payload.items
+  const occurrences = new Map()
   const items = rawItems
     .map((item) => ({
-      id: messageId(item),
+      id: messageId(item, occurrences),
       title: String(item?.xxbt || '').trim(),
       content: htmlToText(item?.xxnr || ''),
       time: String(item?.cjsj || '').trim()
@@ -598,6 +613,8 @@ export function parseMessages(payload) {
   }
   return {
     total: resolvedTotal,
+    // totalResult 缺失时 total 只是「本页条数」的兜底，不能用来判断「是否已拉完」
+    totalKnown: Number.isFinite(total),
     items,
     source: '教务系统（只读）',
     fetchedAt: new Date().toISOString()
@@ -673,7 +690,10 @@ export class ZfAcademicApi {
     if (response?.status !== 200) {
       const failure = new Error(`${label}接口返回 ${response?.status ?? '未知状态'}`)
       failure.status = response?.status
-      failure.sessionExpired = response?.status === 401 || response?.status === 403
+      // 只有 401 才是真的掉登录态；403 多为「该功能未开放 / WAF 拦截 / 权限不足」，
+      // 误判成会话失效会清空本机全部数据（Cookie、快照、附件），代价远大于收益。
+      failure.sessionExpired = response?.status === 401
+      if (response?.status === 403) failure.forbidden = true
       throw failure
     }
     const raw = String(response.body || '').replace(/^\uFEFF/, '')
@@ -711,6 +731,32 @@ export class ZfAcademicApi {
     await setAuthCookies(result.cookieHeader)
     // 刚登录必须现场校验会话，不能回退到旧快照，否则会把登录失败伪装成成功
     return this.restoreSession({ allowSnapshot: false })
+  }
+
+  /**
+   * 会话失效时用统一认证票据静默换票，成功返回新 profile。
+   * 换票后必须现场校验一次，避免把无效 Cookie 当成已恢复；
+   * 失败只返回原因，不在这里清理本机数据。
+   */
+  async reloginSilently(options = {}) {
+    const result = await silentRelogin({ timeoutMs: options.timeoutMs })
+    if (!result?.ok || !result.cookieHeader) {
+      return { ok: false, reason: result?.reason || 'no-cookie' }
+    }
+    try {
+      await setAuthCookies(result.cookieHeader)
+      const profile = await this.restoreSession({ allowSnapshot: false })
+      return { ok: true, reason: 'ok', profile }
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error?.sessionExpired
+          ? 'login-form'
+          : error?.network
+            ? 'network'
+            : 'verify'
+      }
+    }
   }
 
   async restoreSession({ allowSnapshot = true } = {}) {
@@ -879,14 +925,41 @@ export class ZfAcademicApi {
   async getGrades(term) {
     if (!this.term) throw new Error('尚未登录')
     const params = term || this.term
+    const pageSize = 100
     const first = await this.fetchGradesPage(params, 1)
     const items = [...first.items]
-    const totalPage = Math.min(Number(first.totalPage) || 1, 20)
-    for (let page = 2; page <= totalPage; page += 1) {
+    const totalResult = Number(first.totalResult)
+    const declaredPages = Number(first.totalPage)
+    const hasDeclaredPages = Number.isFinite(declaredPages) && declaredPages > 0
+    // totalPage 缺失或为 0 时按 totalResult 推算；两者都没有时，只有首页满页才继续翻，
+    // 否则会静默只取首页 100 条（成绩页按学期查询通常远小于 100 条）。
+    const derivedPages = Number.isFinite(totalResult) && totalResult > 0
+      ? Math.ceil(totalResult / pageSize)
+      : 0
+    const maxPage = Math.min(
+      hasDeclaredPages
+        ? declaredPages
+        : derivedPages || (first.items.length >= pageSize ? 20 : 1),
+      20
+    )
+    for (let page = 2; page <= maxPage; page += 1) {
       const next = await this.fetchGradesPage(params, page)
       items.push(...next.items)
+      if (next.items.length < pageSize) break
     }
-    return mapGrades({ items, totalResult: first.totalResult }, params)
+    // 分页排序不稳时同一门成绩会跨页重复，按服务端主键去重，避免绩点/学分重复累加
+    const seenKeys = new Set()
+    const unique = items.filter((item) => {
+      const key = String(
+        item?.key || item?.row_id || `${item?.kch || ''}_${item?.kcmc || ''}_${item?.cj || ''}`
+      )
+      if (seenKeys.has(key)) return false
+      seenKeys.add(key)
+      return true
+    })
+    const mapped = mapGrades({ items: unique, totalResult: first.totalResult }, params)
+    if (Number.isFinite(totalResult) && totalResult > unique.length) mapped.truncated = true
+    return mapped
   }
 
   // 全部学期：逐学期只读查询后汇总；单个学期失败时保留其余学期，并记录失败项
@@ -987,20 +1060,39 @@ export class ZfAcademicApi {
     const items = []
     const seen = new Set()
     let total = 0
+    let totalKnown = false
+    let lastRawCount = 0
+    let complete = false
     for (let page = 1; page <= 20; page += 1) {
       const result = await this.requestPortal(url, parser, {
         method: 'POST',
         body: buildBody(page)
       })
-      total = result.total
+      // total 只在首页取一次并冻结：后续页若缺 totalResult，parse 层会退化成
+      // 「当前页条数」，每页覆写会让 items.length >= total 恒成立而提前 break，
+      // 表现为「少抓 N 条却报告完整」。
+      if (page === 1) {
+        total = Number(result.total) || 0
+        totalKnown = Boolean(result.totalKnown)
+      }
       for (const item of result.items) {
         if (seen.has(item.id)) continue
         seen.add(item.id)
         items.push(item)
       }
-      if (items.length >= total || result.items.length < 100 || page >= 20) break
+      lastRawCount = result.items.length
+      // 空页 / 短页说明没有下一页；只有 totalResult 可信时才用总数判断拉完
+      if (lastRawCount === 0 || lastRawCount < 100) {
+        complete = true
+        break
+      }
+      if (totalKnown && items.length >= total) {
+        complete = true
+        break
+      }
     }
-    return { total, items, truncated: items.length < total }
+    const truncated = !complete || (totalKnown && items.length < total)
+    return { total: total || items.length, items, truncated }
   }
 
   async getPortalNoticeList() {

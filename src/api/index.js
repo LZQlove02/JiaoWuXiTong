@@ -21,7 +21,12 @@ function guarded(method) {
     try {
       return await target[method](...args)
     } catch (error) {
-      if (error?.sessionExpired) notifySessionExpired()
+      if (error?.sessionExpired) {
+        // 静默重登成功时重放一次原请求，页面不会看到「已失效」的中间态；
+        // 重放仍失败则按普通业务错误抛出，不再二次触发静默。
+        const recovered = await notifySessionExpired()
+        if (recovered) return target[method](...args)
+      }
       throw error
     }
   }

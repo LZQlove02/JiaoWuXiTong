@@ -100,13 +100,27 @@ export const useChangesStore = defineStore('changes', () => {
 
   /**
    * 实时课表到手后交给原生对账。离线快照、缺少学期信息或 Web 端直接跳过。
+   * 用串行队列而不是「正在对账就丢弃」：冷启动/切前台两次 loadSchedule 交错时，
+   * 后到的课表也必须进原生基线，否则下次对账会把已同步的课误判成新增/停课。
    */
-  async function applyFromSchedule(schedule) {
-    if (!schedule || !schedule.rawPayload) return
-    if (schedule.offline) return
+  let applyQueue = Promise.resolve()
+
+  function applyFromSchedule(schedule) {
+    if (!schedule || !schedule.rawPayload) return applyQueue
+    if (schedule.offline) return applyQueue
     const term = schedule.term
-    if (!term || !term.xnm || !term.xqm || !term.startDate) return
-    if (!scheduleChangeAvailable() || applying.value) return
+    if (!term || !term.xnm || !term.xqm || !term.startDate) return applyQueue
+    if (!scheduleChangeAvailable()) return applyQueue
+    applyQueue = applyQueue
+      .then(() => runApply(schedule))
+      .catch(() => {
+        // 单次对账失败不阻断后续队列，下次实时课表到达仍会重试
+      })
+    return applyQueue
+  }
+
+  async function runApply(schedule) {
+    const term = schedule.term
     applying.value = true
     try {
       const state = await applyScheduleChange({

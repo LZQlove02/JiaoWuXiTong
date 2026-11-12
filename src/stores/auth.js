@@ -12,7 +12,7 @@ import {
 } from '../api/nativeHttp'
 import { clearScheduleChange } from '../native/scheduleChangeBridge'
 import { clearCrashLog } from '../native/supportBridge'
-import { setSessionExpiredHandler } from '../utils/sessionExpiry'
+import { notifySessionExpired, setSessionExpiredHandler } from '../utils/sessionExpiry'
 import { clearDataCaches } from '../utils/dataCache'
 import { clearPortalCache } from '../utils/portalCache'
 
@@ -22,6 +22,9 @@ const SESSION_PENDING_RETRY_MS = 600
 // 连续多少次冷启动都读不出会话后，按不可用处理，避免永久停在离线快照
 const MAX_PENDING_FAILURES = 3
 const PENDING_FAILURES_KEY = 'jiaowu.session.pendingFailures'
+// 静默换票的超时与失败冷却：避免弱网或票据失效时反复拉起隐藏页面
+const SILENT_RELOGIN_TIMEOUT_MS = 6000
+const SILENT_RELOGIN_COOLDOWN_MS = 5 * 60 * 1000
 
 function readPendingFailures() {
   try {
@@ -43,7 +46,11 @@ function writePendingFailures(value) {
 // 冷启动恢复会话最多等待 15 秒，避免弱网时首屏长时间停在启动页
 function restoreWithTimeout(api) {
   return new Promise((resolve, reject) => {
+    // 超时后调用方已经按「网络故障」处理，此时迟到的 sessionExpired 必须另行上报，
+    // 否则会被当成已处理的拒绝丢掉，用户会停在「看起来已登录、实际全部接口失效」的状态。
+    let timedOut = false
     const timer = setTimeout(() => {
+      timedOut = true
       const failure = new Error('恢复登录超时')
       failure.network = true
       reject(failure)
@@ -55,6 +62,10 @@ function restoreWithTimeout(api) {
       },
       (error) => {
         clearTimeout(timer)
+        if (timedOut) {
+          if (error?.sessionExpired) notifySessionExpired()
+          return
+        }
         reject(error)
       }
     )
@@ -82,6 +93,10 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => Boolean(user.value))
   let bootstrapPromise = null
   let expiringPromise = null
+  let reloginPromise = null
+  let silentCooldownUntil = 0
+  // 主动退出后禁止任何自动重登，直到用户重新登录成功
+  let manualLogout = false
 
   async function resetAcademic() {
     const { useAcademicStore } = await import('./academic')
@@ -90,16 +105,23 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 清掉本机所有会话相关数据：加密 Cookie、课表快照、变更记录、个人缓存与附件
   async function clearLocalSession() {
-    await clearScheduleChange()
-    await clearAuthCookies()
-    clearScheduleSnapshot()
-    clearDataCaches()
-    clearPortalCache()
-    try {
+    // 每一步都可能是原生调用，任一步失败都不能中断整条清理链：
+    // 否则第一步抛错就会留下 Cookie 与 user，导致「已登出」但仍能读到上一账号的数据。
+    const steps = [
+      () => clearScheduleChange(),
+      () => clearAuthCookies(),
+      () => clearScheduleSnapshot(),
+      () => clearDataCaches(),
+      () => clearPortalCache(),
       // 附件与正文图缓存可能包含上一账号查看过的材料，退出时必须一并删除
-      await Promise.all([clearAuthDownloads(), clearPublicDownloads()])
-    } catch (error) {
-      // 原生缓存清理失败不阻断会话清理，下次清理仍会尝试
+      () => Promise.all([clearAuthDownloads(), clearPublicDownloads()])
+    ]
+    for (const step of steps) {
+      try {
+        await step()
+      } catch (error) {
+        // 单步失败不阻断后续清理，下次清理仍会尝试
+      }
     }
     resetAcademicApi()
     user.value = null
@@ -107,14 +129,48 @@ export const useAuthStore = defineStore('auth', () => {
     writePendingFailures(0)
   }
 
-  // 会话失效统一出口：任一业务请求判定 401/登录页后，只清理一次并回登录页
+  // 用统一认证票据静默换票：成功返回 true，失败返回 false（由调用方降级清理）
+  function attemptSilentRelogin() {
+    if (manualLogout) return Promise.resolve(false)
+    if (reloginPromise) return reloginPromise
+    if (Date.now() < silentCooldownUntil) return Promise.resolve(false)
+    const zf = new ZfAcademicApi()
+    reloginPromise = zf
+      .reloginSilently({ timeoutMs: SILENT_RELOGIN_TIMEOUT_MS })
+      .then((result) => {
+        if (!result?.ok) {
+          silentCooldownUntil = Date.now() + SILENT_RELOGIN_COOLDOWN_MS
+          return false
+        }
+        // 静默过程中用户主动退出，迟到的成功结果必须丢弃
+        if (manualLogout) return false
+        setAcademicApi(zf)
+        user.value = result.profile
+        writePendingFailures(0)
+        silentCooldownUntil = 0
+        return true
+      })
+      .catch(() => {
+        silentCooldownUntil = Date.now() + SILENT_RELOGIN_COOLDOWN_MS
+        return false
+      })
+      .finally(() => {
+        reloginPromise = null
+      })
+    return reloginPromise
+  }
+
+  // 会话失效统一出口：先静默续期，续不上才清理本机数据并回登录页
   async function expireSession() {
     if (expiringPromise) return expiringPromise
-    expiringPromise = clearLocalSession()
-      .then(() => resetAcademic())
-      .finally(() => {
-        expiringPromise = null
-      })
+    expiringPromise = (async () => {
+      if (!manualLogout && (await attemptSilentRelogin())) return true
+      await clearLocalSession()
+      await resetAcademic()
+      return false
+    })().finally(() => {
+      expiringPromise = null
+    })
     return expiringPromise
   }
 
@@ -166,8 +222,10 @@ export const useAuthStore = defineStore('auth', () => {
         return true
       }
     } catch (error) {
-      // 仅在服务端明确判定会话失效时清除本机数据；网络不可达或解析失败时保留，避免误登出
+      // 服务端明确判定失效时先静默换票；换不到才清理本机数据。
+      // 网络不可达或解析失败时保留本机数据，避免误登出。
       if (error?.sessionExpired) {
+        if (await attemptSilentRelogin()) return true
         await clearLocalSession()
       }
     }
@@ -191,7 +249,13 @@ export const useAuthStore = defineStore('auth', () => {
       })
       .catch(async (error) => {
         if (!error?.sessionExpired) return
-        await expireSession()
+        const recovered = await expireSession()
+        if (!recovered) return
+        // 静默换票成功：把快照课表补成实时数据，页面无需跳到登录页
+        const { useAcademicStore } = await import('./academic')
+        const academic = useAcademicStore()
+        await academic.initTerms()
+        await academic.loadSchedule(academic.currentTerm, { force: true })
       })
   }
 
@@ -220,10 +284,20 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = profile
       justLoggedIn.value = true
       writePendingFailures(0)
+      // 用户已主动完成登录，恢复自动重登资格
+      manualLogout = false
+      silentCooldownUntil = 0
       return profile
     } catch (error) {
-      // 登录后校验未通过时丢弃这次无效会话，避免把坏 Cookie 留到下次启动
-      await clearAuthCookies()
+      // 只有「服务端明确判定无效」或「数据无法解析」才丢弃这次 Cookie。
+      // 网络超时、Keystore 暂时不可用时，刚拿到的会话仍然可用，删掉会逼用户重走统一认证。
+      if (error?.sessionExpired || error?.parseError) {
+        try {
+          await clearAuthCookies()
+        } catch (cleanupError) {
+          // 清理失败不能顶替原始登录错误，否则用户看到的是无关的桥接异常
+        }
+      }
       if (error?.sessionExpired) throw new Error('登录未生效，请重试')
       throw error
     } finally {
@@ -232,6 +306,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    // 先禁止自动重登，再清票据：即使静默换票正在途中，迟到的结果也会被丢弃
+    manualLogout = true
+    silentCooldownUntil = 0
     // 明确退出登录才清 CASTGC；会话失效走 clearLocalSession，保留 WebView 中的登录票据
     try {
       // 先关闭「保持登录」：清除开关状态并取消闹钟，避免重新登录后被旧偏好自动恢复

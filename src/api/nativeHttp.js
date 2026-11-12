@@ -48,6 +48,35 @@ export async function loginWithSso() {
   return SsoLogin.login()
 }
 
+// 会话失效时用统一认证票据静默换票；无界面、不弹对话框
+export async function silentRelogin(options = {}) {
+  if (!Capacitor.isNativePlatform()) {
+    return { ok: false, reason: 'unsupported' }
+  }
+  const nativeTimeout = Number(options.timeoutMs) || 6000
+  // 后台启动 Activity 可能被系统拦截且不给回调，必须在 JS 侧兜底，
+  // 否则静默 Promise 永不结束，会把整条会话失效处理链卡死。
+  const guarded = SsoLogin.silentRelogin({ timeoutMs: nativeTimeout }).catch(() => ({
+    ok: false,
+    reason: 'bridge'
+  }))
+  let timer = null
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, reason: 'timeout' }), nativeTimeout + 3000)
+  })
+  try {
+    return await Promise.race([guarded, timeout])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+// 只读探测是否仍持有 CASTGC，不返回票据值
+export async function hasSsoTicket() {
+  if (!Capacitor.isNativePlatform()) return { hasTicket: false }
+  return SsoLogin.hasSsoTicket()
+}
+
 // 明确退出登录时清 CASTGC 会话；会话失效时不调用，保留 WebView 中的登录票据
 export async function clearSsoSession() {
   if (!Capacitor.isNativePlatform()) return

@@ -41,11 +41,23 @@ final class DateUtils {
         }
     }
 
-    /** 当前周：term.startDate 起算，开学前按第 1 周，钳制 1..20。 */
+    /**
+     * 学期锚点归一到最近的周一。学校实际开学日多为周一，08-31 / 02-23 只是启发式，
+     * 直接当周块起点会让周次与课表网格（首列为周一）错位。
+     */
+    private static Calendar termMonday(int[] start) {
+        Calendar monday = atMidnight(start[0], start[1], start[2]);
+        // 与前端 termMonday 保持一致：≤3 天回退到本周一，>3 天前移到下周一
+        int offset = (monday.get(Calendar.DAY_OF_WEEK) + 5) % 7; // 周一=0 … 周日=6
+        monday.add(Calendar.DAY_OF_MONTH, offset <= 3 ? -offset : 7 - offset);
+        return monday;
+    }
+
+    /** 当前周：term.startDate 归一到最近周一后起算，开学前按第 1 周，钳制 1..20。 */
     static int currentWeek(String startDate, Calendar now) {
         int[] start = parseDate(startDate);
         if (start == null) return 1;
-        Calendar from = atMidnight(start[0], start[1], start[2]);
+        Calendar from = termMonday(start);
         Calendar today = atMidnight(
                 now.get(Calendar.YEAR),
                 now.get(Calendar.MONTH),
@@ -57,25 +69,18 @@ final class DateUtils {
     }
 
     /**
-     * 当前周的「第 week 周、星期 weekday」对应日期。
-     * 以 startDate 起算的 7 天周块为锚（与 currentWeek / 课表网格同一口径），
-     * 不假设 startDate 一定是周一（2025-08-31 是周日、2027-02-23 是周二）。
-     * 若 weekday 已过该周块起点，则顺延到下一个同名星期。
+     * 第 week 周、星期 weekday 对应的日期。
+     * 周块起点与 currentWeek / 课表网格同一口径：学期锚点归一到最近周一后每 7 天一周，
+     * 因此 weekStart 必为周一，weekday 直接按「周一=1 … 周日=7」平移即可，无需再做星期对齐。
      */
     static Calendar occurrenceInCurrentWeek(String startDate, int week, int weekday) {
         int[] start = parseDate(startDate);
         if (start == null) return null;
-        Calendar weekStart = atMidnight(start[0], start[1], start[2]);
+        Calendar weekStart = termMonday(start);
         weekStart.add(Calendar.DAY_OF_MONTH, (week - 1) * 7);
 
-        int startDayOfWeek = weekStart.get(Calendar.DAY_OF_WEEK); // 周日=1 … 周六=7
-        int startMondayOffset = (startDayOfWeek + 5) % 7; // 周一=0 … 周日=6
-        int targetOffset = Math.max(weekday, 1) - 1;
-        int delta = targetOffset - startMondayOffset;
-        if (delta < 0) delta += 7;
-
         Calendar day = (Calendar) weekStart.clone();
-        day.add(Calendar.DAY_OF_MONTH, delta);
+        day.add(Calendar.DAY_OF_MONTH, Math.max(weekday, 1) - 1);
         return day;
     }
 

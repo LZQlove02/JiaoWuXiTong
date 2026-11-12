@@ -70,7 +70,8 @@
 
         <button
           v-for="item in visibleSessions"
-          :key="item.courseId + '-' + item.weekday + '-' + item.startSection"
+          :key="[item.courseId, item.weekday, item.startSection, item.endSection,
+                 (item.weeks || []).join('-'), item.room || ''].join('|')"
           class="course-block"
           :style="{
             gridColumn: item.weekday + 1,
@@ -149,7 +150,7 @@ import { useAcademicStore } from '../stores/academic'
 import { useChangesStore } from '../stores/changes'
 import { useScheduleSettingsStore } from '../stores/scheduleSettings'
 import { useUiStore } from '../stores/ui'
-import { WEEKDAY_LABELS, formatDate, getWeekNumber, getWeekday } from '../utils/date'
+import { WEEKDAY_LABELS, formatDate, getWeekNumber, getWeekday, termWeekStart } from '../utils/date'
 import { buildChangeMarks, markOf } from '../utils/changeMarks'
 import { changeMeta } from '../utils/changeLabels'
 import AppIcon from '../components/AppIcon.vue'
@@ -185,8 +186,8 @@ const weekOptions = computed(() =>
 
 const weekRange = computed(() => {
   if (!currentTerm.value) return ''
-  const start = new Date(currentTerm.value.startDate)
-  start.setDate(start.getDate() + (selectedWeek.value - 1) * 7)
+  // 与 getWeekNumber 共用同一套「锚点归一到周一」规则，避免网格首列与周次错位
+  const start = termWeekStart(currentTerm.value.startDate, selectedWeek.value)
   const end = new Date(start)
   end.setDate(end.getDate() + 6)
   return `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`
@@ -194,8 +195,7 @@ const weekRange = computed(() => {
 
 const dayDates = computed(() => {
   if (!currentTerm.value) return weekdayLabels.map(() => '')
-  const base = new Date(currentTerm.value.startDate)
-  base.setDate(base.getDate() + (selectedWeek.value - 1) * 7)
+  const base = termWeekStart(currentTerm.value.startDate, selectedWeek.value)
   return weekdayLabels.map((_, index) => {
     const d = new Date(base)
     d.setDate(d.getDate() + index)

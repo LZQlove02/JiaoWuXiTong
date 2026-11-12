@@ -37,10 +37,26 @@ export function diffDays(from, to) {
   return Math.round(ms / 86400000)
 }
 
+// 开学锚点只是启发式，学校实际开学日多为周一：按「最近的周一」归一，
+// 避免锚点落在周五~周日时，周次与课表网格（首列为周一）互相错位。
+function termMonday(termStart) {
+  const start = toDateOnly(termStart)
+  const offset = (start.getDay() + 6) % 7 // 周一=0 … 周日=6
+  start.setDate(start.getDate() + (offset <= 3 ? -offset : 7 - offset))
+  return start
+}
+
 export function getWeekNumber(termStart, date = new Date()) {
-  const days = diffDays(termStart, date)
+  const days = diffDays(termMonday(termStart), date)
   if (days < 0) return 1
   return Math.floor(days / 7) + 1
+}
+
+// 第 week 周的周一，供课表网格与日期标签复用，避免两处各算一套
+export function termWeekStart(termStart, week) {
+  const start = termMonday(termStart)
+  start.setDate(start.getDate() + (week - 1) * 7)
+  return start
 }
 
 export function getWeekday(date = new Date()) {

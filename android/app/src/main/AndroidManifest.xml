@@ -138,6 +138,15 @@
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:configChanges="orientation|keyboardHidden|screenSize" />
 
+        <!-- 静默换票入口：与普通登录共用 Activity，仅主题与任务栈行为不同 -->
+        <activity-alias
+            android:name=".SilentSsoLoginActivity"
+            android:targetActivity=".SsoLoginActivity"
+            android:exported="false"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.SsoSilent" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

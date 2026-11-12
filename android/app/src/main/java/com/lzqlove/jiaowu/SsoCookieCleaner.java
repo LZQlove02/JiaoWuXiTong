@@ -6,6 +6,12 @@ import android.webkit.CookieManager;
 final class SsoCookieCleaner {
 
     private static final String AUTH_SERVER_URL = "https://authserver.lzzy.net";
+    /**
+     * CookieManager.getCookie 只返回路径匹配的 Cookie；
+     * CAS 的 CASTGC 常带 Path=/authserver，用站点根地址读取会漏掉。
+     */
+    private static final String AUTH_SERVER_LOGIN_URL =
+            "https://authserver.lzzy.net/authserver/login";
     private static final String ZFJW_URL = "https://zfjw.lzzy.net";
     private static final String[] AUTH_PATHS = {"/", "/authserver"};
     private static final String[] ZFJW_PATHS = {"/", "/xtgl", "/sso"};
@@ -23,6 +29,25 @@ final class SsoCookieCleaner {
         expireNames(manager, AUTH_SERVER_URL, TRANSIENT, AUTH_PATHS);
         // CASTGC 有效期由学校控制，应用只保留、不重写；只清较老的 TGC 名称
         expireNames(manager, AUTH_SERVER_URL, new String[]{"TGC"}, AUTH_PATHS);
+    }
+
+    /**
+     * 只读探测是否仍持有统一认证票据（CASTGC/TGC），不返回票据值。
+     * 用于静默重登前的预判：没有票据时不拉起 WebView，避免无意义闪屏。
+     */
+    static boolean hasCastgc(CookieManager manager) {
+        String raw = manager.getCookie(AUTH_SERVER_LOGIN_URL);
+        if (raw == null || raw.isEmpty()) raw = manager.getCookie(AUTH_SERVER_URL);
+        if (raw == null) return false;
+        for (String part : raw.split(";")) {
+            String pair = part.trim();
+            int index = pair.indexOf('=');
+            if (index <= 0) continue;
+            String name = pair.substring(0, index).trim();
+            if (!"CASTGC".equals(name) && !"TGC".equals(name)) continue;
+            if (!pair.substring(index + 1).trim().isEmpty()) return true;
+        }
+        return false;
     }
 
     /** 明确退出登录：清掉 CASTGC/TGC，保证可切换账号。 */

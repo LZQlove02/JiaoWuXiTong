@@ -23,6 +23,8 @@ import com.lzqlove.jiaowu.keepalive.SessionKeepAliveStore;
 @CapacitorPlugin(name = "SsoLogin")
 public class SsoLoginPlugin extends Plugin {
 
+    private static final int DEFAULT_SILENT_TIMEOUT_MS = 4000;
+
     @PluginMethod
     public void login(PluginCall call) {
         Intent intent = new Intent(getContext(), SsoLoginActivity.class);
@@ -56,6 +58,47 @@ public class SsoLoginPlugin extends Plugin {
     @PluginMethod
     public void getKeepAliveState(PluginCall call) {
         call.resolve(keepAliveState());
+    }
+
+    /**
+     * 会话失效时用统一认证票据静默换票：不展示界面、不弹对话框。
+     * 没有 CASTGC 时直接返回 no-ticket，不拉起 WebView。
+     */
+    @PluginMethod
+    public void silentRelogin(PluginCall call) {
+        CookieManager manager = CookieManager.getInstance();
+        if (!SsoCookieCleaner.hasCastgc(manager)) {
+            resolveSilent(call, false, "no-ticket", null, null, 0);
+            return;
+        }
+        Integer requested = call.getInt("timeoutMs");
+        int timeout = requested == null ? DEFAULT_SILENT_TIMEOUT_MS : requested;
+        Intent intent = new Intent();
+        intent.setClassName(getContext(), getContext().getPackageName() + ".SilentSsoLoginActivity");
+        intent.putExtra(SsoLoginActivity.EXTRA_SILENT, true);
+        intent.putExtra(SsoLoginActivity.EXTRA_TIMEOUT_MS, timeout);
+        startActivityForResult(call, intent, "handleSilentResult");
+    }
+
+    /** 只读探测是否还持有 CASTGC，不返回票据值。 */
+    @PluginMethod
+    public void hasSsoTicket(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("hasTicket", SsoCookieCleaner.hasCastgc(CookieManager.getInstance()));
+        call.resolve(result);
+    }
+
+    private void resolveSilent(PluginCall call, boolean ok, String reason,
+                               String cookieHeader, String finalUrl, long elapsedMs) {
+        JSObject result = new JSObject();
+        result.put("ok", ok);
+        result.put("reason", reason);
+        if (cookieHeader != null && !cookieHeader.isEmpty()) {
+            result.put("cookieHeader", cookieHeader);
+        }
+        if (finalUrl != null && !finalUrl.isEmpty()) result.put("finalUrl", finalUrl);
+        result.put("elapsedMs", elapsedMs);
+        call.resolve(result);
     }
 
     /** 查询系统是否已把本应用列入电池优化白名单（部分 ROM 深睡时会冻结闹钟）。 */
@@ -127,5 +170,24 @@ public class SsoLoginPlugin extends Plugin {
         } else {
             call.reject("登录已取消");
         }
+    }
+
+    @ActivityCallback
+    private void handleSilentResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        Bundle data = result.getData() == null ? null : result.getData().getExtras();
+        if (result.getResultCode() == Activity.RESULT_OK && data != null) {
+            String cookieHeader = data.getString("cookieHeader", "");
+            if (cookieHeader.isEmpty()) {
+                resolveSilent(call, false, "no-cookie", null, null, 0);
+                return;
+            }
+            resolveSilent(call, true, "ok", cookieHeader,
+                    data.getString("finalUrl", ""), 0);
+            return;
+        }
+        String reason = data == null ? null : data.getString(SsoLoginActivity.EXTRA_REASON);
+        resolveSilent(call, false, reason == null || reason.isEmpty() ? "canceled" : reason,
+                null, null, 0);
     }
 }

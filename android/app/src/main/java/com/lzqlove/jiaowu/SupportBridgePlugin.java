@@ -56,6 +56,10 @@ public class SupportBridgePlugin extends Plugin {
             "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
             "zip", "rar", "7z", "txt", "jpg", "jpeg", "png"));
 
+    /** 允许交给系统浏览器打开的外链域：学校官网 + 教务系统（「查看通知原文」入口）。 */
+    private static final Set<String> EXTERNAL_HOSTS = new HashSet<>(Arrays.asList(
+            "www.lzpu.edu.cn", "zfjw.lzzy.net"));
+
     /** 只接受 v1.2.3 / 1.2.3 / 1.2.3-beta.1 这类版本号，空串与 .. 一律拒绝。 */
     private static final String TAG_PATTERN =
             "^v?\\d+(?:\\.\\d+){1,3}(?:[-+][0-9A-Za-z.-]+)?$";
@@ -195,7 +199,11 @@ public class SupportBridgePlugin extends Plugin {
         }
     }
 
-    /** 打开公开官网链接：只允许 https://www.lzpu.edu.cn，避免变成任意 Intent 跳板。 */
+    /**
+     * 打开外链：只允许学校官网与教务系统两个域。
+     * 教务系统链接不携带本应用 Cookie（交给系统浏览器/WebView 自行登录），
+     * 但「查看通知原文」必须能打开，否则该功能是死路。
+     */
     @PluginMethod
     public void openExternal(PluginCall call) {
         String url = call.getString("url");
@@ -209,9 +217,7 @@ public class SupportBridgePlugin extends Plugin {
             call.reject("URL_INVALID");
             return;
         }
-        try {
-            HttpPolicy.PUBLIC.check(parsed);
-        } catch (IOException error) {
+        if (!isAllowedExternalUrl(parsed)) {
             call.reject("URL_NOT_ALLOWED");
             return;
         }
@@ -224,6 +230,16 @@ public class SupportBridgePlugin extends Plugin {
         } catch (RuntimeException error) {
             call.reject("OPEN_FAILED");
         }
+    }
+
+    /** 外链白名单判定：抽成纯函数便于单测（Intent 跳转本身无法在 JVM 单测里执行）。 */
+    static boolean isAllowedExternalUrl(HttpUrl url) {
+        return url != null
+                && "https".equals(url.scheme())
+                && url.port() == 443
+                && EXTERNAL_HOSTS.contains(url.host())
+                && url.username().isEmpty()
+                && url.password().isEmpty();
     }
 
     private boolean isInsidePrivateDir(File file) {

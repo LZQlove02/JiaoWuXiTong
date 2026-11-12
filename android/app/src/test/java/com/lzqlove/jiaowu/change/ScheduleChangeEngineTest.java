@@ -33,6 +33,13 @@ public class ScheduleChangeEngineTest {
                 ScheduleParser.parseWeeks(weeks), room);
     }
 
+    private static void assertDate(java.util.Calendar day, int year, int month, int date) {
+        assertNotNull(day);
+        assertEquals(year, day.get(java.util.Calendar.YEAR));
+        assertEquals(month - 1, day.get(java.util.Calendar.MONTH));
+        assertEquals(date, day.get(java.util.Calendar.DAY_OF_MONTH));
+    }
+
     private static Map<Integer, String> times() {
         Map<Integer, String> map = new LinkedHashMap<>();
         map.put(1, "08:20-09:00");
@@ -227,6 +234,30 @@ public class ScheduleChangeEngineTest {
     }
 
     @Test
+    public void occurrenceAlignsToMondayAnchor() {
+        // 锚点 2027-02-23 是周二，归一后第 1 周周一为 2027-02-22（旧实现会错到 03-01）
+        assertDate(DateUtils.occurrenceInCurrentWeek("2027-02-23", 1, 1), 2027, 2, 22);
+        // 锚点 2024-08-31 是周六，归一后第 1 周周一为 2024-09-02
+        assertDate(DateUtils.occurrenceInCurrentWeek("2024-08-31", 1, 1), 2024, 9, 2);
+        // 锚点本身就是周一则保持不变
+        assertDate(DateUtils.occurrenceInCurrentWeek("2026-08-31", 1, 1), 2026, 8, 31);
+        // 周日（weekday=7）落在该周最后一天：2026-08-31 第 2 周 = 09-07(周一) … 09-13(周日)
+        assertDate(DateUtils.occurrenceInCurrentWeek("2026-08-31", 2, 7), 2026, 9, 13);
+    }
+
+    @Test
+    public void occurrenceSharesSameWeekBlockAsCurrentWeek() {
+        // 2025-08-31 是周日：归一后第 3 周为 2025-09-15(周一) … 09-21(周日)
+        java.util.Calendar monday = DateUtils.occurrenceInCurrentWeek("2025-08-31", 3, 1);
+        java.util.Calendar sunday = DateUtils.occurrenceInCurrentWeek("2025-08-31", 3, 7);
+        assertDate(monday, 2025, 9, 15);
+        assertDate(sunday, 2025, 9, 21);
+        // 同属一个周块的两端必须被 currentWeek 判为同一周，否则变更提醒会差一周
+        assertEquals(3, DateUtils.currentWeek("2025-08-31", monday));
+        assertEquals(3, DateUtils.currentWeek("2025-08-31", sunday));
+    }
+
+    @Test
     public void nonMondayTermStartStillUsesRealWeekdayForQuiet() {
         // 2025-08-31 是周日：不能把开学日当成周一，否则周一的变更当天就被判已上完
         TermInfo term = new TermInfo("2025", "3", "2025-08-31");
@@ -245,9 +276,11 @@ public class ScheduleChangeEngineTest {
 
     @Test
     public void tuesdayTermStartKeepsMondayClassInAppWeekBlock() {
-        // 2027-02-23 是周二：第 3 周从 03-09 起算，周一的课应在 03-15，不能在 03-09 被判已上完
+        // 2027-02-23 是周二，锚点归一到最近周一 2027-02-22，第 3 周为 03-08(周一)…03-14(周日)。
+        // 03-08 上午判定时，本周周一的课不能被判已上完（旧实现直接拿 02-23 当周块起点，
+        // 会把周一顺延到 03-15，与 currentWeek 的周次口径分裂）。
         TermInfo term = new TermInfo("2026", "12", "2027-02-23");
-        java.util.Calendar tuesdayMorning = at(2027, 3, 9, 8, 0);
+        java.util.Calendar mondayMorning = at(2027, 3, 8, 8, 0);
         List<ScheduleSession> before = new ArrayList<>();
         before.add(session("C1", "高等数学", 1, 3, 4, "1-16周", "A101"));
         before.add(session("C2", "大学英语", 2, 1, 2, "1-16周", "B203"));
@@ -255,7 +288,7 @@ public class ScheduleChangeEngineTest {
         after.add(session("C2", "大学英语", 2, 1, 2, "1-16周", "B203"));
 
         List<ChangeEntry> entries = ScheduleChangeEngine.diff(
-                before, after, term, times(), tuesdayMorning, "foreground");
+                before, after, term, times(), mondayMorning, "foreground");
         assertEquals(1, entries.size());
         assertFalse(entries.get(0).quiet);
     }

@@ -9,6 +9,7 @@ vi.mock('../src/api/zf', () => {
   const ZfAcademicApi = vi.fn(function () {
     this.loginWithSso = vi.fn(async () => ({ id: 'test-student-1', name: '测试' }))
     this.restoreSession = vi.fn(async () => ({ id: 'test-student-1', name: '测试' }))
+    this.reloginSilently = vi.fn(async () => ({ ok: false, reason: 'no-ticket' }))
   })
   return { ZfAcademicApi, clearScheduleSnapshot: vi.fn() }
 })
@@ -18,13 +19,18 @@ vi.mock('../src/api/nativeHttp', () => ({
   clearPublicDownloads: vi.fn(async () => {}),
   clearSsoSession: vi.fn(async () => {}),
   loadAuthCookies: vi.fn(async () => ({ restored: false })),
-  setKeepAlive: vi.fn(async () => ({ enabled: false }))
+  setKeepAlive: vi.fn(async () => ({ enabled: false })),
+  silentRelogin: vi.fn(async () => ({ ok: false, reason: 'no-ticket' })),
+  hasSsoTicket: vi.fn(async () => ({ hasTicket: false }))
 }))
 vi.mock('../src/native/scheduleChangeBridge', () => ({
   clearScheduleChange: vi.fn(async () => {})
 }))
 vi.mock('../src/utils/dataCache', () => ({ clearDataCaches: vi.fn() }))
-vi.mock('../src/utils/sessionExpiry', () => ({ setSessionExpiredHandler: vi.fn() }))
+vi.mock('../src/utils/sessionExpiry', () => ({
+  setSessionExpiredHandler: vi.fn(),
+  notifySessionExpired: vi.fn(async () => false)
+}))
 vi.mock('../src/stores/academic', () => ({
   useAcademicStore: () => ({ reset: vi.fn(async () => {}) })
 }))

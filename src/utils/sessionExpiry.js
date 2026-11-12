@@ -5,11 +5,14 @@ export function setSessionExpiredHandler(fn) {
   handler = typeof fn === 'function' ? fn : null
 }
 
+// 返回值表示会话是否已恢复：true 时调用方可以重放刚才失败的请求
 export function notifySessionExpired() {
-  if (!handler) return
+  if (!handler) return Promise.resolve(false)
   try {
-    handler()
+    // 处理器内部会先尝试静默换票，失败才清理本机数据；
+    // 任何异常都统一收敛为 false，不能影响调用方的原始业务错误。
+    return Promise.resolve(handler()).then((recovered) => Boolean(recovered)).catch(() => false)
   } catch (error) {
-    // 失效处理失败不能把原始业务错误吞掉
+    return Promise.resolve(false)
   }
 }

@@ -92,22 +92,28 @@ export const useAcademicStore = defineStore('academic', () => {
   let scheduleRequestKey = ''
   let scheduleToken = 0
   let gradesToken = 0
+  // 账号代次：reset() 时 +1。没有独立 token 的业务域（评教/选课/通知/消息/学期）
+  // 用它丢弃上一个账号残留的响应，避免退出后旧数据落进新会话首帧。
+  let dataEpoch = 0
 
   function setError(key, message) {
     errors.value = { ...errors.value, [key]: message }
   }
 
   async function loadTerms() {
+    const epoch = dataEpoch
     setError('terms', '')
     termsLoading.value = true
     try {
       const list = await api.getTerms()
+      if (epoch !== dataEpoch) return
       terms.value = list
       currentTerm.value = list.find((item) => item.isCurrent) || list[0] || null
     } catch (err) {
+      if (epoch !== dataEpoch) return
       setError('terms', err.message || '学期信息加载失败')
     } finally {
-      termsLoading.value = false
+      if (epoch === dataEpoch) termsLoading.value = false
     }
   }
 
@@ -133,7 +139,8 @@ export const useAcademicStore = defineStore('academic', () => {
         if (token !== scheduleToken) return undefined
         schedule.value = data
         if (data?.term) currentTerm.value = data.term
-        changes.applyFromSchedule(data)
+        // 显式忽略：对账失败已由队列内部兜底，这里不需要阻断课表展示
+        void changes.applyFromSchedule(data)
         return data
       } catch (err) {
         if (token !== scheduleToken) return undefined
@@ -249,6 +256,7 @@ export const useAcademicStore = defineStore('academic', () => {
   }
 
   async function loadEvaluations() {
+    const epoch = dataEpoch
     const cached = readDataCache('evaluations', EVALUATIONS_TTL)
     if (cached?.data) {
       evaluations.value = cached.data
@@ -259,12 +267,14 @@ export const useAcademicStore = defineStore('academic', () => {
     setError('evaluations', '')
     try {
       const data = await api.getEvaluations()
+      if (epoch !== dataEpoch) return
       evaluations.value = data
       evaluationsOffline.value = false
       evaluationsExpired.value = false
       const cacheTime = writeDataCache('evaluations', data)
       evaluationsCachedAt.value = data.fetchedAt || cacheTime
     } catch (err) {
+      if (epoch !== dataEpoch) return
       if (evaluations.value) {
         evaluationsOffline.value = true
         evaluationsExpired.value = Boolean(
@@ -274,11 +284,12 @@ export const useAcademicStore = defineStore('academic', () => {
         setError('evaluations', err.message || '评教记录加载失败')
       }
     } finally {
-      evaluationsLoading.value = false
+      if (epoch === dataEpoch) evaluationsLoading.value = false
     }
   }
 
   async function loadCourseSelection() {
+    const epoch = dataEpoch
     const cached = readDataCache('courseSelection', COURSE_SELECTION_TTL)
     if (cached?.data) {
       courseSelection.value = cached.data
@@ -289,12 +300,14 @@ export const useAcademicStore = defineStore('academic', () => {
     setError('courseSelection', '')
     try {
       const data = await api.getCourseSelectionStatus()
+      if (epoch !== dataEpoch) return
       courseSelection.value = data
       courseSelectionOffline.value = false
       courseSelectionExpired.value = false
       const cacheTime = writeDataCache('courseSelection', data)
       courseSelectionCachedAt.value = data.fetchedAt || cacheTime
     } catch (err) {
+      if (epoch !== dataEpoch) return
       if (courseSelection.value) {
         courseSelectionOffline.value = true
         courseSelectionExpired.value = Boolean(
@@ -304,11 +317,12 @@ export const useAcademicStore = defineStore('academic', () => {
         setError('courseSelection', err.message || '选课状态加载失败')
       }
     } finally {
-      courseSelectionLoading.value = false
+      if (epoch === dataEpoch) courseSelectionLoading.value = false
     }
   }
 
   async function loadPortalNotices() {
+    const epoch = dataEpoch
     const cached = readPortalCache('notices.index', PORTAL_NOTICE_TTL)
     const cachedExpired = Boolean(cached?.expired)
     if (cached?.data) {
@@ -320,12 +334,14 @@ export const useAcademicStore = defineStore('academic', () => {
     setError('portalNotices', '')
     try {
       const data = await api.getPortalNotices()
+      if (epoch !== dataEpoch) return
       portalNotices.value = data
       portalNoticesOffline.value = false
       portalNoticesExpired.value = false
       portalNoticesCachedAt.value = data.fetchedAt || new Date().toISOString()
       writePortalCache('notices.index', data)
     } catch (err) {
+      if (epoch !== dataEpoch) return
       if (portalNotices.value) {
         portalNoticesOffline.value = true
         portalNoticesExpired.value = cachedExpired
@@ -333,11 +349,12 @@ export const useAcademicStore = defineStore('academic', () => {
         setError('portalNotices', err.message || '教务通知加载失败')
       }
     } finally {
-      portalNoticesLoading.value = false
+      if (epoch === dataEpoch) portalNoticesLoading.value = false
     }
   }
 
   async function loadPortalNoticeList() {
+    const epoch = dataEpoch
     const cached = readPortalCache('notices.list', PORTAL_NOTICE_TTL)
     const cachedExpired = Boolean(cached?.expired)
     if (cached?.data) {
@@ -349,12 +366,14 @@ export const useAcademicStore = defineStore('academic', () => {
     setError('portalNoticeList', '')
     try {
       const data = await api.getPortalNoticeList()
+      if (epoch !== dataEpoch) return
       portalNoticeList.value = data
       portalNoticeListOffline.value = false
       portalNoticeListExpired.value = false
       portalNoticeListCachedAt.value = data.fetchedAt || new Date().toISOString()
       writePortalCache('notices.list', data)
     } catch (err) {
+      if (epoch !== dataEpoch) return
       if (portalNoticeList.value) {
         portalNoticeListOffline.value = true
         portalNoticeListExpired.value = cachedExpired
@@ -362,12 +381,13 @@ export const useAcademicStore = defineStore('academic', () => {
         setError('portalNoticeList', err.message || '教务通知加载失败')
       }
     } finally {
-      portalNoticeListLoading.value = false
+      if (epoch === dataEpoch) portalNoticeListLoading.value = false
     }
   }
 
   // 未阅与全部消息使用不同缓存键，避免「全部」覆盖首页未阅数据
   async function loadMessages(mode = 'unread') {
+    const epoch = dataEpoch
     const all = mode === 'all'
     const cacheKey = all ? 'messages.all' : 'messages'
     const target = all ? messagesAll : messages
@@ -387,12 +407,14 @@ export const useAcademicStore = defineStore('academic', () => {
     setError(errorKey, '')
     try {
       const data = await api.getMessages(mode)
+      if (epoch !== dataEpoch) return
       target.value = data
       offline.value = false
       expired.value = false
       const cacheTime = writeDataCache(cacheKey, data)
       cachedAt.value = data.fetchedAt || cacheTime
     } catch (err) {
+      if (epoch !== dataEpoch) return
       if (target.value) {
         offline.value = true
         expired.value = Boolean(readDataCache(cacheKey, MESSAGES_TTL)?.expired)
@@ -400,7 +422,7 @@ export const useAcademicStore = defineStore('academic', () => {
         setError(errorKey, err.message || '消息加载失败')
       }
     } finally {
-      loading.value = false
+      if (epoch === dataEpoch) loading.value = false
     }
   }
 
@@ -450,6 +472,7 @@ export const useAcademicStore = defineStore('academic', () => {
     scheduleRequestKey = ''
     scheduleToken += 1
     gradesToken += 1
+    dataEpoch += 1
     errors.value = { ...EMPTY_ERRORS }
   }
 

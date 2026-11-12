@@ -144,7 +144,14 @@ public final class AuthCookieStore {
     public static synchronized void mergeSetCookies(Context context, List<String> setCookies) {
         if (setCookies == null || setCookies.isEmpty()) return;
         Map<String, String> jar = new LinkedHashMap<>();
-        putCookiePairs(jar, load(context));
+        String current = load(context);
+        // 解密瞬时失败时 load 返回 null（loaded 仍为 false）。此时若继续合并，
+        // 会以「只剩本次 Set-Cookie」的空 jar 覆盖整串会话，其它 Cookie 全部丢失。
+        if (current == null && hasStoredCookie(context)) {
+            Log.w(TAG, "mergeSetCookies skipped: session not decryptable yet");
+            return;
+        }
+        putCookiePairs(jar, current);
         boolean changed = false;
         for (String header : setCookies) {
             String pair = header.split(";", 2)[0].trim();
