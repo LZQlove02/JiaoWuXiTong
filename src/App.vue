@@ -315,7 +315,12 @@ async function setupNative() {
     // 会话暂时不可用时，回到前台立刻再换一次票，弱网恢复后用户无需手动点重试
     if (auth.sessionSuspended) auth.retrySession().catch(() => {})
     // 切回 App 也重新对一次账，不能只读原生旧状态
-    if (auth.isLoggedIn) academic.loadSchedule(academic.currentTerm)
+    if (auth.isLoggedIn) {
+      academic.loadSchedule(academic.currentTerm)
+      // 上次因断网降级成缓存的板块，回前台补拉一次，否则会一直停在「网络不可用」
+      if (academic.portalNoticesOffline) academic.loadPortalNotices()
+      if (academic.messagesOffline) academic.loadMessages()
+    }
     // 更新检查按 24h 节流，内部自行判断是否需要请求
     update.autoCheck()
   })

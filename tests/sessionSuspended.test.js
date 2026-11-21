@@ -12,8 +12,12 @@ const academic = vi.hoisted(() => ({
   reset: vi.fn(async () => {}),
   initTerms: vi.fn(async () => {}),
   loadSchedule: vi.fn(async () => {}),
+  loadPortalNotices: vi.fn(async () => {}),
+  loadMessages: vi.fn(async () => {}),
   applySnapshotSchedule: vi.fn(),
-  currentTerm: '2026-2027-1'
+  currentTerm: '2026-2027-1',
+  portalNoticesOffline: false,
+  messagesOffline: false
 }))
 
 vi.mock('../src/api', () => ({
@@ -80,6 +84,8 @@ describe('会话暂时不可用时保留登录态', () => {
     state.snapshot = { id: 'cached-student', name: '缓存学生' }
     state.reloginCalls = 0
     state.reloginResults = []
+    academic.portalNoticesOffline = false
+    academic.messagesOffline = false
   })
 
   it('静默换票遇到网络失败时保持登录态、保留数据并标记挂起', async () => {
@@ -134,6 +140,23 @@ describe('会话暂时不可用时保留登录态', () => {
     expect(auth.isLoggedIn).toBe(true)
     expect(academic.initTerms).toHaveBeenCalled()
     expect(academic.loadSchedule).toHaveBeenCalledWith('2026-2027-1', { force: true })
+  })
+
+  it('会话恢复后把断网期间降级成缓存的板块补成实时数据', async () => {
+    state.reloginResults = [{ ok: false, reason: 'network' }]
+    const auth = await bootstrapWithSnapshot()
+    await vi.waitFor(() => expect(auth.sessionSuspended).toBe(true))
+
+    // 断网刷新失败后，通知与消息都降级成了缓存
+    academic.portalNoticesOffline = true
+    academic.messagesOffline = true
+    state.reloginResults = [{ ok: true, profile: { id: 'cached-student', name: '缓存学生' } }]
+
+    const recovered = await auth.retrySession()
+
+    expect(recovered).toBe(true)
+    expect(academic.loadPortalNotices).toHaveBeenCalled()
+    expect(academic.loadMessages).toHaveBeenCalled()
   })
 
   it('暂时失败后的短冷却内不再重复拉起静默换票', async () => {

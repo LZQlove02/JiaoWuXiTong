@@ -288,6 +288,11 @@ export const useAuthStore = defineStore('auth', () => {
       const academic = useAcademicStore()
       await academic.initTerms()
       await academic.loadSchedule(academic.currentTerm, { force: true })
+      // 断网期间降级成缓存的板块一并补成实时数据，避免会话恢复后仍停在「网络不可用」
+      const stale = []
+      if (academic.portalNoticesOffline) stale.push(academic.loadPortalNotices())
+      if (academic.messagesOffline) stale.push(academic.loadMessages())
+      if (stale.length) await Promise.all(stale)
     } catch (error) {
       // 刷新失败时保留快照，下次进入页面仍会重试
     }
