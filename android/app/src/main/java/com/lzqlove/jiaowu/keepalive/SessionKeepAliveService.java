@@ -69,9 +69,10 @@ public final class SessionKeepAliveService {
         HttpUrl start = HttpUrl.parse(ENDPOINT);
         if (start == null) return Result.FAILED;
         try {
-            Result result = request(context, start, cookie);
-            if (result == Result.EXPIRED) SessionKeepAliveScheduler.cancel(context);
-            return result;
+            // 会话失效也保留闹钟链：等用户下次打开 App 静默换票成功后，
+            // setAuthCookies 会重新排程；避免服务器一次临时跳登录页就永久停掉保活。
+            // 明确退出登录 / 清空数据时由 clearAuthCookies 取消闹钟。
+            return request(context, start, cookie);
         } catch (IOException error) {
             // 网络不可达时保留闹钟链，下一个周期再试
             return Result.FAILED;

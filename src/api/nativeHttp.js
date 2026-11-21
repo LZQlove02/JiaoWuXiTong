@@ -48,12 +48,18 @@ export async function loginWithSso() {
   return SsoLogin.login()
 }
 
+// 原生静默登录的总预算 = TLS 预检（最多 8 秒）+ Activity 内的等待（默认 12 秒）+ 收尾。
+// Activity 的超时计时从 loadUrl 开始，预检耗时不包含在内，所以 JS 兜底必须额外留出预检与桥接余量；
+// 否则会把仍在进行的换票误判为超时，用户反而被当成会话失效。
+const SILENT_RELOGIN_PREFLIGHT_BUDGET_MS = 8000
+const SILENT_RELOGIN_BRIDGE_MARGIN_MS = 4000
+
 // 会话失效时用统一认证票据静默换票；无界面、不弹对话框
 export async function silentRelogin(options = {}) {
   if (!Capacitor.isNativePlatform()) {
     return { ok: false, reason: 'unsupported' }
   }
-  const nativeTimeout = Number(options.timeoutMs) || 6000
+  const nativeTimeout = Number(options.timeoutMs) || 12000
   // 后台启动 Activity 可能被系统拦截且不给回调，必须在 JS 侧兜底，
   // 否则静默 Promise 永不结束，会把整条会话失效处理链卡死。
   const guarded = SsoLogin.silentRelogin({ timeoutMs: nativeTimeout }).catch(() => ({
@@ -62,7 +68,10 @@ export async function silentRelogin(options = {}) {
   }))
   let timer = null
   const timeout = new Promise((resolve) => {
-    timer = setTimeout(() => resolve({ ok: false, reason: 'timeout' }), nativeTimeout + 3000)
+    timer = setTimeout(
+      () => resolve({ ok: false, reason: 'timeout' }),
+      nativeTimeout + SILENT_RELOGIN_PREFLIGHT_BUDGET_MS + SILENT_RELOGIN_BRIDGE_MARGIN_MS
+    )
   })
   try {
     return await Promise.race([guarded, timeout])

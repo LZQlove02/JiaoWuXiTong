@@ -75,6 +75,7 @@ describe('退出登录的本机数据清理', () => {
         error.sessionExpired = true
         throw error
       })
+      this.reloginSilently = vi.fn(async () => ({ ok: false, reason: 'no-ticket' }))
     })
 
     const auth = useAuthStore()
@@ -92,5 +93,40 @@ describe('退出登录的本机数据清理', () => {
     expect(clearPortalCache).toHaveBeenCalled()
     expect(nativeHttp.clearAuthDownloads).toHaveBeenCalled()
     expect(nativeHttp.clearPublicDownloads).toHaveBeenCalled()
+  })
+
+  it('静默换票遇到网络失败时保留本机会话，等待下次重试', async () => {
+    const nativeHttp = await import('../src/api/nativeHttp')
+    const { ZfAcademicApi } = await import('../src/api/zf')
+    nativeHttp.loadAuthCookies.mockResolvedValueOnce({ restored: true })
+    ZfAcademicApi.mockImplementationOnce(function () {
+      this.applySnapshot = vi.fn(() => null)
+      this.restoreSession = vi.fn(async () => {
+        const error = new Error('会话失效')
+        error.sessionExpired = true
+        throw error
+      })
+    })
+    // 静默换票会新建一个 API 实例，单独指定本次结果
+    ZfAcademicApi.mockImplementationOnce(function () {
+      this.reloginSilently = vi.fn(async () => ({ ok: false, reason: 'network' }))
+    })
+
+    const auth = useAuthStore()
+    await auth.bootstrap()
+
+    const { clearScheduleSnapshot } = await import('../src/api/zf')
+    const { clearScheduleChange } = await import('../src/native/scheduleChangeBridge')
+    const { clearPortalCache } = await import('../src/utils/portalCache')
+    const { clearDataCaches } = await import('../src/utils/dataCache')
+
+    expect(auth.isLoggedIn).toBe(false)
+    expect(nativeHttp.clearAuthCookies).not.toHaveBeenCalled()
+    expect(clearScheduleChange).not.toHaveBeenCalled()
+    expect(clearScheduleSnapshot).not.toHaveBeenCalled()
+    expect(clearDataCaches).not.toHaveBeenCalled()
+    expect(clearPortalCache).not.toHaveBeenCalled()
+    expect(nativeHttp.clearAuthDownloads).not.toHaveBeenCalled()
+    expect(nativeHttp.clearPublicDownloads).not.toHaveBeenCalled()
   })
 })

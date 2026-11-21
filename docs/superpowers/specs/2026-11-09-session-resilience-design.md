@@ -2,7 +2,7 @@
 
 - 日期：2026-11-09
 - 版本目标：v2.2.0（当前 2.1.1 / versionCode 32）
-- 状态：**设计稿，待评审，未实现**
+- 状态：**部分实现**（P0 静默重登与「失效不清空」已落地；P1 前台补保活、P2 可观测与 SessionBanner 未做，详见 §13）
 - 关联：[2026-11-02-session-keepalive-design.md](2026-11-02-session-keepalive-design.md)（本案是它的下一级兜底）、[../plan/方案.md](../plan/方案.md) 会话策略章节、[../../README.md](../../README.md)「关键约束」
 
 ## 0. 摘要
@@ -332,3 +332,21 @@ CASTGC 有效但账号策略要求短信验证码时，静默流程会停在验�
 | 日期 | 变更 |
 |---|---|
 | 2026-11-09 | 初稿：现状缺口分析、状态机、接口契约、文件与任务分解、风险与验收 |
+| 2026-11-21 | 补充 §13 实现进度：P0 已落地，P1/P2 与只读横幅仍为待办 |
+
+## 13. 实现进度（2026-11-21）
+
+已落地：
+
+- **P0 静默重登**：`SsoLoginActivity`（silent 透明页、CAS 登录表单探测、`finishSilent` 回传 reason）→ `SsoLoginPlugin.silentRelogin` → `ZfAcademicApi.reloginSilently` → `auth.attemptSilentRelogin()`，失败原因沿用 §5.5 的 `reason` 表；有单飞与冷却（可恢复失败 30 秒，其余 5 分钟）。
+- **P0 失效不清空**（部分）：只有 `no-ticket / login-form / blocked / no-cookie / verify / unsupported` 才 `clearLocalSession()`；`network / timeout / bridge / canceled` 只置 `sessionSuspended`，保留登录态、加密会话与已加载数据，主界面底部提示条支持手动重试，回到前台自动重试一次，成功后就地刷新课表。
+- **静默超时与兜底对齐**：原生 Activity 内等待默认 12 秒（1.5–20 秒可传），计时从 `loadUrl` 开始、不含 TLS 预检；前端兜底 = 原生等待 + 8 秒预检 + 4 秒桥接余量。
+- **保活链路**：检测到会话失效后保留闹钟链（不再 `cancel`），静默换票成功或重新登录时由 `setAuthCookies` 重新排程；退出登录仍由 `clearAuthCookies` 取消。
+
+未做（保留原设计）：
+
+- §4 的「只读快照 + `expiredAt` + 失效横幅」完整状态机：现以 `sessionSuspended` 提示条近似，未引入 7 天只读缓存，隐私文案与 README 口径未升版（§9 风险仍在）。
+- P1 前台补保活（距上次检查超过 25 分钟时 `maybeForegroundKeepAlive`）。
+- P2 可观测：`lastCheckAt / lastResult / nextCheckAt`、设置页展示、电池白名单引导整合。
+- 保活间隔由 30 分钟放宽到约 90 分钟（第三轮评审建议 11）。
+- `manualLogout` 在原生 SharedPreferences 的权威副本（退出瞬间迟到的静默成功仍可能回写 Cookie）。

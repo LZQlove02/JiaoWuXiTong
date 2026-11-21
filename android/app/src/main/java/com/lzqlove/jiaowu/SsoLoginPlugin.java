@@ -23,7 +23,7 @@ import com.lzqlove.jiaowu.keepalive.SessionKeepAliveStore;
 @CapacitorPlugin(name = "SsoLogin")
 public class SsoLoginPlugin extends Plugin {
 
-    private static final int DEFAULT_SILENT_TIMEOUT_MS = 4000;
+    private static final int DEFAULT_SILENT_TIMEOUT_MS = 12000;
 
     @PluginMethod
     public void login(PluginCall call) {

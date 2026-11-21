@@ -22,9 +22,21 @@ const SESSION_PENDING_RETRY_MS = 600
 // 连续多少次冷启动都读不出会话后，按不可用处理，避免永久停在离线快照
 const MAX_PENDING_FAILURES = 3
 const PENDING_FAILURES_KEY = 'jiaowu.session.pendingFailures'
-// 静默换票的超时与失败冷却：避免弱网或票据失效时反复拉起隐藏页面
-const SILENT_RELOGIN_TIMEOUT_MS = 6000
+// 静默换票的超时与失败冷却：避免弱网或票据失效时反复拉起隐藏页面。
+// 冷启动时 TLS 预检、CAS 跳转与教务首页加载都需要时间，6 秒容易误判
+const SILENT_RELOGIN_TIMEOUT_MS = 12000
 const SILENT_RELOGIN_COOLDOWN_MS = 5 * 60 * 1000
+// 网络/超时类失败只做短冷却，避免弱网刚恢复时被 5 分钟冷却挡住
+const SILENT_RELOGIN_TRANSIENT_COOLDOWN_MS = 30 * 1000
+// 只有这些原因代表票据或会话已不可恢复，才清空本机会话与缓存
+const DEFINITIVE_SILENT_FAILURES = new Set([
+  'no-ticket',
+  'login-form',
+  'blocked',
+  'no-cookie',
+  'verify',
+  'unsupported'
+])
 
 function readPendingFailures() {
   try {
@@ -90,6 +102,8 @@ export const useAuthStore = defineStore('auth', () => {
   const restoring = ref(false)
   // 本次会话是否刚完成登录：仅用于一次性欢迎提示，冷启动恢复会话不算
   const justLoggedIn = ref(false)
+  // 会话暂时不可用（网络/超时等可恢复原因）：保持登录态与已加载数据，等下一次重试
+  const sessionSuspended = ref(false)
   const isLoggedIn = computed(() => Boolean(user.value))
   let bootstrapPromise = null
   let expiringPromise = null
@@ -126,33 +140,46 @@ export const useAuthStore = defineStore('auth', () => {
     resetAcademicApi()
     user.value = null
     justLoggedIn.value = false
+    sessionSuspended.value = false
     writePendingFailures(0)
   }
 
-  // 用统一认证票据静默换票：成功返回 true，失败返回 false（由调用方降级清理）
+  // 用统一认证票据静默换票：只返回结果，不在失败时清理本机数据。
+  // 失败原因由调用方区分「票据已不可恢复」与「网络/超时暂时失败」。
   function attemptSilentRelogin() {
-    if (manualLogout) return Promise.resolve(false)
+    if (manualLogout) return Promise.resolve({ ok: false, reason: 'blocked' })
     if (reloginPromise) return reloginPromise
-    if (Date.now() < silentCooldownUntil) return Promise.resolve(false)
+    if (Date.now() < silentCooldownUntil) {
+      return Promise.resolve({ ok: false, reason: 'cooldown' })
+    }
     const zf = new ZfAcademicApi()
     reloginPromise = zf
       .reloginSilently({ timeoutMs: SILENT_RELOGIN_TIMEOUT_MS })
       .then((result) => {
         if (!result?.ok) {
-          silentCooldownUntil = Date.now() + SILENT_RELOGIN_COOLDOWN_MS
-          return false
+          const reason = result?.reason || 'verify'
+          const transient =
+            reason === 'network' ||
+            reason === 'timeout' ||
+            reason === 'bridge' ||
+            reason === 'canceled'
+          silentCooldownUntil =
+            Date.now() +
+            (transient ? SILENT_RELOGIN_TRANSIENT_COOLDOWN_MS : SILENT_RELOGIN_COOLDOWN_MS)
+          return { ok: false, reason }
         }
         // 静默过程中用户主动退出，迟到的成功结果必须丢弃
-        if (manualLogout) return false
+        if (manualLogout) return { ok: false, reason: 'blocked' }
         setAcademicApi(zf)
         user.value = result.profile
+        sessionSuspended.value = false
         writePendingFailures(0)
         silentCooldownUntil = 0
-        return true
+        return { ok: true, reason: 'ok' }
       })
       .catch(() => {
         silentCooldownUntil = Date.now() + SILENT_RELOGIN_COOLDOWN_MS
-        return false
+        return { ok: false, reason: 'verify' }
       })
       .finally(() => {
         reloginPromise = null
@@ -160,13 +187,29 @@ export const useAuthStore = defineStore('auth', () => {
     return reloginPromise
   }
 
-  // 会话失效统一出口：先静默续期，续不上才清理本机数据并回登录页
+  // 会话暂时不可用但原因可能是网络/超时：只降级为「已挂起」，
+  // 保留登录态、加密会话与已加载数据；下次回前台或用户点重试还能接上。
+  function markSessionUnavailable() {
+    sessionSuspended.value = true
+  }
+
+  // 只有票据明确失效、用户主动退出或校方拒绝时才清空本机会话；
+  // 网络、超时等暂时失败保留 Cookie 与快照，避免一次弱网就逼用户重新登录
+  async function clearSessionOrKeepRetry(reason) {
+    if (DEFINITIVE_SILENT_FAILURES.has(reason)) {
+      await clearLocalSession()
+      return
+    }
+    markSessionUnavailable()
+  }
+
+  // 会话失效统一出口：先静默续期，续不上再按失败原因决定是否清理本机数据
   async function expireSession() {
     if (expiringPromise) return expiringPromise
     expiringPromise = (async () => {
-      if (!manualLogout && (await attemptSilentRelogin())) return true
-      await clearLocalSession()
-      await resetAcademic()
+      const result = await attemptSilentRelogin()
+      if (result.ok) return true
+      await clearSessionOrKeepRetry(result.reason)
       return false
     })().finally(() => {
       expiringPromise = null
@@ -222,11 +265,12 @@ export const useAuthStore = defineStore('auth', () => {
         return true
       }
     } catch (error) {
-      // 服务端明确判定失效时先静默换票；换不到才清理本机数据。
+      // 服务端明确判定失效时先静默换票；换不到再按原因决定是否清理。
       // 网络不可达或解析失败时保留本机数据，避免误登出。
       if (error?.sessionExpired) {
-        if (await attemptSilentRelogin()) return true
-        await clearLocalSession()
+        const result = await attemptSilentRelogin()
+        if (result.ok) return true
+        await clearSessionOrKeepRetry(result.reason)
       }
     }
     return false
@@ -235,6 +279,18 @@ export const useAuthStore = defineStore('auth', () => {
   function applyZfSession(zf, profile) {
     setAcademicApi(zf)
     user.value = profile
+  }
+
+  // 静默换票成功后把快照课表补成实时数据；刷新失败不影响「会话已恢复」这一事实
+  async function refreshAfterRecovery() {
+    try {
+      const { useAcademicStore } = await import('./academic')
+      const academic = useAcademicStore()
+      await academic.initTerms()
+      await academic.loadSchedule(academic.currentTerm, { force: true })
+    } catch (error) {
+      // 刷新失败时保留快照，下次进入页面仍会重试
+    }
   }
 
   // 后台静默校验：成功则刷新页面数据，会话失效则清理并退回登录页
@@ -252,11 +308,19 @@ export const useAuthStore = defineStore('auth', () => {
         const recovered = await expireSession()
         if (!recovered) return
         // 静默换票成功：把快照课表补成实时数据，页面无需跳到登录页
-        const { useAcademicStore } = await import('./academic')
-        const academic = useAcademicStore()
-        await academic.initTerms()
-        await academic.loadSchedule(academic.currentTerm, { force: true })
+        await refreshAfterRecovery()
       })
+  }
+
+  // 会话挂起后由界面或回到前台触发：清掉冷却立刻再换一次票
+  async function retrySession() {
+    if (!user.value) return false
+    silentCooldownUntil = 0
+    const result = await attemptSilentRelogin()
+    if (!result.ok) return false
+    sessionSuspended.value = false
+    await refreshAfterRecovery()
+    return true
   }
 
   // 启动时后台恢复会话，页面先挂载，路由守卫等待该结果后再决定去向
@@ -283,6 +347,7 @@ export const useAuthStore = defineStore('auth', () => {
       await resetAcademic()
       user.value = profile
       justLoggedIn.value = true
+      sessionSuspended.value = false
       writePendingFailures(0)
       // 用户已主动完成登录，恢复自动重登资格
       manualLogout = false
@@ -341,9 +406,11 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     restoring,
     isLoggedIn,
+    sessionSuspended,
     bootstrap,
     loginWithSso,
     logout,
+    retrySession,
     consumeJustLoggedIn
   }
 })

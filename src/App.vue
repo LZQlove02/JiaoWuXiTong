@@ -28,6 +28,23 @@
     </main>
     <TabBar v-if="showTabBar" />
     <UpdateDialog v-if="update.dialogOpen" />
+    <!-- 会话暂时不可用：数据仍在，提示用户可以用一次点击重试，而不是被踢回登录页 -->
+    <div
+      v-if="auth.sessionSuspended && auth.isLoggedIn"
+      class="session-bar"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="session-bar-text">网络不稳定，会话暂时不可用，已保留本地数据</span>
+      <button
+        class="session-bar-action"
+        type="button"
+        :disabled="sessionRetrying"
+        @click="onRetrySession"
+      >
+        {{ sessionRetrying ? '重试中…' : '重试' }}
+      </button>
+    </div>
     <ConsentGate
       v-if="keepAlivePromptOpen"
       :clauses="KEEPALIVE_CLAUSES"
@@ -269,6 +286,19 @@ watch(
   }
 )
 
+// 会话暂时不可用时的手动重试：成功后刷新页面数据，失败则保留提示条等下一次
+const sessionRetrying = ref(false)
+async function onRetrySession() {
+  if (sessionRetrying.value) return
+  sessionRetrying.value = true
+  try {
+    const recovered = await auth.retrySession()
+    if (recovered) changes.refresh()
+  } finally {
+    sessionRetrying.value = false
+  }
+}
+
 // 原生能力延迟到「已同意」之后初始化：未同意时不写组件、不注册深链与返回键监听
 async function setupNative() {
   if (nativeReady) return
@@ -282,6 +312,8 @@ async function setupNative() {
   CapApp.addListener('appStateChange', ({ isActive }) => {
     if (!isActive) return
     changes.refresh()
+    // 会话暂时不可用时，回到前台立刻再换一次票，弱网恢复后用户无需手动点重试
+    if (auth.sessionSuspended) auth.retrySession().catch(() => {})
     // 切回 App 也重新对一次账，不能只读原生旧状态
     if (auth.isLoggedIn) academic.loadSchedule(academic.currentTerm)
     // 更新检查按 24h 节流，内部自行判断是否需要请求
@@ -410,5 +442,45 @@ onMounted(() => {
 .boot-text {
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+/* 会话挂起提示条：浮在 TabBar 之上，避免遮挡底部导航 */
+.session-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + var(--tab-height) + 10px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--radius);
+  border-left: 3px solid var(--warning);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.session-bar-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.session-bar-action {
+  flex: none;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.session-bar-action:disabled {
+  opacity: 0.6;
 }
 </style>

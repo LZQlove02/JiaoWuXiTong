@@ -48,9 +48,11 @@ public class SsoLoginActivity extends Activity {
     static final String EXTRA_SILENT = "silent";
     static final String EXTRA_TIMEOUT_MS = "timeoutMs";
     static final String EXTRA_REASON = "reason";
-    private static final int DEFAULT_SILENT_TIMEOUT_MS = 4000;
+    // 冷启动时 TLS 预检、CAS 跳转与教务首页加载都可能较慢；
+    // 超时从真正加载页面开始计，6 秒很容易把可恢复的会话误判为失败
+    private static final int DEFAULT_SILENT_TIMEOUT_MS = 12000;
     private static final int MIN_SILENT_TIMEOUT_MS = 1500;
-    private static final int MAX_SILENT_TIMEOUT_MS = 10000;
+    private static final int MAX_SILENT_TIMEOUT_MS = 20000;
 
     private static final String AUTH_SERVER_HOST = "authserver.lzzy.net";
     private static final String SSO_PREFS = "jiaowu_sso";
@@ -228,7 +230,6 @@ public class SsoLoginActivity extends Activity {
                     .putBoolean(KEY_COOKIE_RESET, true)
                     .apply();
         }
-        if (silent) handler.postDelayed(silentTimeout, silentTimeoutMs);
         startSso();
     }
 
@@ -271,7 +272,10 @@ public class SsoLoginActivity extends Activity {
                                 @Override
                                 public void run() {
                                     // 用户可能在这 300ms 内退出登录页，WebView 已在 onDestroy 置空
-                                    if (webView != null && !finished) webView.loadUrl(LOGIN_URL);
+                                    if (webView == null || finished) return;
+                                    // 静默超时从真正加载页面开始计，不把 TLS 预检耗时算进预算
+                                    if (silent) handler.postDelayed(silentTimeout, silentTimeoutMs);
+                                    webView.loadUrl(LOGIN_URL);
                                 }
                             }, 300);
                             return;
