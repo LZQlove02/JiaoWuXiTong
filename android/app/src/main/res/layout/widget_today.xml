@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 4x2「今日课程」：最多 3 行（时间 / 课名 · 教室 / 状态）+ 底部固定的「下一节」。
-     行数随实际课数变化（1~3 行），主体区 weight=1，所以 footer 永远贴底、不随课多课少上下跳。 -->
+<!-- 4x2「今日课程」：最多 3 行（时间 / 课名 · 教室）+ 底部固定的「下一节」。
+     行数随实际课数变化（1~3 行），主体区 weight=1，所以 footer 永远贴底、不随课多课少上下跳。
+     课程行只保留 时间 / 课名 / 教室 三个信息，不再显示「待上 / 进行中 / 已结束」。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -103,7 +104,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -117,7 +118,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="#1A1C1F"
-                android:textSize="14sp" />
+                android:textSize="16sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -127,33 +128,19 @@
                 android:id="@+id/widget_room1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="6dp"
+                android:layout_marginStart="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:maxWidth="100dp"
                 android:textColor="#8A8F98"
-                android:textSize="11sp" />
-
-            <TextView
-                android:shadowColor="#66000000"
-                android:shadowDx="0"
-                android:shadowDy="1"
-                android:shadowRadius="2"
-                android:id="@+id/widget_state1"
-                android:layout_width="48dp"
-                android:ellipsize="end"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:maxLines="1"
-                android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/widget_row2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -167,7 +154,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -181,7 +168,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="#1A1C1F"
-                android:textSize="14sp" />
+                android:textSize="16sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -191,33 +178,19 @@
                 android:id="@+id/widget_room2"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="6dp"
+                android:layout_marginStart="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:maxWidth="100dp"
                 android:textColor="#8A8F98"
-                android:textSize="11sp" />
-
-            <TextView
-                android:shadowColor="#66000000"
-                android:shadowDx="0"
-                android:shadowDy="1"
-                android:shadowRadius="2"
-                android:id="@+id/widget_state2"
-                android:layout_width="48dp"
-                android:ellipsize="end"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:maxLines="1"
-                android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/widget_row3"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -231,7 +204,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:textColor="#8A8F98"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -245,7 +218,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="#1A1C1F"
-                android:textSize="14sp" />
+                android:textSize="16sp" />
 
             <TextView
                 android:shadowColor="#66000000"
@@ -255,27 +228,12 @@
                 android:id="@+id/widget_room3"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="6dp"
+                android:layout_marginStart="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:maxWidth="100dp"
                 android:textColor="#8A8F98"
-                android:textSize="11sp" />
-
-            <TextView
-                android:shadowColor="#66000000"
-                android:shadowDx="0"
-                android:shadowDy="1"
-                android:shadowRadius="2"
-                android:id="@+id/widget_state3"
-                android:layout_width="48dp"
-                android:ellipsize="end"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:maxLines="1"
-                android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <TextView

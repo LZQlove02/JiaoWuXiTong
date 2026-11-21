@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 添加面板里的 4x2 预览：与运行时结构一致——标题带星期、最多 3 行（时间 / 课名 · 教室 / 状态）、
-     底部固定「下一节」，行数少时垂直居中。这里全部是静态示例文字。 -->
+<!-- 添加面板里的 4x2 预览：与运行时结构一致——标题带星期、最多 3 行（时间 / 课名 · 教室）、
+     底部固定「下一节」，行数少时垂直居中。课程行不显示「待上 / 进行中 / 已结束」。
+     这里全部是静态示例文字。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -66,7 +67,7 @@
                 android:maxLines="1"
                 android:text="08:00"
                 android:textColor="#8A8F98"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:layout_width="0dp"
@@ -76,31 +77,24 @@
                 android:maxLines="1"
                 android:text="高等数学"
                 android:textColor="#1A1C1F"
-                android:textSize="14sp" />
+                android:textSize="16sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="6dp"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
                 android:maxLines="1"
+                android:maxWidth="100dp"
                 android:text="T2-A507"
                 android:textColor="#8A8F98"
-                android:textSize="11sp" />
-
-            <TextView
-                android:layout_width="48dp"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:maxLines="1"
-                android:text="已结束"
-                android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -110,7 +104,7 @@
                 android:maxLines="1"
                 android:text="10:05"
                 android:textColor="#8A8F98"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:layout_width="0dp"
@@ -120,31 +114,24 @@
                 android:maxLines="1"
                 android:text="毛泽东思想"
                 android:textColor="#1A1C1F"
-                android:textSize="14sp" />
+                android:textSize="16sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="6dp"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
                 android:maxLines="1"
+                android:maxWidth="100dp"
                 android:text="T1-D302"
                 android:textColor="#8A8F98"
-                android:textSize="11sp" />
-
-            <TextView
-                android:layout_width="48dp"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:maxLines="1"
-                android:text="进行中"
-                android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="13sp" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -154,7 +141,7 @@
                 android:maxLines="1"
                 android:text="14:30"
                 android:textColor="#8A8F98"
-                android:textSize="12sp" />
+                android:textSize="13sp" />
 
             <TextView
                 android:layout_width="0dp"
@@ -164,26 +151,18 @@
                 android:maxLines="1"
                 android:text="欧洲文明"
                 android:textColor="#1A1C1F"
-                android:textSize="14sp" />
+                android:textSize="16sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="6dp"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
                 android:maxLines="1"
+                android:maxWidth="100dp"
                 android:text="T1-A203"
                 android:textColor="#8A8F98"
-                android:textSize="11sp" />
-
-            <TextView
-                android:layout_width="48dp"
-                android:layout_height="wrap_content"
-                android:gravity="end"
-                android:maxLines="1"
-                android:text="待上"
-                android:textColor="#8A8F98"
-                android:textSize="10.5sp" />
+                android:textSize="13sp" />
         </LinearLayout>
     </LinearLayout>
 

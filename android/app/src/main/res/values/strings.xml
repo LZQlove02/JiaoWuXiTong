@@ -9,9 +9,6 @@
     <string name="widget_title_next">下一节课</string>
     <string name="widget_title_today">今日课程</string>
     <string name="widget_title_today_day">今日 · %1$s</string>
-    <string name="widget_state_pending">待上</string>
-    <string name="widget_state_now">进行中</string>
-    <string name="widget_state_done">已结束</string>
     <string name="widget_next_label">下一节课（2×2）</string>
     <string name="widget_today_label">今日课程（4×2）</string>
     <string name="widget_week_label">本周课表（4×4）</string>

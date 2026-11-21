@@ -10,9 +10,10 @@ import java.util.Calendar;
 import java.util.List;
 
 /**
- * 4x2「今日课程」：最多 3 行（时间 / 课名 · 教室 / 状态），底部固定「下一节」。
+ * 4x2「今日课程」：最多 3 行（时间 / 课名 · 教室），底部固定「下一节」。
  * 结构约束见《小组件执行方案》§7.2：
- * 不做超额提示、进行中不做选中效果、行数随实际课数变化但 footer 始终贴底。
+ * 不做超额提示、行数随实际课数变化但 footer 始终贴底。
+ * 课程行不再显示「待上 / 进行中 / 已结束」，把宽度让给课名与教室。
  */
 final class TodayWidgetBinder {
 
@@ -22,13 +23,8 @@ final class TodayWidgetBinder {
     private static final int[] TIMES = {R.id.widget_time1, R.id.widget_time2, R.id.widget_time3};
     private static final int[] NAMES = {R.id.widget_name1, R.id.widget_name2, R.id.widget_name3};
     private static final int[] ROOMS = {R.id.widget_room1, R.id.widget_room2, R.id.widget_room3};
-    private static final int[] STATES = {R.id.widget_state1, R.id.widget_state2, R.id.widget_state3};
 
     private static final String[] WEEKDAYS = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
-
-    private static final int PENDING = 0;
-    private static final int ONGOING = 1;
-    private static final int DONE = 2;
 
     static RemoteViews build(Context context, WidgetPayload payload, WidgetTheme theme,
                              int appWidgetId) {
@@ -84,18 +80,12 @@ final class TodayWidgetBinder {
         List<WidgetPayload.ClassItem> today = payload.today;
         int shown = Math.min(today.size(), MAX_ROWS);
         hideRows(views, shown);
-        int now = minutesNow();
         for (int i = 0; i < shown; i += 1) {
             WidgetPayload.ClassItem item = today.get(i);
             views.setViewVisibility(ROWS[i], View.VISIBLE);
             views.setTextViewText(TIMES[i], item.startTime);
             views.setTextViewText(NAMES[i], item.name);
             views.setTextViewText(ROOMS[i], item.room);
-
-            int state = stateOf(item, now);
-            views.setTextViewText(STATES[i], context.getString(stateLabel(state)));
-            // 只用文字区分状态，不做任何强调（用户明确不要「选中」效果）
-            views.setTextColor(STATES[i], theme.tertiary);
         }
 
         if (today.isEmpty()) {
@@ -117,40 +107,6 @@ final class TodayWidgetBinder {
         for (int i = from; i < MAX_ROWS; i += 1) {
             views.setViewVisibility(ROWS[i], View.GONE);
         }
-    }
-
-    // 0 待上 / 1 进行中 / 2 已结束；时间缺失按待上处理
-    private static int stateOf(WidgetPayload.ClassItem item, int now) {
-        int start = minutes(item.startTime);
-        if (start < 0) return PENDING;
-        int end = minutes(item.endTime);
-        if (end < 0) end = start + 45;
-        if (now >= end) return DONE;
-        if (now >= start) return ONGOING;
-        return PENDING;
-    }
-
-    private static int stateLabel(int state) {
-        if (state == ONGOING) return R.string.widget_state_now;
-        if (state == DONE) return R.string.widget_state_done;
-        return R.string.widget_state_pending;
-    }
-
-    // "08:00" -> 480；解析失败返回 -1
-    private static int minutes(String value) {
-        if (value == null) return -1;
-        String[] parts = value.split(":");
-        if (parts.length != 2) return -1;
-        try {
-            return Integer.parseInt(parts[0].trim()) * 60 + Integer.parseInt(parts[1].trim());
-        } catch (NumberFormatException error) {
-            return -1;
-        }
-    }
-
-    private static int minutesNow() {
-        Calendar calendar = Calendar.getInstance();
-        return calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE);
     }
 
     private static String weekdayLabel() {

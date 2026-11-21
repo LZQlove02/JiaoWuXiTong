@@ -2,6 +2,12 @@
 
 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号对应 `android/app/build.gradle` 的 `versionName`。
 
+## [Unreleased]
+
+### 变更
+
+- 4x2「今日课程」小组件去掉每行末尾的「待上 / 进行中 / 已结束」状态：状态列 48dp 连同教室两侧边距一起让出，课名可用宽度净增约 52dp；字号课名 14sp → 16sp、教室 11sp → 13sp、时间 12sp → 13sp。课名在 4 列宽度（约 338dp，课名可用约 161dp）下不再被截成「…」；更窄的容器仍按原有「超出省略」处理
+
 ## [2.2.1] - 2026-11-21
 
 ### 新增
