@@ -339,9 +339,10 @@ CASTGC 有效但账号策略要求短信验证码时，静默流程会停在验�
 已落地：
 
 - **P0 静默重登**：`SsoLoginActivity`（silent 透明页、CAS 登录表单探测、`finishSilent` 回传 reason）→ `SsoLoginPlugin.silentRelogin` → `ZfAcademicApi.reloginSilently` → `auth.attemptSilentRelogin()`，失败原因沿用 §5.5 的 `reason` 表；有单飞与冷却（可恢复失败 30 秒，其余 5 分钟）。
-- **P0 失效不清空**（部分）：只有 `no-ticket / login-form / blocked / no-cookie / verify / unsupported` 才 `clearLocalSession()`；`network / timeout / bridge / canceled` 只置 `sessionSuspended`，保留登录态、加密会话与已加载数据，主界面底部提示条支持手动重试，回到前台自动重试一次，成功后就地刷新课表。
+- **P0 失效不清空**（部分）：只有 `no-ticket / login-form / blocked / no-cookie / verify / unsupported` 才 `clearLocalSession()`；`network / timeout / bridge / canceled` 只置 `sessionSuspended`，保留登录态、加密会话与已加载数据，主界面底部提示条支持手动重试，回到前台自动重试一次，成功后就地刷新课表并把断网期间降级的通知/消息补齐。
 - **静默超时与兜底对齐**：原生 Activity 内等待默认 12 秒（1.5–20 秒可传），计时从 `loadUrl` 开始、不含 TLS 预检；前端兜底 = 原生等待 + 8 秒预检 + 4 秒桥接余量。
 - **保活链路**：检测到会话失效后保留闹钟链（不再 `cancel`），静默换票成功或重新登录时由 `setAuthCookies` 重新排程；退出登录仍由 `clearAuthCookies` 取消。
+- **降级板块补拉**：`App.vue` 的 `appStateChange` 与 `auth.refreshAfterRecovery()` 在回到前台或会话恢复后，对 `portalNoticesOffline` / `messagesOffline` 的板块各补拉一次。真机联调发现：原先回前台只刷课表，通知与消息会一直停在「网络不可用，显示缓存」，直到用户手动下拉。
 
 未做（保留原设计）：
 
