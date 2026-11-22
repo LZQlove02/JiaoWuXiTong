@@ -22,6 +22,8 @@ public final class WidgetDeepLink {
 
     // 组件内「样式」按钮：广播给自己换样式，不打开 App
     public static final String ACTION_CYCLE_STYLE = "com.lzqlove.jiaowu.widget.CYCLE_STYLE";
+    // 4x4 标题行的「下周 › / 本周 ‹」：广播给自己翻页，同样不打开 App
+    public static final String ACTION_SWITCH_WEEK = "com.lzqlove.jiaowu.widget.SWITCH_WEEK";
     public static final String EXTRA_APP_WIDGET_ID = "app_widget_id";
 
     private WidgetDeepLink() {
@@ -51,5 +53,18 @@ public final class WidgetDeepLink {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return PendingIntent.getBroadcast(context, 1000 + appWidgetId, intent, flags);
+    }
+
+    // 翻周与样式用不同的 requestCode 段：2000 + appWidgetId，两者不能互相顶掉
+    public static PendingIntent switchWeek(Context context, int appWidgetId) {
+        Intent intent = new Intent(context, WidgetWeekSwitchReceiver.class);
+        intent.setAction(ACTION_SWITCH_WEEK);
+        intent.putExtra(EXTRA_APP_WIDGET_ID, appWidgetId);
+
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        return PendingIntent.getBroadcast(context, 2000 + appWidgetId, intent, flags);
     }
 }

@@ -87,6 +87,10 @@
     overflow: hidden; text-overflow: ellipsis;
   }
   .w-gear { font-size: 12px; opacity: .72; line-height: 1; }
+  .w-toggle {
+    font-size: 10px; font-weight: 700; line-height: 1; white-space: nowrap;
+    padding: 4px 2px 4px 6px; color: var(--ink-2);
+  }
   .w-updated { font-size: 9.5px; color: var(--ink-3); white-space: nowrap; }
   .w-sum { margin-top: 4px; padding: 3px 6px 0; flex: 0 0 auto; }
   .sum-main { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 600; }
@@ -281,6 +285,7 @@
         <li><b>每块必须同时有课名和教室</b>：教室行固定预留，装不下就一起缩字号，不再像以前那样“放不下就把教室藏掉”。</li>
         <li>省下来的高度全给网格：位图可用高度 316px → 约 374px（<code>CHROME_DP</code> 98 → 约 40），12 节每行多 4.8px，两节课的块终于塞得下教室行。</li>
         <li>保留：今天列（<code>#14508F</code> 表头 + 圆点 + 淡底）、<code>本周课表 · 第 9 周</code>、三档冷色 40%。</li>
+        <li>2026-11-22 加：标题行 <code>下周 ›</code> 可翻到下一周（下周页显示 <code>下周课表 · 第 N+1 周</code> / <code>本周 ‹</code>，且不铺今天列、不画圆点）；<code>更新于</code> 改成相对时间，如 <code>刚刚更新</code> / <code>5 分钟前更新</code> / <code>昨天 19:58 更新</code>。</li>
       </ul>
     </div>
   </div>
@@ -318,8 +323,9 @@ function widgetHTML(variant) {
 
   parts.push(`<div class="w-head">
       <span class="w-title">本周课表 · 第 9 周</span>
+      <span class="w-toggle">下周 ›</span>
       <span class="w-gear">⚙</span>
-      <span class="w-updated">更新于 21:48</span>
+      <span class="w-updated">刚刚更新</span>
     </div>`);
 
   parts.push('<div class="grid">');

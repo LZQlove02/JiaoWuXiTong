@@ -129,15 +129,29 @@ public final class WidgetStore {
         return normalizeStyle(prefs(context).getString(styleKey(appWidgetId), STYLE_GLASS));
     }
 
-    // 组件被移除时清掉这个实例的全部设置：样式 + 文字色
+    // 组件被移除时清掉这个实例的全部设置：样式 + 文字色 + 周次页
     public static void clearInstanceSettings(Context context, int[] appWidgetIds) {
         if (appWidgetIds == null || appWidgetIds.length == 0) return;
         SharedPreferences.Editor editor = prefs(context).edit();
         for (int id : appWidgetIds) {
             editor.remove(styleKey(id));
             editor.remove(textColorKey(id));
+            editor.remove(weekOffsetKey(id));
         }
         editor.apply();
+    }
+
+    // 4x4 当前看哪一周：0 = 本周，1 = 下周，按实例保存（两个 4x4 可以各看各的）
+    private static String weekOffsetKey(int appWidgetId) {
+        return "weekOffset_" + appWidgetId;
+    }
+
+    public static void writeWeekOffset(Context context, int appWidgetId, int offset) {
+        prefs(context).edit().putInt(weekOffsetKey(appWidgetId), offset == 1 ? 1 : 0).apply();
+    }
+
+    public static int readWeekOffset(Context context, int appWidgetId) {
+        return prefs(context).getInt(weekOffsetKey(appWidgetId), 0) == 1 ? 1 : 0;
     }
 
     // 文字颜色按组件实例保存，空串表示跟随主题（自动）

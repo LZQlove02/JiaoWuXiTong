@@ -261,6 +261,37 @@ describe('小组件 payload：更新时间口径', () => {
     const bad = { ...schedule, fetchedAt: 'invalid' }
     expect(build({ schedule: bad }).updatedAtLabel).toBe('09:00')
   })
+
+  // 「更新于」要做相对时间，HH:mm 之外还需要知道是哪一天
+  it('同时给出与 updatedAtLabel 同源的本地日期', () => {
+    const withFetched = { ...schedule, fetchedAt: '2026-10-29T08:05:00' }
+    expect(build({ schedule: withFetched }).updatedAtDate).toBe('2026-10-29')
+    expect(build().updatedAtDate).toBe('2026-10-29')
+    expect(build({ now: new Date(2026, 11, 31, 23, 50, 0) }).updatedAtDate).toBe('2026-12-31')
+  })
+
+  it('未登录时也带更新日期，组件才不会退回「更新于 19:58」', () => {
+    const payload = buildWidgetPayload({ user: null, now: morning })
+    expect(payload.updatedAtDate).toBe('2026-10-29')
+    expect(payload.updatedAtLabel).toBe('09:00')
+  })
+})
+
+describe('小组件 payload：下一周', () => {
+  it('单独给出下周课表，不混进本周网格', () => {
+    const payload = build()
+    expect(payload.nextWeek.week).toBe(10)
+    expect(payload.nextWeek.items.map((item) => item.name)).toEqual(['鸿蒙开发技术'])
+    expect(payload.nextWeek.items[0]).toMatchObject({ weekday: 5, start: 1, end: 2, room: 'T2-A507' })
+    expect(payload.week.some((item) => item.weekday === 5)).toBe(false)
+  })
+
+  it('学期末（第 20 周之后）周次仍然 +1，但课表为空数组', () => {
+    // 学期首周 2026-08-31，第 20 周是 2027-01-11 那一周
+    const payload = build({ now: new Date(2027, 0, 12, 10, 0, 0) })
+    expect(payload.term.week).toBe(20)
+    expect(payload.nextWeek).toEqual({ week: 21, items: [] })
+  })
 })
 
 describe('小组件 payload：成绩', () => {
@@ -346,6 +377,7 @@ describe('小组件 payload：整体契约', () => {
       'loggedIn',
       'messages',
       'next',
+      'nextWeek',
       'notices',
       'remainingToday',
       'scheduleLoaded',
@@ -353,6 +385,7 @@ describe('小组件 payload：整体契约', () => {
       'term',
       'today',
       'updatedAt',
+      'updatedAtDate',
       'updatedAtLabel',
       'week',
       'weekAnchor'

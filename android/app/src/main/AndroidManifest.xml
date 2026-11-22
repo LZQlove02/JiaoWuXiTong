@@ -111,6 +111,16 @@
             android:name=".widget.WidgetStyleReceiver"
             android:exported="false" />
 
+        <!-- 4x4 标题行「下周 › / 本周 ‹」：只翻转被点的那个实例 -->
+        <receiver
+            android:name=".widget.WidgetWeekSwitchReceiver"
+            android:exported="false" />
+
+        <!-- 每小时整点后第 2 分钟重绘一次，让「更新于」的相对时间跟着变 -->
+        <receiver
+            android:name=".widget.WidgetTimeTickReceiver"
+            android:exported="false" />
+
         <!-- 课表变更：每天 07:10 / 12:50 后台对账 -->
         <receiver
             android:name=".change.ScheduleCheckReceiver"

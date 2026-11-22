@@ -29,6 +29,13 @@ public final class WidgetUpdater {
         if (WidgetScheduleDeriver.isStale(payload, Calendar.getInstance())) {
             payload.markStale();
         }
+        // 未登录 / 课表未加载 / 跨周时把 4x4 的周次页拨回本周：
+        // 否则重新同步后组件会直接停在上次点的「下周」页，用户会以为课表出错
+        if (!WidgetWeekDisplay.canSwitch(payload)) {
+            for (int id : ids(app, manager, WeekWidgetProvider.class)) {
+                WidgetStore.writeWeekOffset(app, id, WidgetWeekDisplay.THIS_WEEK);
+            }
+        }
         // 只记状态，不记成绩、未读数等个人数据（日志脱敏）
         Log.i("JiaowuWidget", "payload loggedIn=" + payload.loggedIn
             + " loaded=" + payload.scheduleLoaded

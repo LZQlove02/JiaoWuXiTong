@@ -86,9 +86,8 @@ final class NextClassWidgetBinder {
     }
 
     static String updatedText(Context context, WidgetPayload payload) {
-        return payload.updatedLabel.isEmpty()
-            ? ""
-            : context.getString(R.string.widget_updated_at, payload.updatedLabel);
+        // 「更新于」做相对时间；老 payload 没带日期时会自动退回「更新于 19:58」
+        return WidgetUpdatedLabel.text(context, payload.updatedDate, payload.updatedLabel);
     }
 
     static String remainingText(Context context, WidgetPayload payload) {

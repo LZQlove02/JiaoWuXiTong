@@ -33,6 +33,7 @@ public class WidgetAlarmReceiver extends BroadcastReceiver {
         schedule(app);
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
             // 开机后系统会清掉闹钟，这里只补排 + 用现有快照刷一次
+            WidgetTimeTickReceiver.schedule(app);
             WidgetUpdater.refreshAll(app);
             return;
         }

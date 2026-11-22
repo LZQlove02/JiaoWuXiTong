@@ -26,7 +26,7 @@ public final class WidgetBitmapRenderer {
     private WidgetBitmapRenderer() {
     }
 
-    public static Bitmap render(WidgetPayload payload, WidgetTheme theme,
+    public static Bitmap render(WidgetTheme theme, List<WidgetPayload.WeekItem> items,
                                 int widthPx, int heightPx, int todayWeekday, String emptyText) {
         int[] size = fit(widthPx, heightPx);
         Bitmap bitmap;
@@ -36,7 +36,7 @@ public final class WidgetBitmapRenderer {
             return null;
         }
         try {
-            draw(bitmap, payload, theme, todayWeekday, emptyText);
+            draw(bitmap, items, theme, todayWeekday, emptyText);
             // 透明 / 液态玻璃档必须保留 alpha（空网格要透出壁纸），只能用 ARGB_4444；
             // 不透明档的画布已经铺满卡片色（没有透明像素），改用 RGB_565：
             // ARGB_4444 每通道只有 16 级，20% 的浅色叠在白卡上会被量化成中性灰（真机已踩）。
@@ -67,7 +67,7 @@ public final class WidgetBitmapRenderer {
         return new int[]{Math.max(120, w), Math.max(120, h)};
     }
 
-    private static void draw(Bitmap bitmap, WidgetPayload payload, WidgetTheme theme,
+    private static void draw(Bitmap bitmap, List<WidgetPayload.WeekItem> items, WidgetTheme theme,
                              int todayWeekday, String emptyText) {
         int w = bitmap.getWidth();
         int h = bitmap.getHeight();
@@ -151,7 +151,7 @@ public final class WidgetBitmapRenderer {
         float inset = Math.max(1.5f, unit * 0.5f);
         float radius = Math.max(inset * 1.8f, unit * 1.1f);
         boolean liquidGlass = theme.isTransparent();
-        for (WidgetPayload.WeekItem item : mergeBlocks(payload.week)) {
+        for (WidgetPayload.WeekItem item : mergeBlocks(items)) {
             int col = item.weekday - 1;
             if (col < 0 || col >= COLS) continue;
             int rowStart = Math.max(0, item.start - 1);
@@ -182,8 +182,8 @@ public final class WidgetBitmapRenderer {
             drawLabel(canvas, item.name, item.room, block, theme.courseInk(), unit, text);
         }
 
-        // 本周没有课：网格照画（表头与节次留着，版面不塌），中央补一句占位
-        if (payload.week.isEmpty() && emptyText != null && !emptyText.isEmpty()) {
+        // 这一周没有课：网格照画（表头与节次留着，版面不塌），中央补一句占位
+        if (items.isEmpty() && emptyText != null && !emptyText.isEmpty()) {
             text.setTypeface(Typeface.DEFAULT);
             text.setTextSize(Math.max(unit * 3.2f, 11f));
             text.setTextAlign(Paint.Align.CENTER);

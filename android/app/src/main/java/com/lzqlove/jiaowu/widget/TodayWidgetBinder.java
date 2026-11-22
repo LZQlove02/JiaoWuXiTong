@@ -70,9 +70,7 @@ final class TodayWidgetBinder {
             views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
             views.setTextViewText(R.id.widget_empty, context.getString(R.string.widget_open_app_sync));
             views.setTextViewText(R.id.widget_updated,
-                payload.updatedLabel.isEmpty()
-                    ? ""
-                    : context.getString(R.string.widget_updated_at, payload.updatedLabel));
+                WidgetUpdatedLabel.text(context, payload.updatedDate, payload.updatedLabel));
             views.setTextViewText(R.id.widget_footer, "");
             return views;
         }
@@ -98,7 +96,7 @@ final class TodayWidgetBinder {
         }
 
         views.setTextViewText(R.id.widget_updated,
-            payload.updatedLabel.isEmpty() ? "" : context.getString(R.string.widget_updated_at, payload.updatedLabel));
+            WidgetUpdatedLabel.text(context, payload.updatedDate, payload.updatedLabel));
         views.setTextViewText(R.id.widget_footer, footerText(context, payload));
         return views;
     }

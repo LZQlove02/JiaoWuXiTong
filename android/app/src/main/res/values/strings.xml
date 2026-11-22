@@ -29,6 +29,19 @@
     <string name="widget_week_desc">本周课表与消息、通知、成绩摘要</string>
     <string name="widget_title_week_no">本周课表 · 第 %1$d 周</string>
     <string name="widget_empty_week">本周暂无课程</string>
+    <string name="widget_title_next_week">下周课表</string>
+    <string name="widget_title_next_week_no">下周课表 · 第 %1$d 周</string>
+    <string name="widget_empty_next_week">下周暂无课程</string>
+    <string name="widget_switch_next_week">下周 ›</string>
+    <string name="widget_switch_this_week">本周 ‹</string>
+
+    <!-- 桌面小组件：更新时间的相对文案（三档共用） -->
+    <string name="widget_time_just_now">刚刚更新</string>
+    <string name="widget_time_minutes_ago">%1$d 分钟前更新</string>
+    <string name="widget_time_today">今天 %1$s 更新</string>
+    <string name="widget_time_yesterday">昨天 %1$s 更新</string>
+    <string name="widget_time_date">%1$d月%2$d日 %3$s 更新</string>
+    <string name="widget_time_date_year">%1$d年%2$d月%3$d日 %4$s 更新</string>
 
     <!-- 课表变更提醒 -->
     <string name="notification_channel_schedule_change">课表变更</string>

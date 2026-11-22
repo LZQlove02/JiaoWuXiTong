@@ -16,6 +16,12 @@ function clockOf(date) {
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
+// 「更新于」要做相对时间（刚刚 / 5 分钟前 / 今天 19:58 / 昨天 09:20 / 11月20日 …），
+// 光有 HH:mm 判断不了是哪天，这里补一个本地日期；与 updatedAtLabel 同源
+function dateOf(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+}
+
 // 带本地时区偏移的 ISO 时间，原生侧只展示 updatedAtLabel，不需要再解析时区
 function localIso(date) {
   const offset = -date.getTimezoneOffset()
@@ -196,10 +202,11 @@ export function buildWidgetPayload(input = {}) {
   const updatedTime = dataFetchedAt(input.schedule) || now
   const updatedAt = localIso(updatedTime)
   const updatedAtLabel = clockOf(updatedTime)
+  const updatedAtDate = dateOf(updatedTime)
   const schema = WIDGET_SCHEMA
 
   if (!input.user) {
-    return { schema, loggedIn: false, changeBadge: false, updatedAt, updatedAtLabel }
+    return { schema, loggedIn: false, changeBadge: false, updatedAt, updatedAtLabel, updatedAtDate }
   }
 
   const term = input.currentTerm || null
@@ -225,6 +232,13 @@ export function buildWidgetPayload(input = {}) {
     .map((session) => classItem(session, courses, sectionTimes))
     .sort((a, b) => a.weekday - b.weekday || a.start - b.start)
 
+  // 下一周：只给 4x4 的多周切换用。学期末（超过 MAX_TERM_WEEK）或课表里没有该周时为空数组，
+  // 原生侧据此显示「下周暂无课程」，但按钮仍然可以切回本周
+  const nextWeekNo = week + 1
+  const nextWeekGrid = sessionsInWeek(schedule?.sessions, nextWeekNo)
+    .map((session) => classItem(session, courses, sectionTimes))
+    .sort((a, b) => a.weekday - b.weekday || a.start - b.start)
+
   return {
     schema,
     loggedIn: true,
@@ -234,6 +248,7 @@ export function buildWidgetPayload(input = {}) {
       : { changeBadge: Boolean(input.changeUnread > 0) && input.changeEnabled !== false }),
     updatedAt,
     updatedAtLabel,
+    updatedAtDate,
     account: { name: input.user.name || '' },
     term: { label: term?.label || '', week },
     weekAnchor: weekAnchorOf(now),
@@ -243,6 +258,7 @@ export function buildWidgetPayload(input = {}) {
     next: pickNextClass(weekSessions, courses, weekday, nowMinutes, sectionTimes),
     remainingToday,
     week: weekGrid,
+    nextWeek: { week: nextWeekNo, items: nextWeekGrid },
     messages: messageView(input.messages),
     notices: noticeView(input.portalNotices),
     grades: gradeView(input.grades, term)

@@ -20,6 +20,8 @@ public final class WidgetPayload {
     /** 课表变更未读：由 JS 与原生变更引擎写入，组件只读。 */
     public boolean changeBadge;
     public String updatedLabel = "";
+    /** updatedAtLabel 对应的本地日期（yyyy-MM-dd），用来把「更新于」算成相对时间；老 payload 为空。 */
+    public String updatedDate = "";
     public int termWeek;
     /** week[] 代表的那一周的周一（yyyy-MM-dd），用于判断快照是否已经跨周。 */
     public String weekAnchor = "";
@@ -29,6 +31,9 @@ public final class WidgetPayload {
     public ClassItem next;
     public final List<ClassItem> today = new ArrayList<>();
     public final List<WeekItem> week = new ArrayList<>();
+    /** 下一周的周次；0 = 未知（学期末或老 payload），此时 nextWeek 为空。 */
+    public int nextWeekNo;
+    public final List<WeekItem> nextWeek = new ArrayList<>();
 
     public static final class ClassItem {
         public String dayLabel = "";
@@ -77,6 +82,7 @@ public final class WidgetPayload {
             payload.scheduleLoaded = root.optBoolean("scheduleLoaded", false);
             payload.changeBadge = root.optBoolean("changeBadge", false);
             payload.updatedLabel = root.optString("updatedAtLabel", "");
+            payload.updatedDate = root.optString("updatedAtDate", "");
             payload.weekAnchor = root.optString("weekAnchor", "");
             payload.stale = root.optBoolean("stale", false);
 
@@ -100,25 +106,34 @@ public final class WidgetPayload {
 
             payload.remainingToday = root.optInt("remainingToday", 0);
 
-            JSONArray week = root.optJSONArray("week");
-            if (week != null) {
-                for (int i = 0; i < week.length(); i += 1) {
-                    JSONObject item = week.optJSONObject(i);
-                    if (item == null) continue;
-                    WeekItem entry = new WeekItem();
-                    entry.weekday = item.optInt("weekday", 0);
-                    entry.start = item.optInt("start", 0);
-                    entry.end = item.optInt("end", 0);
-                    entry.startTime = item.optString("startTime", "");
-                    entry.endTime = item.optString("endTime", "");
-                    entry.name = item.optString("name", "");
-                    entry.room = item.optString("room", "");
-                    payload.week.add(entry);
-                }
+            readWeeks(payload.week, root.optJSONArray("week"));
+
+            // 下一周：4x4 的「下周」页用；老 payload 没有这个对象，按钮退化为只读
+            JSONObject nextWeek = root.optJSONObject("nextWeek");
+            if (nextWeek != null) {
+                payload.nextWeekNo = nextWeek.optInt("week", 0);
+                readWeeks(payload.nextWeek, nextWeek.optJSONArray("items"));
             }
             return payload;
         } catch (Exception error) {
             return loggedOut();
+        }
+    }
+
+    private static void readWeeks(List<WeekItem> target, JSONArray array) {
+        if (target == null || array == null) return;
+        for (int i = 0; i < array.length(); i += 1) {
+            JSONObject item = array.optJSONObject(i);
+            if (item == null) continue;
+            WeekItem entry = new WeekItem();
+            entry.weekday = item.optInt("weekday", 0);
+            entry.start = item.optInt("start", 0);
+            entry.end = item.optInt("end", 0);
+            entry.startTime = item.optString("startTime", "");
+            entry.endTime = item.optString("endTime", "");
+            entry.name = item.optString("name", "");
+            entry.room = item.optString("room", "");
+            target.add(entry);
         }
     }
 
@@ -135,11 +150,13 @@ public final class WidgetPayload {
         return entry;
     }
 
-    /** 跨周降级：清空今日与下一节，只留 stale 标记，三个组件统一提示回 App 同步。 */
+    /** 跨周降级：清空今日、下一节与下一周，只留 stale 标记，三个组件统一提示回 App 同步。 */
     public void markStale() {
         stale = true;
         next = null;
         remainingToday = 0;
         today.clear();
+        nextWeekNo = 0;
+        nextWeek.clear();
     }
 }
