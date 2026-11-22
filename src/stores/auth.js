@@ -13,6 +13,7 @@ import {
 import { clearScheduleChange } from '../native/scheduleChangeBridge'
 import { clearCrashLog } from '../native/supportBridge'
 import { notifySessionExpired, setSessionExpiredHandler } from '../utils/sessionExpiry'
+import { setSessionBlockCheck } from '../utils/sessionState'
 import { clearDataCaches } from '../utils/dataCache'
 import { clearPortalCache } from '../utils/portalCache'
 
@@ -22,6 +23,11 @@ const SESSION_PENDING_RETRY_MS = 600
 // 连续多少次冷启动都读不出会话后，按不可用处理，避免永久停在离线快照
 const MAX_PENDING_FAILURES = 3
 const PENDING_FAILURES_KEY = 'jiaowu.session.pendingFailures'
+// 票据确认失效的时间点：冷启动时据此把快照当作只读缓存续上，而不是每次回登录页
+const EXPIRED_AT_KEY = 'jiaowu.session.expiredAt'
+const EXPIRED_REASON_KEY = 'jiaowu.session.expiredReason'
+// 只说「上次的课表还能看」的话，7 天足够；再久属过期处理，直接丢弃
+const READ_ONLY_TTL_MS = 7 * 24 * 60 * 60 * 1000
 // 静默换票的超时与失败冷却：避免弱网或票据失效时反复拉起隐藏页面。
 // 冷启动时 TLS 预检、CAS 跳转与教务首页加载都需要时间，6 秒容易误判
 const SILENT_RELOGIN_TIMEOUT_MS = 12000
@@ -52,6 +58,41 @@ function writePendingFailures(value) {
     else localStorage.setItem(PENDING_FAILURES_KEY, String(value))
   } catch (error) {
     // 存储不可用时按无计数处理，不影响本次恢复流程
+  }
+}
+
+function readExpiredAt() {
+  try {
+    return Number(localStorage.getItem(EXPIRED_AT_KEY)) || 0
+  } catch (error) {
+    return 0
+  }
+}
+
+function readExpiredReason() {
+  try {
+    return localStorage.getItem(EXPIRED_REASON_KEY) || null
+  } catch (error) {
+    return null
+  }
+}
+
+function writeExpiredFlag(reason) {
+  try {
+    localStorage.setItem(EXPIRED_AT_KEY, String(Date.now()))
+    if (reason) localStorage.setItem(EXPIRED_REASON_KEY, reason)
+    else localStorage.removeItem(EXPIRED_REASON_KEY)
+  } catch (error) {
+    // 存储不可用时只是失去跨启动的只读缓存，不影响当前界面的横幅
+  }
+}
+
+function clearExpiredFlag() {
+  try {
+    localStorage.removeItem(EXPIRED_AT_KEY)
+    localStorage.removeItem(EXPIRED_REASON_KEY)
+  } catch (error) {
+    // 同上
   }
 }
 
@@ -104,6 +145,12 @@ export const useAuthStore = defineStore('auth', () => {
   const justLoggedIn = ref(false)
   // 会话暂时不可用（网络/超时等可恢复原因）：保持登录态与已加载数据，等下一次重试
   const sessionSuspended = ref(false)
+  // 登录票据已确认失效（学校统一认证到期）：保留课表快照与缓存做只读展示，
+  // 只清凭据与敏感附件，等用户点横幅重新登录
+  const sessionExpired = ref(false)
+  const expiredReason = ref(null)
+  // api 层据此判断「只读模式」：直接查询 store 状态，避免两份副本漂移
+  setSessionBlockCheck(() => sessionExpired.value)
   const isLoggedIn = computed(() => Boolean(user.value))
   let bootstrapPromise = null
   let expiringPromise = null
@@ -141,6 +188,9 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     justLoggedIn.value = false
     sessionSuspended.value = false
+    sessionExpired.value = false
+    expiredReason.value = null
+    clearExpiredFlag()
     writePendingFailures(0)
   }
 
@@ -173,6 +223,9 @@ export const useAuthStore = defineStore('auth', () => {
         setAcademicApi(zf)
         user.value = result.profile
         sessionSuspended.value = false
+        sessionExpired.value = false
+        expiredReason.value = null
+        clearExpiredFlag()
         writePendingFailures(0)
         silentCooldownUntil = 0
         return { ok: true, reason: 'ok' }
@@ -193,11 +246,48 @@ export const useAuthStore = defineStore('auth', () => {
     sessionSuspended.value = true
   }
 
+  // 票据确定不可续期（学校统一认证到期）：进入只读模式。
+  // 只清凭据与敏感附件（附件里可能有别人材料），课表快照与个人缓存保留，
+  // 用户仍能翻上次的课表/消息，再从横幅一键重新登录。
+  async function markSessionExpired(reason) {
+    if (manualLogout) return
+    sessionExpired.value = true
+    expiredReason.value = reason || null
+    sessionSuspended.value = false
+    writeExpiredFlag(reason || null)
+    try {
+      await clearAuthCookies()
+    } catch (error) {
+      // 凭据清理失败不阻断只读展示，下次启动仍会再试
+    }
+    try {
+      await Promise.all([clearAuthDownloads(), clearPublicDownloads()])
+    } catch (error) {
+      // 附件清理失败同样不影响只读模式
+    }
+    resetAcademicApi()
+    writePendingFailures(0)
+    if (user.value) return
+    // 冷启动恢复失败时 user 还是空的：用快照资料撑起只读界面
+    const zf = new ZfAcademicApi()
+    const cached = zf.applySnapshot()
+    if (!cached) return
+    setAcademicApi(zf)
+    user.value = cached
+    try {
+      const { useAcademicStore } = await import('./academic')
+      useAcademicStore().applySnapshotSchedule(zf.snapshotSchedule())
+    } catch (error) {
+      // 快照课表应用失败时保持空态，不影响只读模式本身
+    }
+  }
+
   // 只有票据明确失效、用户主动退出或校方拒绝时才清空本机会话；
   // 网络、超时等暂时失败保留 Cookie 与快照，避免一次弱网就逼用户重新登录
   async function clearSessionOrKeepRetry(reason) {
+    if (manualLogout) return
     if (DEFINITIVE_SILENT_FAILURES.has(reason)) {
-      await clearLocalSession()
+      await markSessionExpired(reason)
       return
     }
     markSessionUnavailable()
@@ -222,6 +312,29 @@ export const useAuthStore = defineStore('auth', () => {
   async function restoreSession() {
     try {
       let state = await loadAuthCookies()
+      // 上次已确认票据失效：用快照续上只读界面（最多保留 7 天），
+      // 而不是每次冷启动都直接甩回登录页
+      const expiredAt = readExpiredAt()
+      if (expiredAt && !state?.restored && !state?.pending) {
+        if (Date.now() - expiredAt <= READ_ONLY_TTL_MS) {
+          const zf = new ZfAcademicApi()
+          const cached = zf.applySnapshot()
+          if (cached) {
+            setAcademicApi(zf)
+            user.value = cached
+            sessionExpired.value = true
+            expiredReason.value = readExpiredReason()
+            const { useAcademicStore } = await import('./academic')
+            useAcademicStore().applySnapshotSchedule(zf.snapshotSchedule())
+            writePendingFailures(0)
+            return true
+          }
+        } else {
+          // 超过只读保留期：丢弃快照，回到全新未登录
+          clearExpiredFlag()
+          clearScheduleSnapshot()
+        }
+      }
       if (state?.pending) {
         // 连续多次冷启动都读不出会话时不再沿用快照，交给用户重新登录
         const failures = readPendingFailures() + 1
@@ -344,15 +457,19 @@ export const useAuthStore = defineStore('auth', () => {
   async function loginWithSso() {
     loading.value = true
     try {
-      clearScheduleSnapshot()
-      clearDataCaches()
       const zf = new ZfAcademicApi()
       const profile = await zf.loginWithSso()
+      // 登录成功后才丢弃旧快照与缓存：失败或取消时保留只读数据，用户不会白跑一趟
+      clearScheduleSnapshot()
+      clearDataCaches()
       setAcademicApi(zf)
       await resetAcademic()
       user.value = profile
       justLoggedIn.value = true
       sessionSuspended.value = false
+      sessionExpired.value = false
+      expiredReason.value = null
+      clearExpiredFlag()
       writePendingFailures(0)
       // 用户已主动完成登录，恢复自动重登资格
       manualLogout = false
@@ -412,6 +529,8 @@ export const useAuthStore = defineStore('auth', () => {
     restoring,
     isLoggedIn,
     sessionSuspended,
+    sessionExpired,
+    expiredReason,
     bootstrap,
     loginWithSso,
     logout,

@@ -29,6 +29,9 @@
         默认开启，可随时关闭；开启后由应用约每 30
         分钟在后台维持一次教务会话，减少长时间不打开后的重新登录与短信验证。系统省电策略可能造成延迟，学校会话到期后仍需重新登录。
       </p>
+      <p v-if="keepAliveEnabled && keepAliveSummary" class="setting-note setting-note--status">
+        {{ keepAliveSummary }}
+      </p>
     </section>
 
     <p class="footnote tiny">退出登录请在「我的」页底部操作。</p>
@@ -115,7 +118,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { App as CapApp } from '@capacitor/app'
 import {
   getBatteryOptimizationState,
@@ -143,6 +146,8 @@ import ConsentGate from '../components/ConsentGate.vue'
 const toast = ref('')
 const keepAliveOpen = ref(false)
 const keepAliveEnabled = ref(false)
+// 保持登录的最近一次执行情况：原生侧持久化，冷启动后仍能看到上次结果
+const keepAliveState = ref(null)
 // null 表示还没查到，避免未就绪时误显示「去允许」
 const batteryExempted = ref(null)
 const widgets = ref([])
@@ -177,12 +182,48 @@ function showToast(message) {
 async function loadKeepAlive() {
   try {
     const state = await getKeepAliveState()
+    keepAliveState.value = state || null
     keepAliveEnabled.value = Boolean(state?.enabled)
   } catch (error) {
+    keepAliveState.value = null
     keepAliveEnabled.value = false
   }
   await loadBatteryState()
 }
+
+// 原生结果代号只用来内部判断，展示时换成用户能看懂的说法
+const KEEP_ALIVE_RESULT_LABELS = {
+  ALIVE: '会话有效',
+  EXPIRED: '会话已失效',
+  FAILED: '临时失败，会自动重试'
+}
+
+function formatStamp(value) {
+  const stamp = Number(value)
+  if (!stamp) return ''
+  const date = new Date(stamp)
+  if (Number.isNaN(date.getTime())) return ''
+  const now = new Date()
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mm = String(date.getMinutes()).padStart(2, '0')
+  // 同一天只显示时分，跨天补上月日，避免每次都读一长串
+  if (date.toDateString() === now.toDateString()) return `${hh}:${mm}`
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${hh}:${mm}`
+}
+
+const keepAliveSummary = computed(() => {
+  const state = keepAliveState.value
+  if (!state) return ''
+  const result = KEEP_ALIVE_RESULT_LABELS[state.lastResult] || ''
+  const parts = []
+  if (state.lastCheckAt) {
+    parts.push(`上次保活 ${formatStamp(state.lastCheckAt)}${result ? `（${result}）` : ''}`)
+  } else {
+    parts.push('尚未执行过保活')
+  }
+  if (state.nextCheckAt) parts.push(`下次约 ${formatStamp(state.nextCheckAt)}`)
+  return parts.join(' · ')
+})
 
 async function loadBatteryState() {
   try {
@@ -218,6 +259,7 @@ async function toggleKeepAlive() {
 async function applyKeepAlive(enabled) {
   try {
     const state = await setKeepAliveNative(enabled)
+    keepAliveState.value = state || null
     keepAliveEnabled.value = Boolean(state?.enabled)
     // 手动开启视为同意说明，手动关闭记录为主动拒绝，默认开启策略不再自动恢复
     if (enabled) acceptKeepAliveConsent()
@@ -348,6 +390,12 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-tertiary);
+}
+
+/* 上次/下次保活时间：比说明文字更「实时」，用次要前景色区分 */
+.setting-note--status {
+  padding-top: 0;
+  color: var(--text-secondary);
 }
 
 .switch {

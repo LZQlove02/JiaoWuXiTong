@@ -41,6 +41,8 @@ public final class SessionKeepAliveScheduler {
             } else {
                 manager.set(AlarmManager.RTC_WAKEUP, triggerAt, pending);
             }
+            // 只有真正排上才记录下次触发时间，避免展示一个并不存在的排程
+            SessionKeepAliveStore.setNextCheckAt(app, triggerAt);
         } catch (RuntimeException ignored) {
             // 个别 ROM 限制后台闹钟时静默失败，下一次打开 App 会重新排程
         }
@@ -49,9 +51,12 @@ public final class SessionKeepAliveScheduler {
     public static void cancel(Context context) {
         Context app = context.getApplicationContext();
         AlarmManager manager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
-        if (manager == null) return;
-        PendingIntent pending = pending(app);
-        if (pending != null) manager.cancel(pending);
+        if (manager != null) {
+            PendingIntent pending = pending(app);
+            if (pending != null) manager.cancel(pending);
+        }
+        // 取消后不再有排程：只清 nextCheckAt，保留 lastCheckAt / lastResult 供设置页展示历史
+        SessionKeepAliveStore.setNextCheckAt(app, 0L);
     }
 
     /** 单测用：下一次触发时间固定为 30 分钟后。 */

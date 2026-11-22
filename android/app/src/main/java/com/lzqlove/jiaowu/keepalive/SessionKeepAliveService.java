@@ -55,6 +55,16 @@ public final class SessionKeepAliveService {
     }
 
     static Result checkNow(Context context) {
+        // 先记开始时间：一次请求最长约 9 秒，记录「发起检查」的时刻更符合展示语义
+        long checkedAt = System.currentTimeMillis();
+        Result result = runCheck(context);
+        // 统一在出口记账：Cookie 为空、网络异常、正常判定等所有返回分支都不会漏记，
+        // 以后新增分支也不需要再改这里
+        SessionKeepAliveStore.recordCheckResult(context, checkedAt, result.name());
+        return result;
+    }
+
+    private static Result runCheck(Context context) {
         String cookie = AuthCookieStore.load(context);
         if (cookie == null || cookie.isEmpty()) {
             // 区分两种 null：本机确实没有会话 → 取消闹钟；

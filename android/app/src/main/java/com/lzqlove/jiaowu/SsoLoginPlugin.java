@@ -20,6 +20,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.lzqlove.jiaowu.keepalive.SessionKeepAliveScheduler;
 import com.lzqlove.jiaowu.keepalive.SessionKeepAliveStore;
 
+import org.json.JSONObject;
+
 @CapacitorPlugin(name = "SsoLogin")
 public class SsoLoginPlugin extends Plugin {
 
@@ -39,6 +41,8 @@ public class SsoLoginPlugin extends Plugin {
         SsoCookieCleaner.expireZfjw(manager);
         manager.flush();
         SessionKeepAliveScheduler.cancel(getContext());
+        // 明确退出登录：上一个会话的保活历史不再适用于新账号，一并清掉观测字段
+        SessionKeepAliveStore.clear(getContext());
         call.resolve();
     }
 
@@ -151,6 +155,13 @@ public class SsoLoginPlugin extends Plugin {
         result.put("enabled", enabled);
         result.put("active", enabled && cookie != null && !cookie.isEmpty());
         result.put("intervalMinutes", 30);
+        // 可观测字段显式放 JSONObject.NULL 保证键存在：前端不需要区分「字段缺失」和「从未保活」
+        long lastCheckAt = SessionKeepAliveStore.getLastCheckAt(getContext());
+        String lastResult = SessionKeepAliveStore.getLastResult(getContext());
+        long nextCheckAt = SessionKeepAliveStore.getNextCheckAt(getContext());
+        result.put("lastCheckAt", lastCheckAt > 0L ? Long.valueOf(lastCheckAt) : JSONObject.NULL);
+        result.put("lastResult", lastResult == null ? JSONObject.NULL : lastResult);
+        result.put("nextCheckAt", nextCheckAt > 0L ? Long.valueOf(nextCheckAt) : JSONObject.NULL);
         return result;
     }
 

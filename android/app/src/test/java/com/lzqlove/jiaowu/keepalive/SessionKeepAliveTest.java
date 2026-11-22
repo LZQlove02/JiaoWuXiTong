@@ -42,4 +42,13 @@ public class SessionKeepAliveTest {
         long now = 1762056000000L;
         assertEquals(now + 30L * 60 * 1000, SessionKeepAliveScheduler.nextTrigger(now));
     }
+
+    @Test
+    public void nextTriggerUsesProvidedNowAndStaysInTheFuture() {
+        // 单次闹钟链按传入时刻推导，不依赖 System.currentTimeMillis，便于单测
+        long now = 1000L;
+        long next = SessionKeepAliveScheduler.nextTrigger(now);
+        assertTrue(next > now);
+        assertEquals(now + SessionKeepAliveScheduler.INTERVAL_MS, next);
+    }
 }

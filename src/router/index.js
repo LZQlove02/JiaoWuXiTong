@@ -137,7 +137,8 @@ router.beforeEach(async (to) => {
   if (auth.restoring) await auth.bootstrap()
   if (to.meta.guest) return true
   if (to.meta.public) {
-    return auth.isLoggedIn ? '/' : true
+    // 票据过期后要允许回登录页重新认证；正常登录态下仍把登录页挡回首页
+    return auth.isLoggedIn && !auth.sessionExpired ? '/' : true
   }
   if (!auth.isLoggedIn) {
     return { path: '/login', query: { redirect: to.fullPath } }

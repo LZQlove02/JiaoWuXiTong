@@ -64,7 +64,7 @@ describe('退出登录的本机数据清理', () => {
     expect(clearDataCaches).toHaveBeenCalled()
   })
 
-  it('冷启动恢复判定会话失效时执行完整本机清理', async () => {
+  it('冷启动判定票据失效时只清凭据与附件，保留只读缓存', async () => {
     const nativeHttp = await import('../src/api/nativeHttp')
     const { ZfAcademicApi } = await import('../src/api/zf')
     nativeHttp.loadAuthCookies.mockResolvedValueOnce({ restored: true })
@@ -86,13 +86,16 @@ describe('退出登录的本机数据清理', () => {
     const { clearPortalCache } = await import('../src/utils/portalCache')
     const { clearDataCaches } = await import('../src/utils/dataCache')
 
+    // 票据确实失效：凭据与可能含他人材料的附件必须清掉
     expect(nativeHttp.clearAuthCookies).toHaveBeenCalled()
-    expect(clearScheduleChange).toHaveBeenCalled()
-    expect(clearScheduleSnapshot).toHaveBeenCalled()
-    expect(clearDataCaches).toHaveBeenCalled()
-    expect(clearPortalCache).toHaveBeenCalled()
     expect(nativeHttp.clearAuthDownloads).toHaveBeenCalled()
     expect(nativeHttp.clearPublicDownloads).toHaveBeenCalled()
+    // 但课表快照与个人缓存要留着：用户还能看上次的课表，再从横幅重新登录
+    expect(clearScheduleChange).not.toHaveBeenCalled()
+    expect(clearScheduleSnapshot).not.toHaveBeenCalled()
+    expect(clearDataCaches).not.toHaveBeenCalled()
+    expect(clearPortalCache).not.toHaveBeenCalled()
+    expect(auth.sessionExpired).toBe(true)
   })
 
   it('静默换票遇到网络失败时保留本机会话，等待下次重试', async () => {

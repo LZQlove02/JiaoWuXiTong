@@ -1,5 +1,6 @@
 import { ZfAcademicApi } from './zf'
 import { notifySessionExpired } from '../utils/sessionExpiry'
+import { isSessionBlocked } from '../utils/sessionState'
 
 // 个人教务数据统一来自学校统一认证后的教务系统；
 // 公开内容（通知/办事指南/校历）走 api/public.js。
@@ -18,6 +19,9 @@ export function resetAcademicApi() {
 // 不再依赖各个页面/仓库自行处理，避免用户卡在「所有页面都报会话失效」。
 function guarded(method) {
   return async (...args) => {
+    // 票据已确认失效、界面处于只读模式：不再带着无效 Cookie 打网络，
+    // 否则每个页面都会各自报一次「会话失效」，也会白白触发静默换票
+    if (isSessionBlocked()) throw new Error('登录已过期，请重新登录')
     try {
       return await target[method](...args)
     } catch (error) {

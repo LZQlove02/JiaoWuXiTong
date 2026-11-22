@@ -113,18 +113,22 @@ describe('会话暂时不可用时保留登录态', () => {
     expect(nativeHttp.clearPublicDownloads).not.toHaveBeenCalled()
   })
 
-  it('票据明确失效时仍然清空本机会话并回到未登录', async () => {
+  it('票据明确失效时保留只读缓存，只清凭据', async () => {
     state.reloginResults = [{ ok: false, reason: 'login-form' }]
     const auth = await bootstrapWithSnapshot()
 
-    await vi.waitFor(() => expect(auth.isLoggedIn).toBe(false))
+    await vi.waitFor(() => expect(auth.sessionExpired).toBe(true))
 
     const nativeHttp = await import('../src/api/nativeHttp')
     const { clearScheduleSnapshot } = await import('../src/api/zf')
 
+    // 仍算「已登录」：界面用快照维持只读展示，横幅引导重新登录
+    expect(auth.isLoggedIn).toBe(true)
     expect(auth.sessionSuspended).toBe(false)
+    expect(auth.expiredReason).toBe('login-form')
     expect(nativeHttp.clearAuthCookies).toHaveBeenCalled()
-    expect(clearScheduleSnapshot).toHaveBeenCalled()
+    expect(clearScheduleSnapshot).not.toHaveBeenCalled()
+    expect(academic.reset).not.toHaveBeenCalled()
   })
 
   it('手动重试成功后恢复登录态并刷新实时数据', async () => {

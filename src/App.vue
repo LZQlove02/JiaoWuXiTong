@@ -23,6 +23,12 @@
     <p class="boot-text">正在恢复登录状态…</p>
   </div>
   <div v-else class="app-shell">
+    <!-- 票据确认失效：数据仍在，顶部横幅说明原因并给一键重新登录，而不是直接踢回登录页 -->
+    <SessionExpiredBanner
+      v-if="auth.sessionExpired && auth.isLoggedIn"
+      :reason="auth.expiredReason"
+      @relogin="onReloginExpired"
+    />
     <main ref="mainRef" class="app-main">
       <router-view :key="$route.fullPath" />
     </main>
@@ -66,6 +72,7 @@ import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import TabBar from './components/TabBar.vue'
 import ConsentGate from './components/ConsentGate.vue'
+import SessionExpiredBanner from './components/SessionExpiredBanner.vue'
 import UpdateDialog from './components/UpdateDialog.vue'
 import { useAuthStore } from './stores/auth'
 import { useAcademicStore } from './stores/academic'
@@ -299,6 +306,11 @@ async function onRetrySession() {
   }
 }
 
+// 票据已确认失效：只读数据仍可浏览，用户主动去登录页重新认证
+function onReloginExpired() {
+  router.push('/login')
+}
+
 // 原生能力延迟到「已同意」之后初始化：未同意时不写组件、不注册深链与返回键监听
 async function setupNative() {
   if (nativeReady) return
@@ -311,6 +323,8 @@ async function setupNative() {
   changes.listen()
   CapApp.addListener('appStateChange', ({ isActive }) => {
     if (!isActive) return
+    // 票据已确认失效时是只读浏览，回前台不再自动打网络，避免每页各报一次「会话失效」
+    if (auth.sessionExpired) return
     changes.refresh()
     // 会话暂时不可用时，回到前台立刻再换一次票，弱网恢复后用户无需手动点重试
     if (auth.sessionSuspended) auth.retrySession().catch(() => {})
