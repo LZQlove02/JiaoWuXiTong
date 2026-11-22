@@ -29,9 +29,10 @@ public final class WidgetUpdater {
         if (WidgetScheduleDeriver.isStale(payload, Calendar.getInstance())) {
             payload.markStale();
         }
-        // 未登录 / 课表未加载 / 跨周时把 4x4 的周次页拨回本周：
-        // 否则重新同步后组件会直接停在上次点的「下周」页，用户会以为课表出错
-        if (!WidgetWeekDisplay.canSwitch(payload)) {
+        // 跨周（stale）时把 4x4 的周次页拨回本周：上一周的 week[] 已经不可信，
+        // 再停在下周页只会显示错数据。未登录 / 未同步不动它——那些状态整块降级成提示，
+        // 用户重新登录后仍能看到上次选的页。
+        if (payload.stale) {
             for (int id : ids(app, manager, WeekWidgetProvider.class)) {
                 WidgetStore.writeWeekOffset(app, id, WidgetWeekDisplay.THIS_WEEK);
             }
@@ -82,6 +83,17 @@ public final class WidgetUpdater {
         String style = WidgetStore.readStyle(app, id);
         return WidgetTheme.resolve(app, themeName, style)
             .withTextColor(WidgetStore.readTextColor(app, id));
+    }
+
+    // 三档组件里有任何一个实例还在桌面：闹钟链（每天重算 / 每小时重绘）才需要保留。
+    // onDisabled 是按 provider 触发的，只凭它判断会把另外两档也在用的闹钟一并掐掉。
+    public static boolean hasAnyWidget(Context context) {
+        Context app = context.getApplicationContext();
+        AppWidgetManager manager = AppWidgetManager.getInstance(app);
+        if (manager == null) return false;
+        return ids(app, manager, NextClassWidgetProvider.class).length > 0
+            || ids(app, manager, TodayWidgetProvider.class).length > 0
+            || ids(app, manager, WeekWidgetProvider.class).length > 0;
     }
 
     private static int[] ids(Context app, AppWidgetManager manager, Class<?> provider) {

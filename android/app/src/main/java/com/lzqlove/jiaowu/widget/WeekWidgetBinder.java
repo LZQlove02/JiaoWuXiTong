@@ -18,8 +18,9 @@ import com.lzqlove.jiaowu.R;
 final class WeekWidgetBinder {
 
     // 与 widget_week.xml 对应：根布局上下内边距 + 标题行 + 网格上方间距（dp）。
-    // 标题行加了「下周 ›」后从 16dp 长到 20dp，46 → 50；改布局必须同步这里。
-    private static final int CHROME_DP = 50;
+    // 标题行加了「下周 ›」后从 16dp 长到 24dp（minHeight 保证点击区），46 → 54；
+    // 改布局必须同步这里，否则位图会被 fitCenter 缩出细边。
+    private static final int CHROME_DP = 54;
     // 根布局左右各 10dp，位图宽度要扣掉
     private static final int H_PADDING_DP = 20;
 

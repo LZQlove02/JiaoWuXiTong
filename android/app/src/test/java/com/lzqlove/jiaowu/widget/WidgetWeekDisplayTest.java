@@ -67,7 +67,8 @@ public class WidgetWeekDisplayTest {
     public void nextWeekHasNoTodayHighlight() {
         assertEquals(3, WidgetWeekDisplay.todayWeekday(WidgetWeekDisplay.THIS_WEEK, 3));
         assertEquals(0, WidgetWeekDisplay.todayWeekday(WidgetWeekDisplay.NEXT_WEEK, 3));
-        assertEquals(0, WidgetWeekDisplay.todayWeekday(9, 3));
+        // 脏数据（非 0/1）按本周处理，高亮照常
+        assertEquals(3, WidgetWeekDisplay.todayWeekday(9, 3));
     }
 
     @Test

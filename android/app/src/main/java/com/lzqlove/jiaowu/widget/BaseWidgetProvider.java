@@ -27,7 +27,9 @@ public abstract class BaseWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onDisabled(Context context) {
-        // 最后一个组件被移除：不再需要每天唤醒，也不需要每小时重绘
+        // onDisabled 是「这个 provider 的最后一个实例被删」时触发，另外两档可能还在用闹钟：
+        // 只有三档都没有实例了才停掉每天重算与每小时重绘
+        if (WidgetUpdater.hasAnyWidget(context)) return;
         WidgetAlarmReceiver.cancel(context);
         WidgetTimeTickReceiver.cancel(context);
     }

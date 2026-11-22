@@ -1,11 +1,9 @@
 package com.lzqlove.jiaowu.widget;
 
-import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -42,12 +40,7 @@ public class WidgetAlarmReceiver extends BroadcastReceiver {
 
     // 排下一次 00:05；重复闹钟由系统自己往后滚，这里只在首次/开机时调用
     static void schedule(Context context) {
-        AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (manager == null) return;
-        Intent intent = new Intent(context, WidgetAlarmReceiver.class);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pending = PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags);
+        PendingIntent pending = WidgetAlarms.pending(context, WidgetAlarmReceiver.class, REQUEST_CODE);
         if (pending == null) return;
 
         Calendar next = Calendar.getInstance();
@@ -58,27 +51,11 @@ public class WidgetAlarmReceiver extends BroadcastReceiver {
         if (next.getTimeInMillis() <= System.currentTimeMillis()) {
             next.add(Calendar.DAY_OF_MONTH, 1);
         }
-        try {
-            // 单次闹钟：setInexactRepeating 会给到最长 18h 的窗口，可能拖到第二天下午才响。
-            // 这里用 setAndAllowWhileIdle，窗口通常只有几分钟；触发后 onReceive 会再排下一天。
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next.getTimeInMillis(), pending);
-            } else {
-                manager.set(AlarmManager.RTC_WAKEUP, next.getTimeInMillis(), pending);
-            }
-        } catch (RuntimeException error) {
-            Log.w(TAG, "跨天闹钟排程失败", error);
-        }
+        WidgetAlarms.setOnce(context, pending, next.getTimeInMillis(), "跨天闹钟排程失败");
     }
 
     static void cancel(Context context) {
-        AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (manager == null) return;
-        Intent intent = new Intent(context, WidgetAlarmReceiver.class);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pending = PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags);
-        if (pending != null) manager.cancel(pending);
+        WidgetAlarms.cancel(context, WidgetAlarms.pending(context, WidgetAlarmReceiver.class, REQUEST_CODE));
     }
 
     private static void recompute(Context app) {

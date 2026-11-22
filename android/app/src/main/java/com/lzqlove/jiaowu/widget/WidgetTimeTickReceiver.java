@@ -1,12 +1,9 @@
 package com.lzqlove.jiaowu.widget;
 
-import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
-import android.util.Log;
 
 import java.util.Calendar;
 
@@ -20,7 +17,6 @@ import java.util.Calendar;
  */
 public class WidgetTimeTickReceiver extends BroadcastReceiver {
 
-    private static final String TAG = "JiaowuWidget";
     private static final int REQUEST_CODE = 1002;
     private static final int TICK_MINUTE = 2;
 
@@ -31,14 +27,11 @@ public class WidgetTimeTickReceiver extends BroadcastReceiver {
         WidgetUpdater.refreshAll(app);
     }
 
-    // 排下一次「下一个整点 + 2 分钟」；单次闹钟链，触发后由 onReceive 续排
+    // 排下一次「下一个整点 + 2 分钟」；单次闹钟链，触发后由 onReceive 续排。
+    // 桌面一个实例都没有（例如开机后用户把组件全删了）就不排，避免空转唤醒。
     static void schedule(Context context) {
-        AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (manager == null) return;
-        Intent intent = new Intent(context, WidgetTimeTickReceiver.class);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pending = PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags);
+        if (!WidgetUpdater.hasAnyWidget(context)) return;
+        PendingIntent pending = WidgetAlarms.pending(context, WidgetTimeTickReceiver.class, REQUEST_CODE);
         if (pending == null) return;
 
         Calendar next = Calendar.getInstance();
@@ -48,24 +41,10 @@ public class WidgetTimeTickReceiver extends BroadcastReceiver {
         if (next.getTimeInMillis() <= System.currentTimeMillis()) {
             next.add(Calendar.HOUR_OF_DAY, 1);
         }
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next.getTimeInMillis(), pending);
-            } else {
-                manager.set(AlarmManager.RTC_WAKEUP, next.getTimeInMillis(), pending);
-            }
-        } catch (RuntimeException error) {
-            Log.w(TAG, "每小时刷新闹钟排程失败", error);
-        }
+        WidgetAlarms.setOnce(context, pending, next.getTimeInMillis(), "每小时刷新闹钟排程失败");
     }
 
     static void cancel(Context context) {
-        AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (manager == null) return;
-        Intent intent = new Intent(context, WidgetTimeTickReceiver.class);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pending = PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags);
-        if (pending != null) manager.cancel(pending);
+        WidgetAlarms.cancel(context, WidgetAlarms.pending(context, WidgetTimeTickReceiver.class, REQUEST_CODE));
     }
 }

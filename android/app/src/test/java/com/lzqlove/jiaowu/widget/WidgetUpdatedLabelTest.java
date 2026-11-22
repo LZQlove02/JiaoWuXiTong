@@ -13,7 +13,11 @@ import java.util.GregorianCalendar;
 public class WidgetUpdatedLabelTest {
 
     private static Calendar at(int year, int month, int day, int hour, int minute) {
-        return new GregorianCalendar(year, month - 1, day, hour, minute, 0);
+        return at(year, month, day, hour, minute, 0);
+    }
+
+    private static Calendar at(int year, int month, int day, int hour, int minute, int second) {
+        return new GregorianCalendar(year, month - 1, day, hour, minute, second);
     }
 
     @Test
@@ -33,15 +37,30 @@ public class WidgetUpdatedLabelTest {
 
     @Test
     public void invalidClockFallsBackToRawValue() {
-        WidgetUpdatedLabel.Label label = WidgetUpdatedLabel.parse("2026-11-22", "8:05", at(2026, 11, 22, 20, 9));
+        WidgetUpdatedLabel.Label label = WidgetUpdatedLabel.parse("2026-11-22", "19:60", at(2026, 11, 22, 20, 9));
         assertEquals(WidgetUpdatedLabel.KIND_UNKNOWN, label.kind);
-        assertEquals("8:05", label.clock);
+        assertEquals("19:60", label.clock);
     }
 
     @Test
     public void underOneMinuteIsJustNow() {
+        // 同一分钟（差值 0 秒）
         assertEquals(WidgetUpdatedLabel.KIND_JUST_NOW,
-            WidgetUpdatedLabel.parse("2026-11-22", "20:08", at(2026, 11, 22, 20, 9)).kind);
+            WidgetUpdatedLabel.parse("2026-11-22", "20:09", at(2026, 11, 22, 20, 9)).kind);
+    }
+
+    @Test
+    public void fiftyNineSecondsIsStillJustNow() {
+        assertEquals(WidgetUpdatedLabel.KIND_JUST_NOW,
+            WidgetUpdatedLabel.parse("2026-11-22", "20:09", at(2026, 11, 22, 20, 9, 59)).kind);
+    }
+
+    @Test
+    public void exactlyOneMinuteCountsMinutes() {
+        WidgetUpdatedLabel.Label label =
+            WidgetUpdatedLabel.parse("2026-11-22", "20:09", at(2026, 11, 22, 20, 10));
+        assertEquals(WidgetUpdatedLabel.KIND_MINUTES, label.kind);
+        assertEquals(1, label.minutes);
     }
 
     @Test
@@ -81,11 +100,19 @@ public class WidgetUpdatedLabelTest {
 
     @Test
     public void lastYearCarriesTheYear() {
-        WidgetUpdatedLabel.Label label = WidgetUpdatedLabel.parse("2025-12-31", "23:50", at(2026, 1, 1, 9, 0));
+        // 跨年但不是「昨天」：2025-12-31 相对 2026-01-10 属于去年，必须带年份
+        WidgetUpdatedLabel.Label label = WidgetUpdatedLabel.parse("2025-12-31", "23:50", at(2026, 1, 10, 9, 0));
         assertEquals(WidgetUpdatedLabel.KIND_DATE_YEAR, label.kind);
         assertEquals(2025, label.year);
         assertEquals(12, label.month);
         assertEquals(31, label.day);
+    }
+
+    @Test
+    public void newYearEveIsYesterdayNotLastYear() {
+        // 反过来钉住「昨天」优先于「跨年」：2025-12-31 23:50 在 2026-01-01 09:00 眼里就是昨天
+        assertEquals(WidgetUpdatedLabel.KIND_YESTERDAY,
+            WidgetUpdatedLabel.parse("2025-12-31", "23:50", at(2026, 1, 1, 9, 0)).kind);
     }
 
     @Test

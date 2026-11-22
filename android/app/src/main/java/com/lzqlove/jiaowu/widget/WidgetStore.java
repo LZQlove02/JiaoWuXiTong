@@ -147,11 +147,15 @@ public final class WidgetStore {
     }
 
     public static void writeWeekOffset(Context context, int appWidgetId, int offset) {
-        prefs(context).edit().putInt(weekOffsetKey(appWidgetId), offset == 1 ? 1 : 0).apply();
+        int value = offset == WidgetWeekDisplay.NEXT_WEEK
+            ? WidgetWeekDisplay.NEXT_WEEK
+            : WidgetWeekDisplay.THIS_WEEK;
+        prefs(context).edit().putInt(weekOffsetKey(appWidgetId), value).apply();
     }
 
     public static int readWeekOffset(Context context, int appWidgetId) {
-        return prefs(context).getInt(weekOffsetKey(appWidgetId), 0) == 1 ? 1 : 0;
+        return WidgetWeekDisplay.normalize(
+            prefs(context).getInt(weekOffsetKey(appWidgetId), WidgetWeekDisplay.THIS_WEEK));
     }
 
     // 文字颜色按组件实例保存，空串表示跟随主题（自动）

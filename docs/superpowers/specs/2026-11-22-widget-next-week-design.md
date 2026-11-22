@@ -92,7 +92,7 @@ static int weekNo(WidgetPayload payload, int offset)                           /
 
 三个尺寸共用同一个格式化方法；2×2 的 `widget_updated` 已有 `maxLines=1 + ellipsize=end`，放不下时按原有规则截断。
 
-刷新节拍：新增 `WidgetTimeTickReceiver`（requestCode `1002`，单次闹钟链，目标时刻固定为「下一个整点 + 2 分钟」），到点只调用 `WidgetUpdater.refreshAll()` 重画文案，**不联网、不写 payload**，然后排下一次。排程挂在 `BaseWidgetProvider.onUpdate / onEnabled` 与开机广播上；`onDisabled`（最后一个组件被移除）时取消。Doze 下闹钟可能被推迟，最坏情况下「12 分钟前」会晚一小时才变成「今天 19:58」——这是省电与准确度之间的取舍，不提高频率。
+刷新节拍：新增 `WidgetTimeTickReceiver`（requestCode `1002`，单次闹钟链，目标时刻固定为「下一个整点 + 2 分钟」），到点只调用 `WidgetUpdater.refreshAll()` 重画文案，**不联网、不写 payload**，然后排下一次。排程挂在 `BaseWidgetProvider.onUpdate / onEnabled` 与开机广播上；`onDisabled` 是**按 provider** 触发的，所以取消前要先确认三档组件都没有实例了（`WidgetUpdater.hasAnyWidget()`），否则删掉一个尺寸会把另外两档的闹钟一起掐掉；桌面一个实例都没有时也不排新闹钟。Doze 下闹钟可能被推迟，最坏情况下「12 分钟前」会晚一小时才变成「今天 19:58」——这是省电与准确度之间的取舍，不提高频率。
 
 ### 5. 边界与降级
 
@@ -114,8 +114,8 @@ static int weekNo(WidgetPayload payload, int offset)                           /
 ### 7. 文档
 
 - `docs/plan/小组件执行方案.md` §7.3 增加「两周切换」与「更新时间格式」两条，并在 §7.1/§7.2 的「更新于」行同步新口径。
-- `CHANGELOG.md` 的 `[Unreleased]` 增记本次新增与变更。
-- 本次不新增 4×4 视觉预览稿（样式档位未变），只更新方案文档与 CHANGELOG。
+- `CHANGELOG.md` 当前版本段（2.2.2）的「### 新增」增记本次新增与变更。
+- 不新增 4×4 视觉预览稿（样式档位未变）；实现时顺手把既有 `docs/previews/widget-4x4-glass-preview.html` 的标题行与「更新于」文案同步成新版（只改文案与按钮，不加样式档位）。
 
 ## 验收
 
