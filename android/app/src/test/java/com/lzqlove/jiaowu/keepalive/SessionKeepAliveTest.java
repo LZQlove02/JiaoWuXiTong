@@ -74,4 +74,23 @@ public class SessionKeepAliveTest {
         assertEquals(SessionKeepAliveScheduler.nextTrigger(now),
                 SessionKeepAliveScheduler.nextTrigger(now, false));
     }
+
+    @Test
+    public void topsUpOnlyWhenLastCheckIsStale() {
+        long now = 1762056000000L;
+        long threshold = SessionKeepAliveService.TOP_UP_MIN_INTERVAL_MS;
+        // 从未检查过（lastCheckAt=0）时补一次
+        assertTrue(SessionKeepAliveService.shouldTopUp(now, 0L, false, threshold));
+        // 刚好到阈值补一次
+        assertTrue(SessionKeepAliveService.shouldTopUp(now, now - threshold, false, threshold));
+        // 比阈值新就不补，交给闹钟
+        assertFalse(SessionKeepAliveService.shouldTopUp(now, now - threshold + 1, false, threshold));
+        // 处于失效退避时不补：否则回前台会绕过 3 小时退避重新探活，并把闹钟一直往后推
+        assertFalse(SessionKeepAliveService.shouldTopUp(now, 0L, true, threshold));
+        assertFalse(SessionKeepAliveService.shouldTopUp(now, now - threshold * 2, true, threshold));
+        // 补保活阈值应当比 30 分钟闹钟略小，留出一次检查的余量
+        assertEquals(25L * 60 * 1000, SessionKeepAliveService.TOP_UP_MIN_INTERVAL_MS);
+        assertTrue(SessionKeepAliveService.TOP_UP_MIN_INTERVAL_MS
+                < SessionKeepAliveScheduler.INTERVAL_MS);
+    }
 }

@@ -6,15 +6,23 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// 发布回退开关：-PdisableSsoRenew=true 打出的包不启用后台换票（行为回到 2.2.2 的「失效即退避」）
+def ssoRenewEnabled = !(project.hasProperty('disableSsoRenew')
+        && project.property('disableSsoRenew').toString().toBoolean())
+
 android {
     namespace "com.lzqlove.jiaowu"
     compileSdk rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.lzqlove.jiaowu"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 35
-        versionName "2.2.2"
+        versionCode 36
+        versionName "2.2.3"
+        buildConfigField "boolean", "SSO_RENEW_ENABLED", ssoRenewEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

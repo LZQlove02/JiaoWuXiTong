@@ -28,7 +28,7 @@
       <p class="setting-note">
         默认开启，可随时关闭；开启后由应用约每 30
         分钟在后台维持一次教务会话，减少长时间不打开后的重新登录与短信验证。系统省电策略可能造成延迟；学校侧对连续在线约 3
-        小时的会话会强制下线，届时仍需要重新登录一次，判定失效后本应用会退避到 3 小时才再检查。
+        小时的会话会强制下线，判定失效后应用会先用本机加密保存的统一认证票据自动续期一次，续期不成才退避到 3 小时再检查。
       </p>
       <p v-if="keepAliveEnabled && keepAliveSummary" class="setting-note setting-note--status">
         {{ keepAliveSummary }}

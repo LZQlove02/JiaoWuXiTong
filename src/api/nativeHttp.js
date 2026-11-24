@@ -105,6 +105,12 @@ export async function getKeepAliveState() {
   return SsoLogin.getKeepAliveState()
 }
 
+// 回前台补一次保活：原生按「距上次检查超过 25 分钟」节流，未到点会直接返回 SKIPPED
+export async function topUpKeepAlive() {
+  if (!Capacitor.isNativePlatform()) return { result: 'SKIPPED', reason: 'inactive' }
+  return SsoLogin.checkKeepAliveNow()
+}
+
 // 系统是否已允许本应用在后台稳定运行（电池优化白名单）
 export async function getBatteryOptimizationState() {
   if (!Capacitor.isNativePlatform()) return { ignoring: true }

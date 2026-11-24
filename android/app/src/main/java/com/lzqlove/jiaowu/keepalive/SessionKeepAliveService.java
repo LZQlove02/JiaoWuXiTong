@@ -3,7 +3,9 @@ package com.lzqlove.jiaowu.keepalive;
 import android.content.Context;
 
 import com.lzqlove.jiaowu.AuthCookieStore;
+import com.lzqlove.jiaowu.DebugLog;
 import com.lzqlove.jiaowu.HttpPolicy;
+import com.lzqlove.jiaowu.SsoSilentRenewer;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -45,7 +47,10 @@ public final class SessionKeepAliveService {
             .followSslRedirects(false)
             .build();
 
-    enum Result {
+    /** 回前台补保活的最小间隔：比 30 分钟闹钟略小，留出一次检查本身的耗时余量。 */
+    public static final long TOP_UP_MIN_INTERVAL_MS = 25L * 60 * 1000;
+
+    public enum Result {
         ALIVE,
         EXPIRED,
         FAILED
@@ -58,9 +63,45 @@ public final class SessionKeepAliveService {
         // 先记开始时间：一次请求最长约 9 秒，记录「发起检查」的时刻更符合展示语义
         long checkedAt = System.currentTimeMillis();
         Result result = runCheck(context);
+        if (result == Result.EXPIRED && AuthCookieStore.hasStoredCookie(context)) {
+            // 失效不等于没救：统一认证票据还在的话，先用它换一份新会话。
+            // 换票成功时 renew 已经拿到教务首页 200 与新的会话 Cookie，这里不再二次查询：
+            // goAsync 建议窗口约 10 秒，检查最长 9 秒、换票最长 6 秒，最坏约 15 秒；
+            // 并发由 SsoSilentRenewer 内部串行化，真的超时被杀也只是本次未记结果，下次重试。
+            SsoSilentRenewer.Result renewed = SsoSilentRenewer.renew(context);
+            DebugLog.i("JiaowuKeepAlive", "静默续期 " + renewed);
+            if (renewed == SsoSilentRenewer.Result.OK) {
+                result = Result.ALIVE;
+            }
+        }
         // 统一在出口记账：Cookie 为空、网络异常、正常判定等所有返回分支都不会漏记，
         // 以后新增分支也不需要再改这里
         SessionKeepAliveStore.recordCheckResult(context, checkedAt, result.name());
+        return result;
+    }
+
+    /**
+     * 只有距上次检查超过阈值才值得在回前台时补一次；lastCheckAt 为 0 表示从未检查过。
+     * 处于失效退避（上次判定 EXPIRED）时不补：否则每次回前台都会绕过 3 小时退避重新探活，
+     * 既浪费请求，也会把下一次闹钟不断往后推，退避形同虚设。
+     */
+    public static boolean shouldTopUp(long now, long lastCheckAt, boolean backoff, long thresholdMs) {
+        if (backoff) return false;
+        if (lastCheckAt <= 0) return true;
+        return now - lastCheckAt >= thresholdMs;
+    }
+
+    /**
+     * 前台补保活：用户回到 App 且距上次检查已超过阈值时立刻补一次，
+     * 会话在后台失效的话在这里先换票，随后的数据请求就能直接用新会话。
+     * 顺序与闹钟一致：先续上闹钟链防止中途被杀断链，检查完再按最终退避状态重排
+     * （换票成功会把退避清掉，必须重排回 30 分钟，不能沿用检查前的 3 小时）。
+     */
+    public static Result checkNowAndReschedule(Context context) {
+        Context app = context.getApplicationContext();
+        SessionKeepAliveScheduler.scheduleNext(app);
+        Result result = checkNow(app);
+        SessionKeepAliveScheduler.scheduleNext(app);
         return result;
     }
 

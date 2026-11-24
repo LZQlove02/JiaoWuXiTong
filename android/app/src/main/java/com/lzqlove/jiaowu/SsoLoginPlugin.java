@@ -18,14 +18,22 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.lzqlove.jiaowu.keepalive.SessionKeepAliveScheduler;
+import com.lzqlove.jiaowu.keepalive.SessionKeepAliveService;
 import com.lzqlove.jiaowu.keepalive.SessionKeepAliveStore;
 
 import org.json.JSONObject;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @CapacitorPlugin(name = "SsoLogin")
 public class SsoLoginPlugin extends Plugin {
 
     private static final int DEFAULT_SILENT_TIMEOUT_MS = 12000;
+    /** 同一时刻只允许一次补保活，避免快速切前台并发打网络。 */
+    private static final AtomicBoolean topUpRunning = new AtomicBoolean(false);
+    /** 票据副本的补录来源：统一认证登录页与根域各读一次（CASTGC 常挂 Path=/authserver）。 */
+    private static final String AUTH_LOGIN_COOKIE_URL = "https://authserver.lzzy.net/authserver/login";
+    private static final String AUTH_ROOT_COOKIE_URL = "https://authserver.lzzy.net";
 
     @PluginMethod
     public void login(PluginCall call) {
@@ -40,6 +48,7 @@ public class SsoLoginPlugin extends Plugin {
         SsoCookieCleaner.expireSsoSession(manager);
         SsoCookieCleaner.expireZfjw(manager);
         manager.flush();
+        SsoTicketStore.clear(getContext());
         SessionKeepAliveScheduler.cancel(getContext());
         // 明确退出登录：上一个会话的保活历史不再适用于新账号，一并清掉观测字段
         SessionKeepAliveStore.clear(getContext());
@@ -50,18 +59,96 @@ public class SsoLoginPlugin extends Plugin {
     @PluginMethod
     public void setKeepAlive(PluginCall call) {
         Boolean enabled = call.getBoolean("enabled");
-        SessionKeepAliveStore.setEnabled(getContext(), enabled != null && enabled);
-        if (enabled != null && enabled) {
+        boolean on = enabled != null && enabled;
+        SessionKeepAliveStore.setEnabled(getContext(), on);
+        if (on) {
+            // 旧版本登录或登录时还没开启保活时没有票据副本，这里从 WebView 补一份
+            ensureTicketFromWebView();
             SessionKeepAliveScheduler.resumeIfEnabled(getContext());
         } else {
             SessionKeepAliveScheduler.cancel(getContext());
+            // 关闭即删副本：文案承诺「关闭/撤回后删除」，也避免 WebView 之外的长期票据残留
+            SsoTicketStore.clear(getContext());
         }
         call.resolve(keepAliveState());
+    }
+
+    /** 从 WebView Cookie 补录票据副本；已有副本、没有票据或 WebView 未就绪时静默跳过。 */
+    private void ensureTicketFromWebView() {
+        if (!SsoTicketStore.load(getContext()).isEmpty()) return;
+        try {
+            CookieManager manager = CookieManager.getInstance();
+            String raw = manager.getCookie(AUTH_LOGIN_COOKIE_URL);
+            if (raw == null || raw.isEmpty()) raw = manager.getCookie(AUTH_ROOT_COOKIE_URL);
+            if (raw == null) return;
+            for (String part : raw.split(";")) {
+                String pair = part.trim();
+                int index = pair.indexOf('=');
+                if (index <= 0) continue;
+                String name = pair.substring(0, index).trim();
+                if (!"CASTGC".equals(name) && !"TGC".equals(name)) continue;
+                String value = pair.substring(index + 1).trim();
+                if (!value.isEmpty()) {
+                    SsoTicketStore.save(getContext(), name + "=" + value);
+                    return;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // WebView 未就绪：下次登录或再开开关时补
+        }
     }
 
     @PluginMethod
     public void getKeepAliveState(PluginCall call) {
         call.resolve(keepAliveState());
+    }
+
+    /**
+     * 回前台补一次保活：距上次检查超过 25 分钟才真正发起，避免每次切前台都打网络。
+     * 原生先轻量检查、明确失效再用票据换票；返回 result=ALIVE/EXPIRED/FAILED/SKIPPED。
+     */
+    @PluginMethod
+    public void checkKeepAliveNow(PluginCall call) {
+        Context context = getContext();
+        if (!SessionKeepAliveStore.isEnabled(context) || !AuthCookieStore.hasStoredCookie(context)) {
+            call.resolve(keepAliveTopUpState("SKIPPED", "inactive"));
+            return;
+        }
+        long lastCheckAt = SessionKeepAliveStore.getLastCheckAt(context);
+        boolean backoff = SessionKeepAliveStore.isBackoff(context);
+        if (!SessionKeepAliveService.shouldTopUp(System.currentTimeMillis(), lastCheckAt, backoff,
+                SessionKeepAliveService.TOP_UP_MIN_INTERVAL_MS)) {
+            call.resolve(keepAliveTopUpState("SKIPPED", backoff ? "backoff" : "fresh"));
+            return;
+        }
+        if (!topUpRunning.compareAndSet(false, true)) {
+            call.resolve(keepAliveTopUpState("SKIPPED", "running"));
+            return;
+        }
+        final PluginCall pending = call;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    SessionKeepAliveService.Result result =
+                            SessionKeepAliveService.checkNowAndReschedule(getContext());
+                    // 只记录结果，不记录 Cookie 或响应内容
+                    DebugLog.i("JiaowuKeepAlive", "前台补保活 " + result);
+                    pending.resolve(keepAliveTopUpState(result.name(), null));
+                } catch (RuntimeException error) {
+                    pending.resolve(keepAliveTopUpState("FAILED", null));
+                } finally {
+                    topUpRunning.set(false);
+                }
+            }
+        }, "keepalive-topup").start();
+    }
+
+    private JSObject keepAliveTopUpState(String result, String reason) {
+        JSObject state = keepAliveState();
+        state.put("result", result);
+        if (reason != null) state.put("reason", reason);
+        return state;
     }
 
     /**

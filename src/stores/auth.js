@@ -441,6 +441,16 @@ export const useAuthStore = defineStore('auth', () => {
     return true
   }
 
+  // 原生后台换票成功（回前台补保活）：会话已恢复，清掉只读标记并把缓存板块补成实时数据
+  async function markSessionRecovered() {
+    if (!user.value) return false
+    sessionExpired.value = false
+    sessionSuspended.value = false
+    clearExpiredFlag()
+    await refreshAfterRecovery()
+    return true
+  }
+
   // 启动时后台恢复会话，页面先挂载，路由守卫等待该结果后再决定去向
   function bootstrap() {
     if (!bootstrapPromise) {
@@ -535,6 +545,7 @@ export const useAuthStore = defineStore('auth', () => {
     loginWithSso,
     logout,
     retrySession,
+    markSessionRecovered,
     consumeJustLoggedIn
   }
 })

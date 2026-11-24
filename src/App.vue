@@ -82,7 +82,7 @@ import { usePortalAlertStore } from './stores/portalAlert'
 import { useScheduleSettingsStore } from './stores/scheduleSettings'
 import { useUiStore } from './stores/ui'
 import { useUpdateStore } from './stores/update'
-import { setKeepAlive } from './api/nativeHttp'
+import { setKeepAlive, topUpKeepAlive } from './api/nativeHttp'
 import { isBackgroundConsentAccepted } from './utils/backgroundConsent'
 import {
   KEEPALIVE_CLAUSES,
@@ -311,6 +311,23 @@ function onReloginExpired() {
   router.push('/login')
 }
 
+// 回前台补保活最多等 6 秒：超时先让页面继续，原生线程会在后台把这次检查跑完
+const TOP_UP_WAIT_MS = 6000
+async function topUpKeepAliveOnResume() {
+  if (!auth.isLoggedIn) return null
+  let timer
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), TOP_UP_WAIT_MS)
+  })
+  try {
+    return await Promise.race([topUpKeepAlive(), timeout])
+  } catch (error) {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // 原生能力延迟到「已同意」之后初始化：未同意时不写组件、不注册深链与返回键监听
 async function setupNative() {
   if (nativeReady) return
@@ -321,8 +338,15 @@ async function setupNative() {
   await changes.init()
   installWidgetSync()
   changes.listen()
-  CapApp.addListener('appStateChange', ({ isActive }) => {
+  CapApp.addListener('appStateChange', async ({ isActive }) => {
     if (!isActive) return
+    // 回前台先补一次保活：后台失效时在这里用票据换票，随后的数据请求才能直接用新会话。
+    // 原生按「距上次检查超过 25 分钟」节流，未到点会立刻返回，不会每次切前台都打网络。
+    const topUp = await topUpKeepAliveOnResume()
+    if (topUp?.result === 'ALIVE' && auth.sessionExpired) {
+      // 后台已经换票成功：清掉只读标记并把缓存板块补成实时数据
+      await auth.markSessionRecovered()
+    }
     // 票据已确认失效时是只读浏览，回前台不再自动打网络，避免每页各报一次「会话失效」
     if (auth.sessionExpired) return
     changes.refresh()

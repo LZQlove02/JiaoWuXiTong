@@ -20,10 +20,10 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.lzqlove.jiaowu.keepalive.SessionKeepAliveStore;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.security.MessageDigest;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.LinkedHashMap;
@@ -61,13 +61,10 @@ public class SsoLoginActivity extends Activity {
             "https://authserver.lzzy.net/authserver/login"
                     + "?service=http%3A%2F%2Fzfjw.lzzy.net%2Fsso%2Fjziotlogin";
     /**
-     * 统一认证服务器固定证书指纹（SHA-256，证书有效期至 2027-01-12）。
+     * 统一认证服务器固定证书指纹见 SsoPin（唯一来源）。
      * 与 res/xml/network_security_config.xml 的 SPKI pin 对应；证书轮换时必须同步更新两者。
-     * 只有指纹完全一致才放行，不一致直接阻止登录并提示更新 App，不再使用首次信任（TOFU）。
+     * 只有指纹完全一致且证书在有效期内才放行，不一致直接阻止登录并提示更新 App，不再使用首次信任（TOFU）。
      */
-    private static final String AUTH_SERVER_SHA256 =
-            "85:BA:F1:69:43:27:A8:B7:82:D2:CE:BC:A6:A1:A8:14:"
-                    + "E1:22:19:D3:F2:D6:4F:1B:F3:6B:A5:66:E9:13:4A:50";
 
     /**
      * 加载 WebView 前的 TLS 预检：只接受内置指纹命中的证书，
@@ -109,9 +106,11 @@ public class SsoLoginActivity extends Activity {
             if (chain == null || chain.length == 0) {
                 throw new java.security.cert.CertificateException("证书链为空");
             }
-            if (!AUTH_SERVER_SHA256.equals(sha256(chain[0].getEncoded()))) {
+            if (!SsoPin.matches(chain[0])) {
                 throw new java.security.cert.CertificateException("证书指纹不一致");
             }
+            // 指纹命中仍要求证书未过期：过期证书即使指纹一致也按更新提示处理
+            chain[0].checkValidity();
         }
 
         @Override
@@ -396,12 +395,18 @@ public class SsoLoginActivity extends Activity {
             blockSsl(handler, "无法读取证书指纹", "已停止登录，请检查网络环境后重试。");
             return;
         }
-        if (AUTH_SERVER_SHA256.equals(info.sha256)) {
+        int primary = error.getPrimaryError();
+        if (primary == SslError.SSL_EXPIRED || primary == SslError.SSL_NOTYETVALID) {
+            // 指纹命中也不能放过有效期问题：预检会拒绝过期证书，WebView 这条路径保持一致
+            blockSsl(handler, "证书已过期", "统一认证服务器证书不在有效期内，已停止登录。请检查系统时间后重试。");
+            return;
+        }
+        if (SsoPin.SHA256.equals(info.sha256)) {
             handler.proceed();
             return;
         }
         blockSsl(handler, "证书指纹不一致",
-                info.describe() + "\n\n内置指纹：\n" + AUTH_SERVER_SHA256
+                info.describe() + "\n\n内置指纹：\n" + SsoPin.SHA256
                         + "\n\n证书可能已变更或被篡改，已阻止登录。请更新 App 后再试。");
     }
 
@@ -438,23 +443,9 @@ public class SsoLoginActivity extends Activity {
                     parsed.getIssuerX500Principal().getName(),
                     parsed.getNotBefore().toString(),
                     parsed.getNotAfter().toString(),
-                    sha256(parsed.getEncoded()));
+                    SsoPin.sha256(parsed.getEncoded()));
         } catch (Exception error) {
             return null;
-        }
-    }
-
-    private static String sha256(byte[] data) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = digest.digest(data);
-            StringBuilder builder = new StringBuilder();
-            for (byte value : bytes) {
-                builder.append(String.format("%02X:", value));
-            }
-            return builder.substring(0, builder.length() - 1);
-        } catch (Exception error) {
-            return "";
         }
     }
 
@@ -501,6 +492,11 @@ public class SsoLoginActivity extends Activity {
 
         finished = true;
         handler.removeCallbacks(silentTimeout);
+        // 只有已开启「保持登录」才留 CASTGC 加密副本：后台闹钟被唤醒时拿它换票，不必启动 WebView。
+        // 首次登录时同意说明还在登录后弹出，此时开关尚未写入；随后 App 打开开关时会从 WebView 补录。
+        if (SessionKeepAliveStore.isEnabled(this)) {
+            SsoTicketStore.save(this, readCastgc());
+        }
         if (silent) Log.i("SsoSilent", "finish ok, cookies=" + cookies.size());
         final Intent data = new Intent();
         data.putExtra("cookieHeader", header.toString());
@@ -550,6 +546,43 @@ public class SsoLoginActivity extends Activity {
             webView.loadUrl("about:blank");
         }
         if (onDone != null) onDone.run();
+    }
+
+    /** 只读探测统一认证票据：先查登录地址，再退到根域；取不到返回空串。 */
+    private String readCastgc() {
+        try {
+            CookieManager manager = CookieManager.getInstance();
+            String[] urls = {
+                    "https://authserver.lzzy.net/authserver/login",
+                    "https://authserver.lzzy.net"
+            };
+            for (String url : urls) {
+                String raw = manager.getCookie(url);
+                if (raw == null) continue;
+                // 只打印名称，确认学校 CAS 的票据 Cookie 叫什么（不打印值）
+                StringBuilder names = new StringBuilder();
+                for (String part : raw.split(";")) {
+                    String pair = part.trim();
+                    int index = pair.indexOf('=');
+                    if (index <= 0) continue;
+                    if (names.length() > 0) names.append(',');
+                    names.append(pair.substring(0, index).trim());
+                }
+                DebugLog.i("SsoSilent", "auth cookies " + url + " -> " + names);
+                for (String part : raw.split(";")) {
+                    String pair = part.trim();
+                    int index = pair.indexOf('=');
+                    if (index <= 0) continue;
+                    String name = pair.substring(0, index);
+                    if (!"CASTGC".equals(name) && !"TGC".equals(name)) continue;
+                    String value = pair.substring(index + 1);
+                    if (!value.isEmpty()) return name + "=" + value;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // CookieManager 未初始化等场景：拿不到就不存副本
+        }
+        return "";
     }
 
     private void collectCookies(Map<String, String> target, String url) {
