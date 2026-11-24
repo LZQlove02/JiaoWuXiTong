@@ -2,7 +2,7 @@
 
 - 日期：2026-11-09
 - 版本目标：v2.2.0（当前 2.1.1 / versionCode 32）
-- 状态：**部分实现**（P0 静默重登与「失效不清空」已落地；P1 前台补保活、P2 可观测与 SessionBanner 未做，详见 §13）
+- 状态：**已实现（P0/P1/P2 主要部分）**：P0 静默重登与「失效不清空」已落地；P1 前台补保活已在 2.2.3 落地；P2 可观测与 SessionExpiredBanner 已落地；剩余见 §13。
 - 关联：[2026-11-02-session-keepalive-design.md](2026-11-02-session-keepalive-design.md)（本案是它的下一级兜底）、[2026-11-24-keep-alive-design.md](2026-11-24-keep-alive-design.md)（保活现状权威版）、[../plan/方案.md](../plan/方案.md) 会话策略章节、[../../README.md](../../README.md)「关键约束」
 
 ## 0. 摘要
@@ -347,10 +347,10 @@ CASTGC 有效但账号策略要求短信验证码时，静默流程会停在验�
 - **P2 可观测**：`SessionKeepAliveStore` 持久化 `lastCheckAt / lastResult / nextCheckAt`，`checkNow` 统一出口记账，`scheduleNext`/`cancel` 同步 `nextCheckAt`；`getKeepAliveState()` 返回三字段，「我的 → 账号与设备」显示「上次保活 19:13（会话有效）· 下次约 20:07」。仅在明确退出登录的 `clearSession()` 清历史。
 - **降级板块补拉**：`App.vue` 的 `appStateChange` 与 `auth.refreshAfterRecovery()` 在回到前台或会话恢复后，对 `portalNoticesOffline` / `messagesOffline` 的板块各补拉一次。真机联调发现：原先回前台只刷课表，通知与消息会一直停在「网络不可用，显示缓存」，直到用户手动下拉。
 - 隐私政策升至 v5（§9 口径）：补充只读缓存最多保留 7 天、保活执行时间与结果仅存本机。
+- **P1 前台补保活（2.2.3）**：回到前台且距上次检查超过 25 分钟时补一次；前端 `App.vue` 调 `SsoLogin.checkKeepAliveNow`，原生 `SessionKeepAliveService.checkNowAndReschedule` 复用同一套检查与换票，结果仍由 `checkNow` 统一记账，不新增字段；超过 6 秒未返回就先放行页面，原生线程在后台跑完。
 
 未做（保留原设计）：
 
-- P1 前台补保活（距上次检查超过 25 分钟时 `maybeForegroundKeepAlive`）。
 - 电池白名单引导整合（现为设置页独立入口）。
 - 保活间隔由 30 分钟放宽到约 90 分钟（第三轮评审建议 11）。
 - `manualLogout` 在原生 SharedPreferences 的权威副本（退出瞬间迟到的静默成功仍可能回写 Cookie）。

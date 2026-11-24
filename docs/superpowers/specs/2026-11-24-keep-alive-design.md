@@ -2,20 +2,20 @@
 
 - 日期：2026-11-24
 - 状态：已实现。本版取代 [2026-11-02-session-keepalive-design.md](2026-11-02-session-keepalive-design.md)（初版只描述理想链路，已与代码脱节）；会话失效后的降级与静默重登见 [2026-11-09-session-resilience-design.md](2026-11-09-session-resilience-design.md)。
-- 适用范围：`android/app/src/main/java/com/lzqlove/jiaowu/keepalive/` 全部、`src/views/AccountSettings.vue`、`src/utils/keepAliveConsent.js`、`src/utils/keepAliveSummary.js`、`SsoLoginPlugin.java` 的 `setKeepAlive / getKeepAliveState / clearSession`、`JwxtHttpPlugin.java` 的 Cookie 落盘入口。
-- 最近三处修正（2026-11-24，已合入 master，未发版）：无本地会话时不排程、判定失效后退避 3 小时、设置页与教程文案说明「学校侧 3 小时强制下线」。
+- 适用范围：`android/app/src/main/java/com/lzqlove/jiaowu/keepalive/` 全部、`SsoSilentRenewer.java`、`SsoTicketStore.java`、`SsoPin.java`、`DebugLog.java`、`src/views/AccountSettings.vue`、`src/utils/keepAliveConsent.js`、`src/utils/keepAliveSummary.js`、`SsoLoginPlugin.java` 的 `setKeepAlive / getKeepAliveState / clearSession`、`JwxtHttpPlugin.java` 的 Cookie 落盘入口。
+- 最近修正（2026-11-24）：无本地会话时不排程、判定失效后退避 3 小时、设置页与教程文案说明「学校侧 3 小时强制下线」；2.2.3 起增加「失效后先用票据换票」的后台续期（§6.1、§7），并同步升到同意 v2 / 隐私 v6。
 
 ---
 
 ## 0. 一句话
 
-**保持登录 = 用本机加密保存的教务会话，每 30 分钟在后台向学校教务系统发一次只读请求，把会话「焐热」；它只能降低重新登录频率，不能延长学校设定的会话上限。**
+**保持登录 = 用本机加密保存的教务会话，每 30 分钟在后台向学校教务系统发一次只读请求，把会话「焐热」；判定会话失效时，再用本机加密保存的统一认证票据（CASTGC/TGC）向学校统一认证换一份新会话。它降低重新登录频率，但学校设定的会话与票据上限仍由学校控制。**
 
 从多轮真机验证来看，三条边界必须写在最前面，否则方案看起来像「应该一直在线」，实际做不到：
 
 1. 保活 **不能** 绕过统一认证、短信验证，也不能改写学校 Cookie；
 2. 学校对「连续在线约 3 小时」的会话会强制下线，保活对此无能为力；
-3. 后台没有 WebView，**静默重登只能在前台发生**。保活做的是「别让空闲把你踢掉」，不是「被踢了自动爬回来」。
+3. 后台没有 WebView：需要输入账号密码或短信的重新登录只能在前台发生；但**票据换票不需要 WebView**——2.2.3 起失效后先在后台用票据换票，票据仍有效时无需用户重登。
 
 ---
 
@@ -30,7 +30,7 @@
 | 教务业务会话（zfjw，JSESSIONID 等） | 正方教务系统 | 空闲约 2–3 小时失效 | 多久要重新登录一次 |
 | 统一认证 CASTGC | 学校 SSO | 由学校控制，通常更长 | 重新登录时要不要输账号密码与短信验证码 |
 
-保活只作用于第一层（每 30 分钟发一个请求让它不空闲超时），完全触碰不到 CASTGC；CASTGC 还在时，用户被踢后前台可静默换票，无需短信。
+保活主要作用于第一层（每 30 分钟发一个请求让它不空闲超时）；票据（CASTGC/TGC）另存一份 Keystore 加密副本，仅用于失效后在后台换票，不改变票据有效期、也不延长学校会话上限。
 
 ### 1.2 学校侧的三个事实
 
@@ -38,14 +38,14 @@
 |---|---|---|
 | 统一认证页没有「记住登录」选项，CASTGC 有效期由学校控制 | `SsoCookieCleaner.java` 注释；历年真机验证 | 不做「永久登录」承诺，不改写 Cookie |
 | 教务会话**空闲**约 2–3 小时失效 | 多轮真机验证（`docs/reports/真机验证报告-20261027.md`） | 30 分钟保活能挡住「每次打开都要重登」 |
-| 教务会话**连续在线**约 3 小时也会被强制下线 | 2026-11-24 用户反馈；当日 14:48 本地判定失效，按此推算登录时间约 11:48（推断，未核对服务端日志） | 保活有天花板；失效后必须退避，不能每 30 分钟白请求 |
+| 教务会话**连续在线**约 3 小时也会被强制下线 | 2026-11-24 用户反馈；当日 14:48 本地判定失效，按此推算登录时间约 11:48（推断，未核对服务端日志） | 保活有天花板；失效后先换票，换票失败才退避，不能每 30 分钟白请求 |
 
 > 第 3 条是 2026-11-24 才明确的：此前只把保活当「防空闲」，现在明确它同时要「防无意义的消耗」。
 
 ### 1.3 应用侧的约束
 
 - **没有自建服务端**：不像微信有 refresh token 与推送续期，只能由客户端发起请求。
-- **认证必须在 WebView 里完成**：`SsoLoginActivity + SsoLoginPlugin`，证书指纹固定 + SPKI pin；后台没有 WebView 实例。
+- **首次认证必须在 WebView 里完成**：`SsoLoginActivity + SsoLoginPlugin`，证书指纹固定 + SPKI pin；后台不启动 WebView，失效后的换票由 OkHttp 手动跟随 CAS 重定向完成（§6.1）。
 - **Android 后台限制**：只用 `setAndAllowWhileIdle`（非精确闹钟），不申请 `SCHEDULE_EXACT_ALARM`；Doze 与厂商省电策略会推迟甚至跳过。
 - **隐私合规**：后台网络请求必须有单独说明并可随时关闭（见 §5、§11）。
 
@@ -64,7 +64,7 @@
 
 - 不追求「永不掉线」（做不到，见 §1.2）。
 - 不在后台弹出登录界面、不保存账号密码、不模拟登录表单、不引入代理服务端。
-- 不绕过学校会话有效期，不篡改 Cookie，不延长 CASTGC。
+- 不绕过学校会话有效期，不篡改 Cookie，不延长 CASTGC；换票只在票据仍有效时发生，票据失效即删除副本并回到退避。
 - 不影响课表变更/成绩/通知等其它后台检查子系统（见 §10）。
 
 ---
@@ -153,10 +153,12 @@
 |---|---|---|
 | 教务 Cookie | SharedPreferences `auth_session` / 键 `cookie` | Android Keystore `AES/GCM/NoPadding`（别名 `jwxt_auth_cookie_key`、12 字节 IV），仅回传 `zfjw.lzzy.net` |
 | 保活开关与记账 | SharedPreferences `jiaowu_keepalive` | 仅本机；不含 Cookie、响应内容、学号姓名 |
-| 同意记录 | localStorage `jiaowu.keepalive.consent` / `.declined` | 版本号字符串；范围或频率变化时 `KEEPALIVE_CONSENT_VERSION` +1 重新说明 |
+| 同意记录 | localStorage `jiaowu.keepalive.consent` / `.declined` | 版本号字符串；范围或频率变化时 `KEEPALIVE_CONSENT_VERSION` +1 重新说明（2.2.3 起为 `2`，覆盖换票与票据副本） |
+| 统一认证票据副本 | SharedPreferences `jiaowu_sso` / 键 `castgc_cipher` | `LocalCipher`（Android Keystore `AES/GCM/NoPadding`，别名 `jwxt_local_data_key`），值形如 `NAME=value`（CASTGC 或 TGC）；「保持登录」开启（含登录后同意补录）时写入，换票成功按学校返回更新，关闭保持登录 / 票据失效 / 退出登录 / 撤回同意 / 清除本机数据时删除 |
 
 - `AuthCookieStore.hasStoredCookie(context)` 只 `prefs.contains(KEY)`，**不解密**——所以「本地有会话」判断不会因 Keystore 暂时不可用而误判（`AuthCookieStore.java:130`）。
 - `AuthCookieStore.load()` 解密失败返回 `null`；此时若 `hasStoredCookie` 为真，保活记为 `FAILED` 而不是「已失效」，保留闹钟链等下次重试（Keystore 偶发不可用不该清用户登录态）。
+- 票据副本只用于换票：不参与业务请求，不打印值；换票请求只发往 `authserver.lzzy.net`（§6.1）。
 - 不保存：账号密码、短信验证码、教务响应正文、任何上传。
 
 ---
@@ -185,7 +187,9 @@
         ▼
 ⑥ SessionKeepAliveService.checkNow()
    load cookie 为空 && !hasStoredCookie ──▶ cancel() + EXPIRED
-   否则 POST 轻量接口 → 判定 → recordCheckResult(checkAt, result)
+   否则 POST 轻量接口 → 判定 → 若 EXPIRED：SsoSilentRenewer.renew() 换票
+        ├─ 换票 OK → recordCheckResult(ALIVE)
+        └─ 换票失败 → recordCheckResult(EXPIRED)
         ▼
 ⑦ result == EXPIRED
    Receiver 再次 scheduleNext()（此时 backoff=true → 3 小时后）
@@ -219,6 +223,16 @@ body: flag=0&sfyy=1&queryModel.showCount=1&queryModel.currentPage=1
 - 只读首部最多 4 KB 判断响应类型，不解析、不落盘正文。
 - 用 JSON 接口而不是 HTML 首页，是为了避免正常页面里出现「统一身份认证」或 authserver 链接时被误判为失效。
 
+### 6.1 会话失效后的后台换票（2.2.3）
+
+- **触发**：保活检查判定 `EXPIRED`，且 `AuthCookieStore.hasStoredCookie(context)` 为真（本地确有会话）；构建开关 `SSO_RENEW_ENABLED`（`-PdisableSsoRenew`，默认开）关闭时直接 `FAILED`，不发起换票。
+- **输入**：`SsoTicketStore` 的票据副本（`NAME=value`，CASTGC 或 TGC）；副本缺失时退回 `CookieManager` 读 authserver Cookie，仍没有则返回 `NO_TICKET`（不清理本地会话，本次按 `EXPIRED` 退避）。
+- **请求**：`SsoSilentRenewer` 用固定指纹的 OkHttp 客户端请求 `LOGIN_URL`（CAS，`service=http://zfjw.lzzy.net/sso/jziotlogin`），手动跟随最多 8 跳，并把 CAS 返回的 `http://zfjw…` 改写为 `https://`；落到 zfjw 的 `/xtgl/` 非登录页即换票成功。
+- **输出**：成功 → `AuthCookieStore.mergeSetCookies(zfjw Set-Cookie)`，并把响应里轮换的新 CASTGC/TGC 写回 `SsoTicketStore`；`LOGIN_FORM` → 先清副本再返回；`FAILED` → 保留副本，交给退避重试。
+- **预算**：`DEADLINE_MS=6000`，connect 4s / read 4s / call 5s；检查本身 ≤9s、换票 ≤6s，合计最长约 15s，可能超出 `goAsync` 约 10 秒的窗口；即便进程在收尾前被回收，Receiver 的收尾 `scheduleNext` 仍会重排下一次（只是本次结果可能未落盘）；一次广播内只做「检查 + 换票」，不再串联第二次查询。
+- **证书**：authserver 必须固定指纹命中且叶子证书在有效期内；zfjw 走系统信任库，过旧时退回指纹 + 有效期。
+- **日志**：`DebugLog` 只在 `BuildConfig.DEBUG` 包输出，release 包恒静默（没有可开启日志的验证构建，探针也已移除）；hop 只记 `code scheme://host path`，路径经 `sanitizePath` 去掉 query 与 `;jsessionid`。
+
 ---
 
 ## 7. 判定规则
@@ -227,16 +241,17 @@ body: flag=0&sfyy=1&queryModel.showCount=1&queryModel.currentPage=1
 |---|---|---|
 | 本地无 Cookie 且 `hasStoredCookie == false` | `EXPIRED` | `cancel()`，设置页「已停止，等待重新登录」 |
 | 本地有记录但解密失败 | `FAILED` | 保留闹钟，30 分钟后重试 |
-| 重定向目标为 `http://` 或 `authserver.lzzy.net` | `EXPIRED` | 3 小时退避 |
-| HTTP 401 / 403 | `EXPIRED` | 3 小时退避 |
+| 重定向目标为 `http://` 或 `authserver.lzzy.net` | `EXPIRED` | 先换票；换票成功改记 `ALIVE`，失败才 3 小时退避 |
+| HTTP 401 / 403 | `EXPIRED` | 先换票；换票成功改记 `ALIVE`，失败才 3 小时退避 |
 | HTTP 非 200（5xx、网关错误等） | `FAILED` | 30 分钟后重试 |
-| 200 但正文以 `<` 开头且命中登录页特征（`login_slogin` 或 `name="yhm"`） | `EXPIRED` | 3 小时退避 |
+| 200 但正文以 `<` 开头且命中登录页特征（`login_slogin` 或 `name="yhm"`） | `EXPIRED` | 先换票；换票成功改记 `ALIVE`，失败才 3 小时退避 |
 | 200 且非登录页 | `ALIVE` | 合并 Set-Cookie，30 分钟后重试 |
 
 补充：
 
 - 判定只看「会话还在不在」，**不解析业务数据**；请求体固定，与用户课表/成绩无关。
-- `ALIVE` 时把响应里的 `Set-Cookie` 合并回 `AuthCookieStore`，避免服务端轮换会话标识后前台还在用旧值。
+- `EXPIRED` 先走后台上文换票：成功即记为 `ALIVE`（30 分钟）；`NO_TICKET` / `LOGIN_FORM` / `FAILED` 才进入 3 小时退避。
+- `ALIVE` 时把响应里的 `Set-Cookie` 合并回 `AuthCookieStore`，避免服务端轮换会话标识后前台还在用旧值；换票成功时同样合并，并写回轮换后的票据副本。
 - 单次网络失败（`FAILED`）绝不清登录态、不取消闹钟——这是 2.2.1「弱网不清登录态」的延续。
 
 ---
@@ -250,7 +265,9 @@ body: flag=0&sfyy=1&queryModel.showCount=1&queryModel.currentPage=1
 | 开机、覆盖安装（`ScheduleBootReceiver`） | 是 | 同上 |
 | 设置页打开开关 | 是 | 30 分钟 |
 | 闹钟触发（Receiver 先排下一次） | 是 | 取决于上一次结果 |
-| 上一次结果 `EXPIRED` | 是（Receiver 再排一次） | **3 小时** |
+| 回到前台且距上次检查 ≥ 25 分钟、且不在退避期（`checkKeepAliveNow` → `checkNowAndReschedule`） | 是（先续链，到期未到点或退避中则由前端直接跳过） | 按本次结果重排：`ALIVE`/`FAILED` 30 分钟，`EXPIRED` 3 小时 |
+| 上一次结果 `EXPIRED`（含换票失败） | 是（Receiver 再排一次） | **3 小时** |
+| 换票成功（结果改记 `ALIVE`） | 是 | 30 分钟 |
 | 上一次结果 `ALIVE` / `FAILED` | 是 | 30 分钟 |
 | 开关关闭 / 退出登录 / 撤回同意 / 清除数据 | 否，并取消 | — |
 | 开关开但本地无会话 | 否，并取消 | — |
@@ -271,9 +288,11 @@ body: flag=0&sfyy=1&queryModel.showCount=1&queryModel.currentPage=1
 |---|---|---|
 | 网络不可达 / 超时 | `FAILED`，30 分钟后重试 | 状态行「临时失败，会自动重试」 |
 | Doze 或厂商省电推迟闹钟 | 闹钟延后触发；无补偿 | 无（属预期） |
-| 学校 3 小时强制下线 | 一次 `EXPIRED` → 退避 3 小时 | 「会话已失效」 |
+| 学校 3 小时强制下线 | 一次 `EXPIRED` → 先后台换票（§6.1）：成功记 `ALIVE`、继续 30 分钟；失败退避 3 小时 | 「会话已失效」（换票成功则无感） |
 | 会话失效且前台已打开 | 401 → 静默重登（12s） | 成功则无感；失败则只读快照 + 顶部横幅「重新登录」 |
-| CASTGC 也失效 | 静默重登返回 `login-form` 等 definitive 失败 | 只读 7 天 + 横幅，需本人走统一认证（含短信） |
+| 票据（CASTGC/TGC）也失效 | 换票返回 `LOGIN_FORM` 并清副本；前台静默重登同样 definitive 失败 | 只读 7 天 + 横幅，需本人走统一认证（含短信） |
+| 换票 `NO_TICKET`（无副本） | 当作普通 `EXPIRED` → 退避 3 小时 | 「会话已失效」 |
+| 换票网络失败 `FAILED` | 保留副本，退避 3 小时 | 「会话已失效」 |
 | 服务端轮换 Set-Cookie | 合并回存储 | 无感 |
 | Keystore 暂时不可用 | `FAILED`，不清 Cookie | 「临时失败，会自动重试」 |
 | 用户关开关 | 立即取消闹钟，保留历史 | 开关关闭，状态行隐藏 |
@@ -286,7 +305,8 @@ body: flag=0&sfyy=1&queryModel.showCount=1&queryModel.currentPage=1
 
 | 机制 | 关系 |
 |---|---|
-| 静默重登（`src/stores/auth.js:199-240`） | 保活失效后的唯一「续命」途径：前台 401 时用 CASTGC 换票，成功即 `setAuthCookies` → `resumeIfEnabled` 清退避恢复 30 分钟。超时 12s；definitive 失败（`no-ticket` / `login-form` / `blocked` 等）→ 会话失效；网络类失败 → `sessionSuspended` 保留登录态，冷却 30s；其它冷却 5 分钟。 |
+| 静默重登（`src/stores/auth.js:199-240`） | 前台「续命」途径：前台 401 时用 CASTGC 换票，成功即 `setAuthCookies` → `resumeIfEnabled` 清退避恢复 30 分钟。超时 12s；definitive 失败（`no-ticket` / `login-form` / `blocked` 等）→ 会话失效；网络类失败 → `sessionSuspended` 保留登录态，冷却 30s；其它冷却 5 分钟。 |
+| 后台换票（`SsoSilentRenewer`） | 保活判定失效后的第一选择：用票据副本走 CAS 换票，成功即合并 Cookie、写回轮换票据；不弹界面、不启动 Activity、不需要 WebView。见 §6.1。 |
 | 只读快照（7 天）+ 失效横幅 | 会话失效后不清数据，首页横幅提示「学校统一认证已到期，当前显示离线缓存」+「重新登录」。 |
 | 课表变更 / 成绩 / 通知检查（`change/*`） | 独立闹钟（默认关闭，07:10 / 12:50 两时段），共用同一份 Cookie；失效时发「需要重新登录」通知，**不写保活记账**、不取消保活链。 |
 | 桌面小组件 | 只消费本地 payload，与保活无耦合。 |
@@ -296,9 +316,10 @@ body: flag=0&sfyy=1&queryModel.showCount=1&queryModel.currentPage=1
 
 ## 11. 隐私与合规
 
-- 后台请求**只**发往 `zfjw.lzzy.net`，只携带本机加密保存的会话，不携带学号、姓名或设备标识。
+- 后台请求发往 `zfjw.lzzy.net`（保活探测）与 `authserver.lzzy.net`（失效换票）；只携带本机加密保存的会话或票据副本，不携带学号、姓名或设备标识，换票请求不携带账号密码。
 - 不读取、不保存、不上传响应正文；只保留「时间 + 三态结果」。
-- 隐私政策「后台检查」章节已写明频率、内容、结果存放与关闭方式（`src/utils/privacy.js:26-32`）。
+- 隐私政策「后台检查」章节已写明频率、内容、结果存放与关闭方式（`src/utils/privacy.js`）。
+- 票据副本用 Keystore 加密，仅换票使用；关闭「保持登录」、票据失效、退出登录、撤回同意、清除数据时删除。
 - 电池优化白名单单独说明用途，用户可拒绝、可随时在系统设置撤销。
 - 撤回隐私同意 / 退出登录 / 清除本机个人数据 → 立即停止并清理。
 
@@ -330,6 +351,10 @@ adb logcat -d -s JiaowuKeepAlive:D
 | 18:09 | 打开 App（无 Cookie），旧版又排了一次 18:39；新版不再排程 |
 | 18:19–18:20 | 用户重新登录 → `resumeIfEnabled` → 排到 18:50:59 |
 | 18:39 | 装退避版本，设置页显示「上次保活 14:48（会话已失效） · 下次约 19:09」 |
+| 21:43:44 | 2.2.3-dev 重新登录：`SsoSilent` 记录 authserver Cookie 名单，`.sso` 票据 CASTGC 写盘（`AuthCookieStore` 83 字节） |
+| 21:44:24–26 | 强制重启触发一次性探针：5 跳 CAS 换票（authserver → jziotlogin → ;jsessionid → ticketlogin → login_slogin → index_initMenu），`probe 1 OK`，Cookie 合并为 114 字节，首页实时数据恢复 |
+| 22:02:13–17 | 验证包（`-PrenewProbe=true`，该验证开关后来被移除）再次探针：hop 日志已去掉 `;jsessionid`，`ok, cookies=5` / `probe 1 OK`，正式包启动无 `SsoRenew` 日志 |
+| 22:16 | 正式包（release，无探针）：切后台再回前台触发补保活，设置页显示「上次保活 22:16（会话有效） · 下次约 22:46」；再次切前后台没有重复检查（25 分钟节流生效） |
 
 ---
 
@@ -341,9 +366,11 @@ adb logcat -d -s JiaowuKeepAlive:D
 |---|---|
 | `SessionKeepAliveTest.schedulesOnlyWhenSwitchIsOnAndSessionIsStored` | `shouldSchedule(true,true)=true`，其余三种 `false` |
 | `SessionKeepAliveTest.expiryBacksOffToThreeHours` | `nextTrigger(now,true)=now+3h`、`nextTrigger(now,false)=now+30min` |
+| `SessionKeepAliveTest.topsUpOnlyWhenLastCheckIsStale` | `shouldTopUp` 在 `lastCheckAt=0`、恰好到 25 分钟时为真，比 25 分钟新时为假 |
 | `SessionKeepAliveStoreTest.expiryArmsBackoffAndOtherResultsClearIt` | `EXPIRED` 置 `backoff`，`ALIVE`/`FAILED` 清除 |
 | `SessionKeepAliveStoreTest.clearResetsBackoff` | 退出登录清空全部记账 |
 | `SessionKeepAliveStoreTest`（KEY_BACKOFF 常量） | 键名稳定，避免静默改名 |
+| `SsoSilentRenewerTest` | `ticketName` / `ticketValue` / `setCookiePair` / `sanitizePath` / `cookieHeader` 的纯函数行为（旧包名、`Path` 参数、`;jsessionid` 矩阵参数） |
 
 **前端单测**（`tests/keepAliveSummary.test.js`，8 条）：同日/跨日、`active=false` 有/无历史、旧版无 `active` 字段按有会话处理、从未执行、`null`、非法时间戳。
 
@@ -361,12 +388,13 @@ adb logcat -d -s JiaowuKeepAlive:D
 
 ## 14. 已知限制
 
-1. **3 小时天花板**：学校连续在线强制下线，保活无法越过；到期必须人工登录一次。
-2. **后台不能静默重登**：没有 WebView，被踢后在后台无解，只能等前台 401 触发。
+1. **3 小时天花板**：学校连续在线强制下线；换票成功后实际在线时长会被延长，若学校把票据也绑定在 3 小时内，则换票只能挡住空闲失效、挡不住连续在线强制下线。
+2. **后台换票依赖票据仍有效**：CAS 票据失效或轮换失败时，后台无解，只能等前台 401 触发重新登录。
 3. **省电策略**：非精确闹钟可能被推迟数十分钟甚至跳过；部分 ROM 会冻结后台。
-4. **退避期间不探活**：判定失效后 3 小时内不再请求，若用户在这期间重新登录，靠 `resumeIfEnabled` 立即恢复。
+4. **退避期间不探活**：判定失效后 3 小时内不再请求（回前台补保活同样跳过退避期），若用户在这期间重新登录，靠 `resumeIfEnabled` 立即恢复。
 5. **多设备不同步**：保活只作用于本机 Cookie，另一台设备的会话仍按学校规则失效。
 6. **WebView 内部存储不可见**：`/data/data` 未 root 无法读取，真机排障只能用日志与桥接状态（2026-11-24 实践结论）。
+7. **合规边界**：换票会延长实际在线时长，可能不符合学校「连续在线 3 小时强制下线」的管理意图；上线前需与学校确认，必要时用构建开关回退到「失效即退避」：`-PdisableSsoRenew` 生成 `SSO_RENEW_ENABLED=false` 的包，后台换票直接记 `FAILED` 并按 3 小时退避。验证用的探针已移除，release 包不输出网络日志、也不会自行发起换票之外的行为。
 
 ---
 
@@ -376,19 +404,20 @@ adb logcat -d -s JiaowuKeepAlive:D
 
 | # | 问题 | 选项 | 建议 |
 |---|---|---|---|
-| A | 「默认开启」的文案与实现不一致（原生默认关闭、需手动开启） | ① 改文案为「默认关闭，可手动开启」；② 实现首次登录自动弹说明并在同意后开启 | ①：改动小、合规最稳；② 需要把 ConsentGate 提到全局，且后台请求要等用户确认 |
+| A | 「默认开启」的文案与实现不一致（原生默认关闭、需手动开启） | ① 改文案为「默认关闭，可手动开启」；② 实现首次登录自动弹说明并在同意后开启 | 已在 2.2.2 按 ② 落地（`syncKeepAliveDefault` + ConsentGate），2.2.3 同意升到 v2 重新说明；本条保留作历史记录 |
 | B | 保活间隔是否从 30 分钟放宽到 90 分钟 | 保持 30；放宽到 90 | 保持 30。学校给的是连续 3 小时上限，放宽只会让空闲窗口更易超时 |
-| C | 是否实现「前台补保活」（>25 分钟回到前台补一次） | 做 / 不做 | 做，但要与静默重登合并触发，避免两套逻辑打架 |
+| C | 是否实现「前台补保活」（>25 分钟回到前台补一次） | 做 / 不做 | 已在 2.2.3 落地：回前台且距上次检查超过 25 分钟时补一次，复用 `checkNow` 的检查与换票，不新增记账字段 |
 | D | 退避期间是否给用户「立即检查一次」 | 做 / 不做 | 不做。用户已能通过重新登录恢复，多一个按钮只增加解释成本 |
 | E | 电池白名单引导是否并入首启 | 并入 / 维持设置页 | 维持设置页，仅当 `batteryExempted === false` 时露出入口 |
+| F | 失效后是否在后台用票据换票（2.2.3） | 做 / 不做 | 已做（§6.1）：票据仍有效时免重登；需与学校确认不违反其会话管理要求（见 §14.7），保留构建开关可回退（`-PdisableSsoRenew`） |
 
 **待办**
 
-- P1：实现决策 C（前台补保活），复用 `SessionKeepAliveService.checkNow` 的结果口径，不新增记账字段。
-- P1：文案对齐（决策 A 的落地），同步 `tutorial.js`、`privacy.js`、隐私政策正文与 `docs/plan/方案.md:292`。
-- P2：`lastResult` 增加最近一次失败原因（`timeout` / `http-5xx` / `bridge`）以便支持排查，仍不落正文。
+- P1：真机验证后台换票能否越过学校连续 3 小时强制下线（2026-11-24 21:18 登录，约 00:18 观察），结论写入验收报告。
+- P1：文案对齐，同步 `tutorial.js`、`privacy.js`、隐私政策正文与 `docs/plan/方案.md`（2.2.3 已改应用内文案与方案对应段落，其余章节仍需复核）。
+- P2：`lastResult` 增加最近一次换票结果与失败原因（`ok` / `no-ticket` / `login-form` / `network`）以便支持排查，仍不落正文。
 - P2：`manualLogout` 的 SharedPreferences 权威副本（防止进程被杀后旧偏好自动恢复保活，见 11-09 §13）。
-- P2：把「失效退避 3 小时」补进 `docs/reports/真机验证报告-20261027.md` 的验收记录。
+- P2：把「失效退避 3 小时」与「后台换票」补进 `docs/reports/真机验证报告-20261027.md` 的验收记录。
 
 ---
 
@@ -401,3 +430,4 @@ adb logcat -d -s JiaowuKeepAlive:D
 | 2026-11-22 | 2.2.2 发布：只读快照 + 失效横幅、保活可观测（设置页状态行）、4×4 翻周 | `docs/plan/方案.md` |
 | 2026-11-24 | 无本地会话时不排程（`shouldSchedule`）；判定 `EXPIRED` 后退避 3 小时；账号页与教程文案说明「学校 3 小时强制下线」；设置页「已停止，等待重新登录」 | 提交 `ba763d7`、`f9d5679`；本文件 |
 | 2026-11-24 | 重新整理本方案（取代 11-02 初版），补充状态机、判定表、失败矩阵、排障与决策点 | 本文件 |
+| 2026-11-24 | 2.2.3：失效后先用票据后台换票（`SsoSilentRenewer`）、票据副本 Keystore 加密、证书双保险、日志脱敏（release 恒静默）、验证探针移除；换票后按最终状态重排、退避期不补保活、续期可用 `-PdisableSsoRenew` 回退；同意 v2 / 隐私 v6；`versionCode 36` | `SsoSilentRenewer.java`、`SsoTicketStore.java`、`SsoPin.java`、`DebugLog.java`、`CHANGELOG.md` |
