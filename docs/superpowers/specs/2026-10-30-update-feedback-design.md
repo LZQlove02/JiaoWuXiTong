@@ -9,6 +9,8 @@
 
 源码仓库保持私有，新增一个**公开分发仓库** `LZQlove02/lzpu-jwxt-releases` 只存放签名 APK 与更新说明。App 通过该仓库的 `releases/latest` 匿名接口实现每日一次的更新检查；同时新增意见反馈入口，用系统邮件 App 把用户描述 + 脱敏诊断信息发送到固定收件人。全部能力不新增权限、不上传账号数据、不在 App 内下载安装包。
 
+> 2026-11-24 变更（v2.2.4）：源码仓库已公开，更新检查与发布合并到 `LZQlove02/JiaoWuXiTong`；§3 与 §7 已按新仓库更新，`lzpu-jwxt-releases` 保留为过渡期仓库，见 §11。
+
 ## 1. 背景与目标
 
 1. 让已安装旧版本的同学能收到新版本提示，而不是靠群里发文件。
@@ -36,10 +38,10 @@
 
 | 仓库 | 可见性 | 内容 | 用途 |
 |---|---|---|---|
-| `LZQlove02/JiaoWuXiTong` | 私有 | 源码、设计文档 | 开发 |
-| `LZQlove02/lzpu-jwxt-releases` | 公开 | 签名 APK、Release 说明 | 分发与更新检查 |
+| `LZQlove02/JiaoWuXiTong` | 公开（v2.2.4 起） | 源码、设计文档、签名 APK、Release 说明 | 开发、分发与更新检查 |
+| `LZQlove02/lzpu-jwxt-releases` | 公开（历史，过渡期） | 签名 APK、Release 说明 | v2.2.3 及更早版本的更新检查 |
 
-- 客户端只读 `https://api.github.com/repos/LZQlove02/lzpu-jwxt-releases/releases/latest`
+- 客户端只读 `https://api.github.com/repos/LZQlove02/JiaoWuXiTong/releases/latest`；v2.2.3 及更早版本读的是 `.../lzpu-jwxt-releases/releases/latest`
 - 该接口不返回 draft / prerelease；测试版本要能被检测到，必须按正式 Release 发布
 - 仓库尚无 Release 时返回 404，按「无更新」处理
 - 匿名调用有速率限制（约 60 次/小时/IP），24h 节流远低于该上限
@@ -130,7 +132,7 @@
 
 - 仅向 `api.github.com` 匿名 GET，不带 Cookie、学号、姓名、查询参数；不发 `Authorization`
 - 使用独立 OkHttp client（无 CookieJar），与教务会话完全隔离
-- 只允许 `https://github.com/LZQlove02/lzpu-jwxt-releases/releases/tag/<tag>`；tag 先过正则
+- 只允许 `https://github.com/LZQlove02/JiaoWuXiTong/releases/tag/<tag>`（v2.2.3 及更早为 `lzpu-jwxt-releases`）；tag 先过正则
 - 邮件收件人写死；不接受调用方传入地址
 - 不新增权限；不下载、不安装 APK
 - 诊断信息不含账号与业务数据；反馈正文由用户自行确认后发送
@@ -165,3 +167,10 @@
 - GitHub 在部分网络环境不可达，自动检查会静默失败；用户仍可手动打开发布页
 - 无法在 App 内校验 APK 完整性或自动安装，需系统浏览器下载后手动安装
 - 公开发布仓库匿名可读，APK 可被任意下载；LICENSE 仅约束使用行为，无法技术限制
+
+## 11. 迁移记录（2026-11-24，v2.2.4）
+
+- 源码仓库 `LZQlove02/JiaoWuXiTong` 转为公开，作为唯一仓库：源码、设计文档与 Releases 同仓
+- 客户端更新检查地址改为 `https://api.github.com/repos/LZQlove02/JiaoWuXiTong/releases/latest`，「去更新」发布页基址同步改为 `https://github.com/LZQlove02/JiaoWuXiTong/releases/tag/`；`HttpPolicy.GITHUB` 白名单仍只允许 `api.github.com` 与 `github.com`，路径校验不变
+- 过渡：v2.2.4 同时发布到旧仓库 `LZQlove02/lzpu-jwxt-releases`，v2.2.3 及更早版本升级到 2.2.4 后自动指向新仓库；确认升级到位后删除旧仓库
+- 影响：未升级的旧版本在旧仓库删除后无法自动检查更新，需手动安装一次 2.2.4 或更新版本

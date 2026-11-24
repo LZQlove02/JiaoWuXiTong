@@ -44,7 +44,7 @@ import okhttp3.Response;
 @CapacitorPlugin(name = "SupportBridge")
 public class SupportBridgePlugin extends Plugin {
 
-    private static final String RELEASE_REPO = "LZQlove02/lzpu-jwxt-releases";
+    private static final String RELEASE_REPO = "LZQlove02/JiaoWuXiTong";
     private static final String LATEST_URL =
             "https://api.github.com/repos/" + RELEASE_REPO + "/releases/latest";
     private static final String RELEASE_PAGE_BASE =

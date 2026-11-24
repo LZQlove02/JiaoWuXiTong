@@ -11,7 +11,7 @@
 | 保持登录方案 | [superpowers/specs/2026-11-24-keep-alive-design.md](superpowers/specs/2026-11-24-keep-alive-design.md) | 保活现状权威版：状态机、判定表、失效先换票、30 分钟/3 小时退避、失败矩阵、排障与决策点（已实现，含 2.2.3 后台换票） |
 | 登录态保持方案 | [superpowers/specs/2026-11-09-session-resilience-design.md](superpowers/specs/2026-11-09-session-resilience-design.md) | 静默重登、失效保留缓存、前台补保活与可观测（已实现：P0 与可观测已落地，2.2.3 补上前台补保活） |
 | 设计规格 | [superpowers/specs/](superpowers/specs/) | 按功能拆分的实现规格（首启免责声明、课表变更提醒、更新检查与反馈等） |
-| 发布流程 | [发布流程.md](发布流程.md) | 版本号、测试、打包、验签、公开仓库发布与真机验证清单 |
+| 发布流程 | [发布流程.md](发布流程.md) | 版本号、测试、打包、验签、源码仓库 Releases 发布与真机验证清单 |
 | 视觉预览 | [previews/](previews/) | 桌面组件样式预览 HTML，仅用于视觉确认，不参与打包 |
 
 维护约定：

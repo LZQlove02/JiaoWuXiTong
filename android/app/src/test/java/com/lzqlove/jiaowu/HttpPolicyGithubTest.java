@@ -26,7 +26,7 @@ public class HttpPolicyGithubTest {
 
     @Test(expected = IOException.class)
     public void rejectsOtherHost() throws Exception {
-        HttpPolicy.GITHUB.check(HttpUrl.parse("https://github.com/LZQlove02/lzpu-jwxt-releases"));
+        HttpPolicy.GITHUB.check(HttpUrl.parse("https://github.com/LZQlove02/JiaoWuXiTong"));
     }
 
     @Test(expected = IOException.class)

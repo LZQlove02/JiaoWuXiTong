@@ -20,8 +20,8 @@ android {
         applicationId "com.lzqlove.jiaowu"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 36
-        versionName "2.2.3"
+        versionCode 37
+        versionName "2.2.4"
         buildConfigField "boolean", "SSO_RENEW_ENABLED", ssoRenewEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

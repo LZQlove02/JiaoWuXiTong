@@ -4,7 +4,7 @@ import { buildFeedbackMailto } from '../utils/feedback'
 // 原生实现见 android/app/src/main/java/com/lzpu/jwxt/SupportBridgePlugin.java
 export const SupportBridge = registerPlugin('SupportBridge')
 
-const REPO = 'LZQlove02/lzpu-jwxt-releases'
+const REPO = 'LZQlove02/JiaoWuXiTong'
 const LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 
 export const RELEASE_PAGE_BASE = `https://github.com/${REPO}/releases/tag/`

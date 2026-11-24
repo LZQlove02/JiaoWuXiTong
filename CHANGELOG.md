@@ -2,6 +2,13 @@
 
 遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号对应 `android/app/build.gradle` 的 `versionName`。
 
+## [2.2.4] - 2026-11-24
+
+### 变更
+
+- 源码仓库转为公开，更新检查与 APK 发布合并到同一仓库 `LZQlove02/JiaoWuXiTong`：客户端改为读取该仓库的 `releases/latest`，「去更新」打开的发布页也指向它；本版本同时发布到旧发布仓库，供 v2.2.3 及更早版本升级后自动切换
+- 旧发布仓库 `LZQlove02/lzpu-jwxt-releases` 待确认老版本升级到位后删除；删除后仍停留在 v2.2.3 及更早版本的安装包不再自动检查更新
+
 ## [2.2.3] - 2026-11-24
 
 ### 新增
