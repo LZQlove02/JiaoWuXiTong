@@ -333,21 +333,24 @@ CASTGC 有效但账号策略要求短信验证码时，静默流程会停在验�
 |---|---|
 | 2026-11-09 | 初稿：现状缺口分析、状态机、接口契约、文件与任务分解、风险与验收 |
 | 2026-11-21 | 补充 §13 实现进度：P0 已落地，P1/P2 与只读横幅仍为待办 |
+| 2026-11-24 | 真机核查后补 §13：无本地会话时不排保活、设置页显示「已停止，等待重新登录」 |
 
-## 13. 实现进度（2026-11-21）
+## 13. 实现进度（2026-11-22）
 
 已落地：
 
 - **P0 静默重登**：`SsoLoginActivity`（silent 透明页、CAS 登录表单探测、`finishSilent` 回传 reason）→ `SsoLoginPlugin.silentRelogin` → `ZfAcademicApi.reloginSilently` → `auth.attemptSilentRelogin()`，失败原因沿用 §5.5 的 `reason` 表；有单飞与冷却（可恢复失败 30 秒，其余 5 分钟）。
-- **P0 失效不清空**（部分）：只有 `no-ticket / login-form / blocked / no-cookie / verify / unsupported` 才 `clearLocalSession()`；`network / timeout / bridge / canceled` 只置 `sessionSuspended`，保留登录态、加密会话与已加载数据，主界面底部提示条支持手动重试，回到前台自动重试一次，成功后就地刷新课表并把断网期间降级的通知/消息补齐。
+- **P0 失效不清空**（分两档）：`network / timeout / bridge / canceled` 只置 `sessionSuspended`，保留登录态、加密会话与已加载数据，主界面底部提示条支持手动重试，回到前台自动重试一次；`no-ticket / login-form / blocked / no-cookie / verify / unsupported` 进入 `sessionExpired` 只读模式（见下一条）。
+- **只读快照 + `expiredAt` + 失效横幅**（§4）：票据确认失效时只清凭据（`clearAuthCookies`）与可能含他人材料的附件缓存，保留课表快照与个人缓存，`sessionExpired = true`；主界面顶部 `SessionExpiredBanner` 提供「重新登录」，`api` 层在只读模式下直接拒绝请求（不再用失效 Cookie 打网络、不再各页触发静默换票）；`localStorage` 记 `jiaowu.session.expiredAt`，冷启动 7 天内用快照续上只读界面，超期或登录成功后清除。`loginWithSso` 的清缓存时机挪到登录成功之后，失败/取消不再丢只读数据。
 - **静默超时与兜底对齐**：原生 Activity 内等待默认 12 秒（1.5–20 秒可传），计时从 `loadUrl` 开始、不含 TLS 预检；前端兜底 = 原生等待 + 8 秒预检 + 4 秒桥接余量。
-- **保活链路**：检测到会话失效后保留闹钟链（不再 `cancel`），静默换票成功或重新登录时由 `setAuthCookies` 重新排程；退出登录仍由 `clearAuthCookies` 取消。
+- **保活链路**：票据失效但本地仍有会话时保留闹钟链（不再 `cancel`），静默换票成功或重新登录时由 `setAuthCookies` 重新排程；退出登录仍由 `clearAuthCookies` 取消。2026-11-24 补：`scheduleNext` 改为「开关已开 + 本地确有会话」才排程（`shouldSchedule`）。此前开关开着但 Cookie 已被清掉时，每次启动仍会排一次注定失败的检查，触发后立刻自我 `cancel`，设置页却显示一个并不存在的「下次约」；真机复现为 14:48 判失效清 Cookie 后再无闹钟，静默 3 小时 20 分，直到重新打开 App 才又排上一次。现在无会话时直接 `cancel`，设置页显示「上次保活 …（会话已失效）· 已停止，等待重新登录」，重新登录经 `setAuthCookies` 自动续上。
+- **P2 可观测**：`SessionKeepAliveStore` 持久化 `lastCheckAt / lastResult / nextCheckAt`，`checkNow` 统一出口记账，`scheduleNext`/`cancel` 同步 `nextCheckAt`；`getKeepAliveState()` 返回三字段，「我的 → 账号与设备」显示「上次保活 19:13（会话有效）· 下次约 20:07」。仅在明确退出登录的 `clearSession()` 清历史。
 - **降级板块补拉**：`App.vue` 的 `appStateChange` 与 `auth.refreshAfterRecovery()` 在回到前台或会话恢复后，对 `portalNoticesOffline` / `messagesOffline` 的板块各补拉一次。真机联调发现：原先回前台只刷课表，通知与消息会一直停在「网络不可用，显示缓存」，直到用户手动下拉。
+- 隐私政策升至 v5（§9 口径）：补充只读缓存最多保留 7 天、保活执行时间与结果仅存本机。
 
 未做（保留原设计）：
 
-- §4 的「只读快照 + `expiredAt` + 失效横幅」完整状态机：现以 `sessionSuspended` 提示条近似，未引入 7 天只读缓存，隐私文案与 README 口径未升版（§9 风险仍在）。
 - P1 前台补保活（距上次检查超过 25 分钟时 `maybeForegroundKeepAlive`）。
-- P2 可观测：`lastCheckAt / lastResult / nextCheckAt`、设置页展示、电池白名单引导整合。
+- 电池白名单引导整合（现为设置页独立入口）。
 - 保活间隔由 30 分钟放宽到约 90 分钟（第三轮评审建议 11）。
 - `manualLogout` 在原生 SharedPreferences 的权威副本（退出瞬间迟到的静默成功仍可能回写 Cookie）。
