@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
+import com.lzqlove.jiaowu.AuthCookieStore;
+
 /**
  * 会话保活的单次闹钟链：约每 30 分钟触发一次，触发后由接收器排下一次。
  * 使用 setAndAllowWhileIdle（非精确），不申请 SCHEDULE_EXACT_ALARM 权限。
@@ -29,7 +31,13 @@ public final class SessionKeepAliveScheduler {
 
     static void scheduleNext(Context context) {
         Context app = context.getApplicationContext();
-        if (!SessionKeepAliveStore.isEnabled(app)) return;
+        boolean enabled = SessionKeepAliveStore.isEnabled(app);
+        // 开关开着但本地已没有会话（例如统一认证到期后清过 Cookie）：排一次检查必然立刻失败，
+        // 还会让设置页显示一个并不存在的「下次保活」。直接清掉排程，等重新登录再续上。
+        if (!shouldSchedule(enabled, AuthCookieStore.hasStoredCookie(app))) {
+            if (enabled) cancel(app);
+            return;
+        }
         AlarmManager manager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
         if (manager == null) return;
         PendingIntent pending = pending(app);
@@ -62,6 +70,11 @@ public final class SessionKeepAliveScheduler {
     /** 单测用：下一次触发时间固定为 30 分钟后。 */
     static long nextTrigger(long now) {
         return now + INTERVAL_MS;
+    }
+
+    /** 只有「开关已开 + 本地确有会话」才值得排程；抽成纯函数便于单测。 */
+    static boolean shouldSchedule(boolean enabled, boolean hasStoredCookie) {
+        return enabled && hasStoredCookie;
     }
 
     private static PendingIntent pending(Context context) {

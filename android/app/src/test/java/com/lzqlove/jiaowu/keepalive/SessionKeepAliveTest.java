@@ -51,4 +51,14 @@ public class SessionKeepAliveTest {
         assertTrue(next > now);
         assertEquals(now + SessionKeepAliveScheduler.INTERVAL_MS, next);
     }
+
+    @Test
+    public void schedulesOnlyWhenSwitchIsOnAndSessionIsStored() {
+        // 本地没有会话时排出来的闹钟只会立刻判定失效并把自己取消，
+        // 设置页却会显示一个并不存在的「下次保活」，所以排程条件是两者同时成立
+        assertTrue(SessionKeepAliveScheduler.shouldSchedule(true, true));
+        assertFalse(SessionKeepAliveScheduler.shouldSchedule(true, false));
+        assertFalse(SessionKeepAliveScheduler.shouldSchedule(false, true));
+        assertFalse(SessionKeepAliveScheduler.shouldSchedule(false, false));
+    }
 }

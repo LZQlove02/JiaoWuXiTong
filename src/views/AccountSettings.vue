@@ -139,6 +139,7 @@ import {
   declineKeepAliveConsent,
   isKeepAliveConsentAccepted
 } from '../utils/keepAliveConsent'
+import { describeKeepAlive } from '../utils/keepAliveSummary'
 import AppIcon from '../components/AppIcon.vue'
 import BackBar from '../components/BackBar.vue'
 import ConsentGate from '../components/ConsentGate.vue'
@@ -191,39 +192,7 @@ async function loadKeepAlive() {
   await loadBatteryState()
 }
 
-// 原生结果代号只用来内部判断，展示时换成用户能看懂的说法
-const KEEP_ALIVE_RESULT_LABELS = {
-  ALIVE: '会话有效',
-  EXPIRED: '会话已失效',
-  FAILED: '临时失败，会自动重试'
-}
-
-function formatStamp(value) {
-  const stamp = Number(value)
-  if (!stamp) return ''
-  const date = new Date(stamp)
-  if (Number.isNaN(date.getTime())) return ''
-  const now = new Date()
-  const hh = String(date.getHours()).padStart(2, '0')
-  const mm = String(date.getMinutes()).padStart(2, '0')
-  // 同一天只显示时分，跨天补上月日，避免每次都读一长串
-  if (date.toDateString() === now.toDateString()) return `${hh}:${mm}`
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${hh}:${mm}`
-}
-
-const keepAliveSummary = computed(() => {
-  const state = keepAliveState.value
-  if (!state) return ''
-  const result = KEEP_ALIVE_RESULT_LABELS[state.lastResult] || ''
-  const parts = []
-  if (state.lastCheckAt) {
-    parts.push(`上次保活 ${formatStamp(state.lastCheckAt)}${result ? `（${result}）` : ''}`)
-  } else {
-    parts.push('尚未执行过保活')
-  }
-  if (state.nextCheckAt) parts.push(`下次约 ${formatStamp(state.nextCheckAt)}`)
-  return parts.join(' · ')
-})
+const keepAliveSummary = computed(() => describeKeepAlive(keepAliveState.value))
 
 async function loadBatteryState() {
   try {
