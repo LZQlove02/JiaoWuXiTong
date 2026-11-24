@@ -28,6 +28,7 @@ public class SessionKeepAliveStoreTest {
     private static final String KEY_LAST_CHECK_AT = "lastCheckAt";
     private static final String KEY_LAST_RESULT = "lastResult";
     private static final String KEY_NEXT_CHECK_AT = "nextCheckAt";
+    private static final String KEY_BACKOFF = "backoff";
 
     private final FakePreferences prefs = new FakePreferences();
 
@@ -78,6 +79,32 @@ public class SessionKeepAliveStoreTest {
         assertFalse(prefs.contains(KEY_LAST_CHECK_AT));
         assertFalse(prefs.contains(KEY_LAST_RESULT));
         assertFalse(prefs.contains(KEY_NEXT_CHECK_AT));
+    }
+
+    @Test
+    public void expiryArmsBackoffAndOtherResultsClearIt() {
+        SessionKeepAliveStore.recordCheckResult(prefs, 1762056000000L, "EXPIRED");
+        assertTrue(SessionKeepAliveStore.isBackoff(prefs));
+        assertTrue(prefs.contains(KEY_BACKOFF));
+
+        // 重新判定为有效，立刻恢复正常 30 分钟节奏
+        SessionKeepAliveStore.recordCheckResult(prefs, 1762057800000L, "ALIVE");
+        assertFalse(SessionKeepAliveStore.isBackoff(prefs));
+
+        // 临时失败不能退避，下一轮还要尽快重试
+        SessionKeepAliveStore.recordCheckResult(prefs, 1762059600000L, "FAILED");
+        assertFalse(SessionKeepAliveStore.isBackoff(prefs));
+    }
+
+    @Test
+    public void clearResetsBackoff() {
+        SessionKeepAliveStore.setBackoff(prefs, true);
+        assertTrue(SessionKeepAliveStore.isBackoff(prefs));
+
+        SessionKeepAliveStore.clear(prefs);
+
+        assertFalse(SessionKeepAliveStore.isBackoff(prefs));
+        assertFalse(prefs.contains(KEY_BACKOFF));
     }
 
     @Test

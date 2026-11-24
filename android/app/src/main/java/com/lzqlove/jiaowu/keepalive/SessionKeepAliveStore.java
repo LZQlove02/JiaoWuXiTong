@@ -18,6 +18,7 @@ public final class SessionKeepAliveStore {
     private static final String KEY_LAST_CHECK_AT = "lastCheckAt";
     private static final String KEY_LAST_RESULT = "lastResult";
     private static final String KEY_NEXT_CHECK_AT = "nextCheckAt";
+    private static final String KEY_BACKOFF = "backoff";
 
     private SessionKeepAliveStore() {
     }
@@ -58,6 +59,15 @@ public final class SessionKeepAliveStore {
         setNextCheckAt(prefs(context), triggerAt);
     }
 
+    /** 是否处于「上次判定失效」的退避状态（下次检查推到 3 小时后）。 */
+    public static boolean isBackoff(Context context) {
+        return isBackoff(prefs(context));
+    }
+
+    public static void setBackoff(Context context, boolean backoff) {
+        setBackoff(prefs(context), backoff);
+    }
+
     /**
      * 清除保活观测状态（lastCheckAt / lastResult / nextCheckAt），不影响 enabled 开关本身。
      * 只在明确退出登录时调用：历史结果属于上一个会话，不应带到下一次登录展示。
@@ -95,10 +105,24 @@ public final class SessionKeepAliveStore {
         return prefs.getLong(KEY_NEXT_CHECK_AT, 0L);
     }
 
+    static boolean isBackoff(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_BACKOFF, false);
+    }
+
+    static void setBackoff(SharedPreferences prefs, boolean backoff) {
+        if (backoff) {
+            prefs.edit().putBoolean(KEY_BACKOFF, true).apply();
+        } else {
+            prefs.edit().remove(KEY_BACKOFF).apply();
+        }
+    }
+
     static void recordCheckResult(SharedPreferences prefs, long checkedAt, String result) {
         prefs.edit()
                 .putLong(KEY_LAST_CHECK_AT, checkedAt)
                 .putString(KEY_LAST_RESULT, result)
+                // 明确失效才退避；临时失败（网络/接口异常）仍按 30 分钟尽快重试
+                .putBoolean(KEY_BACKOFF, "EXPIRED".equals(result))
                 .apply();
     }
 
@@ -116,6 +140,7 @@ public final class SessionKeepAliveStore {
                 .remove(KEY_LAST_CHECK_AT)
                 .remove(KEY_LAST_RESULT)
                 .remove(KEY_NEXT_CHECK_AT)
+                .remove(KEY_BACKOFF)
                 .apply();
     }
 

@@ -61,4 +61,17 @@ public class SessionKeepAliveTest {
         assertFalse(SessionKeepAliveScheduler.shouldSchedule(false, true));
         assertFalse(SessionKeepAliveScheduler.shouldSchedule(false, false));
     }
+
+    @Test
+    public void expiryBacksOffToThreeHours() {
+        // 学校侧连续在线约 3 小时就强制下线：判定失效后再每 30 分钟重试只会拿到同一个结果
+        long now = 1762056000000L;
+        assertEquals(now + SessionKeepAliveScheduler.BACKOFF_MS,
+                SessionKeepAliveScheduler.nextTrigger(now, true));
+        assertEquals(now + SessionKeepAliveScheduler.INTERVAL_MS,
+                SessionKeepAliveScheduler.nextTrigger(now, false));
+        // 默认重载不带退避，保持原有 30 分钟语义
+        assertEquals(SessionKeepAliveScheduler.nextTrigger(now),
+                SessionKeepAliveScheduler.nextTrigger(now, false));
+    }
 }

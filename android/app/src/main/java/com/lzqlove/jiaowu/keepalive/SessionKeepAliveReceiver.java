@@ -32,6 +32,11 @@ public class SessionKeepAliveReceiver extends BroadcastReceiver {
                     SessionKeepAliveService.Result result = SessionKeepAliveService.checkNow(app);
                     // 只记录结果状态，不记录 Cookie、响应内容或账号信息
                     Log.i("JiaowuKeepAlive", "后台保活结果 " + result);
+                    if (result == SessionKeepAliveService.Result.EXPIRED) {
+                        // 上面那次排程发生在结果写入之前（还是 30 分钟后），
+                        // 明确失效后立刻按退避重排，避免被学校踢下线后每半小时白请求一次
+                        SessionKeepAliveScheduler.scheduleNext(app);
+                    }
                 } catch (RuntimeException ignored) {
                     // 后台保活失败静默处理，等下一次闹钟或用户打开 App
                 } finally {
