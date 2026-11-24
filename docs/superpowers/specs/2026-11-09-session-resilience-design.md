@@ -3,7 +3,7 @@
 - 日期：2026-11-09
 - 版本目标：v2.2.0（当前 2.1.1 / versionCode 32）
 - 状态：**部分实现**（P0 静默重登与「失效不清空」已落地；P1 前台补保活、P2 可观测与 SessionBanner 未做，详见 §13）
-- 关联：[2026-11-02-session-keepalive-design.md](2026-11-02-session-keepalive-design.md)（本案是它的下一级兜底）、[../plan/方案.md](../plan/方案.md) 会话策略章节、[../../README.md](../../README.md)「关键约束」
+- 关联：[2026-11-02-session-keepalive-design.md](2026-11-02-session-keepalive-design.md)（本案是它的下一级兜底）、[2026-11-24-keep-alive-design.md](2026-11-24-keep-alive-design.md)（保活现状权威版）、[../plan/方案.md](../plan/方案.md) 会话策略章节、[../../README.md](../../README.md)「关键约束」
 
 ## 0. 摘要
 
